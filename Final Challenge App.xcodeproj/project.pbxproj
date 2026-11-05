@@ -6,8 +6,19 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		4F016EDE309C7EF80065B9E6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = "Final Challenge App";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Final Challenge App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Final Challenge App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F016EDA309C7EF70065B9E6 /* Skema Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Skema Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,20 @@
 			path = "Final Challenge App";
 			sourceTree = "<group>";
 		};
+		4F016EDB309C7EF80065B9E6 /* Skema Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Skema Tests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		4F016ED7309C7EF70065B9E6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -31,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* Final Challenge App */,
+				4F016EDB309C7EF80065B9E6 /* Skema Tests */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* Final Challenge App.app */,
+				4F016EDA309C7EF70065B9E6 /* Skema Tests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -64,6 +87,27 @@
 			productReference = 000000000000000000000120 /* Final Challenge App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4F016ED9309C7EF70065B9E6 /* Skema Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F016EE2309C7EF80065B9E6 /* Build configuration list for PBXNativeTarget "Skema Tests" */;
+			buildPhases = (
+				4F016ED6309C7EF70065B9E6 /* Sources */,
+				4F016ED7309C7EF70065B9E6 /* Frameworks */,
+				4F016ED8309C7EF70065B9E6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4F016EDF309C7EF80065B9E6 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4F016EDB309C7EF80065B9E6 /* Skema Tests */,
+			);
+			name = "Skema Tests";
+			productName = "Skema Tests";
+			productReference = 4F016EDA309C7EF70065B9E6 /* Skema Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -71,11 +115,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2700;
+				LastSwiftUpdateCheck = 2720;
+				LastUpgradeCheck = 2720;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					4F016ED9309C7EF70065B9E6 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 000000000000000100000000;
 					};
 				};
 			};
@@ -94,12 +142,18 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* Final Challenge App */,
+				4F016ED9309C7EF70065B9E6 /* Skema Tests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		4F016ED8309C7EF70065B9E6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -112,7 +166,20 @@
 			files = (
 			);
 		};
+		4F016ED6309C7EF70065B9E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4F016EDF309C7EF80065B9E6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Final Challenge App */;
+			targetProxy = 4F016EDE309C7EF80065B9E6 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "Final Challenge App" */ = {
@@ -151,6 +218,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = SB586Q784K;
 				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -221,6 +289,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = SB586Q784K;
 				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -252,7 +321,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SB586Q784K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -291,7 +359,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SB586Q784K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -325,6 +392,51 @@
 			};
 			name = Release;
 		};
+		4F016EE0309C7EF80065B9E6 /* Debug configuration for PBXNativeTarget "Skema Tests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Amadeus.Skema-Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Final Challenge App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Final Challenge App";
+			};
+			name = Debug;
+		};
+		4F016EE1309C7EF80065B9E6 /* Release configuration for PBXNativeTarget "Skema Tests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Amadeus.Skema-Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Final Challenge App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Final Challenge App";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -341,6 +453,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "Final Challenge App" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "Final Challenge App" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		4F016EE2309C7EF80065B9E6 /* Build configuration list for PBXNativeTarget "Skema Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F016EE0309C7EF80065B9E6 /* Debug configuration for PBXNativeTarget "Skema Tests" */,
+				4F016EE1309C7EF80065B9E6 /* Release configuration for PBXNativeTarget "Skema Tests" */,
 			);
 			defaultConfigurationName = Release;
 		};
