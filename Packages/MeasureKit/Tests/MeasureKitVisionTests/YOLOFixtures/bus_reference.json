@@ -1,0 +1,11 @@
+{
+  "source": "Ultralytics 8.4.201 PyTorch predict, yolo26s-seg.pt, imgsz 640, conf 0.25, on ultralytics/assets/bus.jpg (810x1080). Model output, made by the main session on 4 Nov 2026 to check the Swift decoder; not measurement ground truth.",
+  "image_size": [810, 1080],
+  "detections": [
+    {"cls": "bus", "conf": 0.92, "xyxy_px": [0.0, 230.4, 805.2, 739.5]},
+    {"cls": "person", "conf": 0.912, "xyxy_px": [667.9, 398.5, 809.4, 881.5]},
+    {"cls": "person", "conf": 0.9, "xyxy_px": [48.7, 398.8, 248.0, 903.2]},
+    {"cls": "person", "conf": 0.867, "xyxy_px": [220.7, 405.5, 345.0, 861.4]},
+    {"cls": "person", "conf": 0.818, "xyxy_px": [0.5, 552.7, 76.6, 873.4]}
+  ]
+}

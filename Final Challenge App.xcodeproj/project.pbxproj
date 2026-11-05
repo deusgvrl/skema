@@ -148,7 +148,7 @@
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				4F016F56309CCA040065B9E6 /* XCLocalSwiftPackageReference "../poc/lidar-yolo-measure/MeasureKit" */,
+				4F016F56309CCA040065B9E6 /* XCLocalSwiftPackageReference "Packages/MeasureKit" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
@@ -493,9 +493,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		4F016F56309CCA040065B9E6 /* XCLocalSwiftPackageReference "../poc/lidar-yolo-measure/MeasureKit" */ = {
+		4F016F56309CCA040065B9E6 /* XCLocalSwiftPackageReference "Packages/MeasureKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../poc/lidar-yolo-measure/MeasureKit";
+			relativePath = "Packages/MeasureKit";
 		};
 /* End XCLocalSwiftPackageReference section */
 

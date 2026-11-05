@@ -1,0 +1,84 @@
+import simd
+
+extension DepthSampler {
+    /// Like `worldPoints(in:box)` but keeps only depth pixels whose centre falls on a mask pixel that is 1
+    /// after eroding the mask by `erosion` pixels (4-neighbourhood, applied `erosion` times; pixels outside
+    /// the mask image count as 0). Erosion drops edge pixels where depth blends with the background.
+    /// Then the same confidence filter and nearest-surface `depthBand` filter as the box version.
+    public static func worldPoints(
+        in mask: InstanceMask, depth: DepthFrame, camera: CameraModel,
+        erosion: Int = 1, minConfidence: UInt8 = 2, depthBand: Float = 0.15
+    ) -> [SIMD3<Float>] {
+        guard depth.width > 0, depth.height > 0, mask.width > 0, mask.height > 0,
+              mask.pixels.count == mask.width * mask.height,
+              depth.depth.count == depth.width * depth.height,
+              depth.confidence.count == depth.depth.count else { return [] }
+
+        let kept = eroded(mask, by: erosion)
+        var candidates: [(i: Int, j: Int, d: Float)] = []
+        for j in 0..<depth.height {
+            let mj = min(mask.height - 1, Int((Float(j) + 0.5) / Float(depth.height) * Float(mask.height)))
+            for i in 0..<depth.width {
+                let mi = min(mask.width - 1, Int((Float(i) + 0.5) / Float(depth.width) * Float(mask.width)))
+                guard kept[mj * mask.width + mi] != 0 else { continue }
+                let idx = j * depth.width + i
+                let d = depth.depth[idx]
+                guard depth.confidence[idx] >= minConfidence, d.isFinite, d > 0 else { continue }
+                candidates.append((i, j, d))
+            }
+        }
+        guard !candidates.isEmpty else { return [] }
+
+        let anchor = nearestSurfaceDepth(candidates.map(\.d).sorted(), depthBand: depthBand)
+        let scaleU = camera.imageResolution.x / Float(depth.width)
+        let scaleV = camera.imageResolution.y / Float(depth.height)
+        return candidates.compactMap { c in
+            guard abs(c.d - anchor) <= depthBand else { return nil }
+            let pixel = SIMD2<Float>((Float(c.i) + 0.5) * scaleU, (Float(c.j) + 0.5) * scaleV)
+            return unproject(pixel: pixel, depth: c.d, camera: camera)
+        }
+    }
+
+    /// Every `stride`-th depth pixel (confidence >= minConfidence, finite positive depth) as a world point,
+    /// with its normalized native-image position (pixel centre) for colour lookup.
+    public static func scanPoints(
+        depth: DepthFrame, camera: CameraModel, stride: Int = 2, minConfidence: UInt8 = 2
+    ) -> [(world: SIMD3<Float>, uv: SIMD2<Float>, depth: Float)] {
+        guard stride > 0, depth.width > 0, depth.height > 0,
+              depth.depth.count == depth.width * depth.height,
+              depth.confidence.count == depth.depth.count else { return [] }
+        let scaleU = camera.imageResolution.x / Float(depth.width)
+        let scaleV = camera.imageResolution.y / Float(depth.height)
+        var points: [(world: SIMD3<Float>, uv: SIMD2<Float>, depth: Float)] = []
+        for j in Swift.stride(from: 0, to: depth.height, by: stride) {
+            for i in Swift.stride(from: 0, to: depth.width, by: stride) {
+                let idx = j * depth.width + i
+                let d = depth.depth[idx]
+                guard depth.confidence[idx] >= minConfidence, d.isFinite, d > 0 else { continue }
+                let pixel = SIMD2<Float>((Float(i) + 0.5) * scaleU, (Float(j) + 0.5) * scaleV)
+                points.append((unproject(pixel: pixel, depth: d, camera: camera),
+                               SIMD2((Float(i) + 0.5) / Float(depth.width), (Float(j) + 0.5) / Float(depth.height)),
+                               d))
+            }
+        }
+        return points
+    }
+
+    private static func eroded(_ mask: InstanceMask, by steps: Int) -> [UInt8] {
+        var cur = mask.pixels
+        let w = mask.width, h = mask.height
+        for _ in 0..<max(0, steps) {
+            var next = [UInt8](repeating: 0, count: cur.count)
+            for j in 0..<h {
+                for i in 0..<w where cur[j * w + i] != 0 {
+                    guard i > 0, j > 0, i < w - 1, j < h - 1,
+                          cur[j * w + i - 1] != 0, cur[j * w + i + 1] != 0,
+                          cur[(j - 1) * w + i] != 0, cur[(j + 1) * w + i] != 0 else { continue }
+                    next[j * w + i] = 1
+                }
+            }
+            cur = next
+        }
+        return cur
+    }
+}
