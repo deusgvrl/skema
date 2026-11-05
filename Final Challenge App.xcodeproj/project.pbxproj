@@ -6,6 +6,11 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4F016F58309CCA040065B9E6 /* MeasureKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4F016F57309CCA040065B9E6 /* MeasureKit */; };
+		4F016F5A309CCA040065B9E6 /* MeasureKitVision in Frameworks */ = {isa = PBXBuildFile; productRef = 4F016F59309CCA040065B9E6 /* MeasureKitVision */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4F016EDE309C7EF80065B9E6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -38,6 +43,8 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				4F016F5A309CCA040065B9E6 /* MeasureKitVision in Frameworks */,
+				4F016F58309CCA040065B9E6 /* MeasureKit in Frameworks */,
 			);
 		};
 		4F016ED7309C7EF70065B9E6 /* Frameworks */ = {
@@ -83,6 +90,10 @@
 				000000000000000000000010 /* Final Challenge App */,
 			);
 			name = "Final Challenge App";
+			packageProductDependencies = (
+				4F016F57309CCA040065B9E6 /* MeasureKit */,
+				4F016F59309CCA040065B9E6 /* MeasureKitVision */,
+			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* Final Challenge App.app */;
 			productType = "com.apple.product-type.application";
@@ -137,7 +148,7 @@
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				4F016F55309CC8630065B9E6 /* XCLocalSwiftPackageReference "../poc/lidar-yolo-measure/MeasureKit" */,
+				4F016F56309CCA040065B9E6 /* XCLocalSwiftPackageReference "../poc/lidar-yolo-measure/MeasureKit" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
@@ -482,11 +493,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		4F016F55309CC8630065B9E6 /* XCLocalSwiftPackageReference "../poc/lidar-yolo-measure/MeasureKit" */ = {
+		4F016F56309CCA040065B9E6 /* XCLocalSwiftPackageReference "../poc/lidar-yolo-measure/MeasureKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../poc/lidar-yolo-measure/MeasureKit";
 		};
 /* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4F016F57309CCA040065B9E6 /* MeasureKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MeasureKit;
+		};
+		4F016F59309CCA040065B9E6 /* MeasureKitVision */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MeasureKitVision;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }
