@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000100000000"
                BuildableName = "Final Challenge App.app"
+               BlueprintName = "Final Challenge App"
                ReferencedContainer = "container:Final Challenge App.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -58,6 +59,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
             BuildableName = "Final Challenge App.app"
+            BlueprintName = "Final Challenge App"
             ReferencedContainer = "container:Final Challenge App.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -74,6 +76,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
             BuildableName = "Final Challenge App.app"
+            BlueprintName = "Final Challenge App"
             ReferencedContainer = "container:Final Challenge App.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
