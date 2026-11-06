@@ -89,3 +89,4 @@ Secrets.xcconfig
 .vscode/
 .idea/
 *.swp
+.claude/settings.local.json
