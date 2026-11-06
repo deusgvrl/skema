@@ -1,0 +1,11 @@
+included:
+  - "Final Challenge App"
+  - "Skema Tests"
+excluded:
+  # MeasureKit is excluded for now while it is being reworked (Nov 6, 2026).
+  - "Packages/MeasureKit"
+  - "**/.build"
+  - DerivedData
+
+# The hook may pass only excluded files (for example MeasureKit); that is not an error.
+allow_zero_lintable_files: true

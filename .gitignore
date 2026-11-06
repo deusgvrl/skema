@@ -90,3 +90,4 @@ Secrets.xcconfig
 .idea/
 *.swp
 .claude/settings.local.json
+.tools/
