@@ -1,0 +1,13 @@
+#!/bin/sh
+# Blocks the commit when SwiftLint finds errors in staged Swift files.
+SWIFTLINT="$(git rev-parse --show-toplevel)/.tools/swiftlint"
+
+if [ ! -x "$SWIFTLINT" ]; then
+  echo "SwiftLint is missing. Run ./scripts/setup.sh once." >&2
+  exit 1
+fi
+
+files=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
+[ -z "$files" ] && exit 0
+
+printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 "$SWIFTLINT" lint --quiet --force-exclude --
