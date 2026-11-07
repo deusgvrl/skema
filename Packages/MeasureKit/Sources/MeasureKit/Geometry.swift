@@ -126,6 +126,14 @@ public enum Geometry {
         return EquipmentCentres(status: .measured, baseCentre: baseCentre, topCentre: SIMD3(topXZ.x, topY, topXZ.y))
     }
 
+    /// Returns the distance on the floor, in metres, between the base centres of two pieces of equipment.
+    ///
+    /// Only x and z count, so height is ignored. Returns nil when either base centre is missing (not measured).
+    public static func floorDistance(from subject: EquipmentCentres, to equipment: EquipmentCentres) -> Float? {
+        guard let subjectBase = subject.baseCentre, let equipmentBase = equipment.baseCentre else { return nil }
+        return simd_distance(subjectBase, equipmentBase)
+    }
+
     /// The average position on the floor of some points: add up all the x values and all the z values, then divide by how many there are.
     private static func meanXZ(_ points: [SIMD3<Float>]) -> SIMD2<Float> {
         // `reduce` walks through the points and keeps a running total of (x, z); `$0` is the total so far, `$1` the next point.
