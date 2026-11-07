@@ -248,3 +248,61 @@ struct EquipmentCentresTests {
         #expect(result.status == .baseNotSeen)
     }
 }
+
+/// A10-18 test cases. Distances in the written cases are whole centimetres; `cm(_:)` converts them to metres.
+@Suite("Floor distance (A10-18)")
+struct FloorDistanceTests {
+    @Test("An item to the right of the subject is 100 cm away")
+    func itemToTheRight() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+        let light = measuredCentres(baseX: 300, baseZ: 300)
+
+        let distance = try #require(Geometry.floorDistance(from: subject, to: light))
+
+        #expect(near(distance, cm(100), 0.001))
+    }
+
+    @Test("A 3-4-5 diagonal is 500 cm away")
+    func diagonal() throws {
+        let subject = measuredCentres(baseX: 0, baseZ: 0)
+        let light = measuredCentres(baseX: 300, baseZ: 400)
+
+        let distance = try #require(Geometry.floorDistance(from: subject, to: light))
+
+        #expect(near(distance, cm(500), 0.001))
+    }
+
+    @Test("Height is ignored")
+    func heightIsIgnored() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300, topY: 95)
+        let light = measuredCentres(baseX: 300, baseZ: 300, topY: 180)
+
+        let distance = try #require(Geometry.floorDistance(from: subject, to: light))
+
+        #expect(near(distance, cm(100), 0.001))
+    }
+
+    @Test("A light at the same spot as the subject is 0 cm away")
+    func sameSpot() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+        let light = measuredCentres(baseX: 200, baseZ: 300)
+
+        let distance = try #require(Geometry.floorDistance(from: subject, to: light))
+
+        #expect(near(distance, 0, 0.001))
+    }
+
+    @Test("A light whose base centre is missing is not measured")
+    func itemBaseMissing() {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+
+        #expect(Geometry.floorDistance(from: subject, to: baseNotSeenCentres()) == nil)
+    }
+
+    @Test("A subject whose base centre is missing is not measured")
+    func subjectBaseMissing() {
+        let light = measuredCentres(baseX: 300, baseZ: 300)
+
+        #expect(Geometry.floorDistance(from: baseNotSeenCentres(), to: light) == nil)
+    }
+}
