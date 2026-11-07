@@ -136,3 +136,24 @@ public struct ObjectMeasurement: Equatable, Sendable {
         self.aimOffsetDegrees = aimOffsetDegrees
     }
 }
+
+/// Why a piece of equipment has, or has no, measured values. Precedence when several apply:
+/// `outOfRange`, then `tooFewPoints`, then `baseNotSeen`, then `measured`.
+public enum MeasurementStatus: String, Codable, Sendable {
+    case measured, baseNotSeen, tooFewPoints, outOfRange
+}
+
+/// Base centre and top centre of one piece of equipment (the subject included), or the reason they could not be computed.
+public struct EquipmentCentres: Equatable, Sendable {
+    public let status: MeasurementStatus
+    /// Where the equipment stands: x and z on the floor, metres. Nil unless `status == .measured`.
+    public let baseCentre: SIMD2<Float>?
+    /// The top of the whole equipment including its modifier: x, y, z, metres. Nil unless `status == .measured`.
+    public let topCentre: SIMD3<Float>?
+
+    public init(status: MeasurementStatus, baseCentre: SIMD2<Float>?, topCentre: SIMD3<Float>?) {
+        self.status = status
+        self.baseCentre = baseCentre
+        self.topCentre = topCentre
+    }
+}

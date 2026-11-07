@@ -10,6 +10,22 @@ public enum Geometry {
     /// Below this tilt the axis's horizontal direction is LiDAR noise, so there is no aim.
     public static let minAimTiltDegrees: Float = 20
 
+    /// Below this many points the equipment is "too few points".
+    public static let minPointCount = 100
+
+    /// Height of the "base band": the thin slice of points from the lowest point up to this much higher.
+    /// Averaging only this slice gives where the equipment stands. Example: for the stand, the points from 0 to 10 cm.
+    public static let baseBandHeight: Float = 0.10
+
+    /// If the lowest point is higher than this above the floor, the base is not on the floor
+    public static let maxBaseGapAboveFloor: Float = 0.15
+
+    /// The top is the height that this many percent of the points lie under (98 = the 98th percentile), not the single highest point.
+    public static let topPercentile = 98
+
+    /// Thickness of the "top slice": the points from the top height down to this much lower give the top centre's x and z.
+    public static let topEpsilon: Float = 0.05
+
     /// Per-axis median. Nil when `points` is empty.
     public static func medianPoint(_ points: [SIMD3<Float>]) -> SIMD3<Float>? {
         guard !points.isEmpty else { return nil }
@@ -67,6 +83,63 @@ public enum Geometry {
     /// Height of `point` above the horizontal floor plane at `floorY`.
     public static func heightAboveFloor(_ point: SIMD3<Float>, floorY: Float) -> Float {
         point.y - floorY
+    }
+
+    /// Base centre and top centre of one piece of equipment from its world points (metres, y up).
+    ///
+    /// `points` are the 3D dots the LiDAR scan put on this equipment: x and z say where it is on the floor,
+    /// y says how high. The base centre (x, z) is where the equipment stands. The top centre (x, y, z) is its highest part.
+    /// The subject (`isSubject`) skips the floor rule because the product often sits on a table.
+    /// When the equipment cannot be measured, the result says why (`status`) and has no centres.
+    /// `outOfRange` is not decided here: it needs the iPhone position.
+    public static func centres(of points: [SIMD3<Float>], floorY: Float, isSubject: Bool) -> EquipmentCentres {
+        // Small helper for every "cannot measure" exit: a status with no centres.
+        func notMeasured(_ status: MeasurementStatus) -> EquipmentCentres {
+            EquipmentCentres(status: status, baseCentre: nil, topCentre: nil)
+        }
+
+        // Step 1: too few points means too little information to trust a base or a top. `lowest` is the height of the lowest point.
+        guard points.count >= minPointCount, let lowest = points.map(\.y).min() else {
+            return notMeasured(.tooFewPoints)
+        }
+
+        // Step 2: a normal piece of equipment must touch the floor. If its lowest point is well above the floor,
+        // the base was not seen. The subject is exempt: its base is the bottom of the product, which can sit on a table.
+        if !isSubject, lowest - floorY > maxBaseGapAboveFloor {
+            return notMeasured(.baseNotSeen)
+        }
+
+        // Step 3: base centre. Take only a thin band of points just above the lowest point and average their x and z.
+        // A band, not the single lowest point, because one point is noisy.
+        let band = points.filter { $0.y <= lowest + baseBandHeight }
+        let baseCentre = meanXZ(band)
+
+        // Step 4: top height. Use a high percentile, not the highest point, so a few stray points cannot make the equipment look taller.
+        let topY = percentile(points.map(\.y), topPercentile)
+
+        // Step 5: top centre x and z. Average a thin slice of points just under the top height: one point would be noisy.
+        // The slice also stops at the top height, because the points above it are the strays we just chose to ignore.
+        let slice = points.filter { $0.y >= topY - topEpsilon && $0.y <= topY }
+        let topXZ = meanXZ(slice)
+
+        // Done: measured, with the base centre (x, z) and the top centre (x, y, z). The top's height is the percentile.
+        return EquipmentCentres(status: .measured, baseCentre: baseCentre, topCentre: SIMD3(topXZ.x, topY, topXZ.y))
+    }
+
+    /// The average position on the floor of some points: add up all the x values and all the z values, then divide by how many there are.
+    private static func meanXZ(_ points: [SIMD3<Float>]) -> SIMD2<Float> {
+        // `reduce` walks through the points and keeps a running total of (x, z); `$0` is the total so far, `$1` the next point.
+        let sum = points.reduce(SIMD2<Float>.zero) { $0 + SIMD2($1.x, $1.z) }
+        return sum / Float(points.count)
+    }
+
+    /// Nearest-rank percentile: sort the values from low to high and take the one at rank `ceil(percent * n / 100)`.
+    private static func percentile(_ values: [Float], _ percent: Int) -> Float {
+        let sorted = values.sorted()
+        // Whole numbers only: `(a + 99) / 100` is `a / 100` rounded up, with no floating-point rounding error.
+        let rank = (percent * sorted.count + 99) / 100
+        // `min` and `max` keep the position inside the array.
+        return sorted[min(sorted.count - 1, max(0, rank - 1))]
     }
 
     /// Largest eigenvalue and unit eigenvector of a symmetric positive semi-definite matrix, by power iteration.
