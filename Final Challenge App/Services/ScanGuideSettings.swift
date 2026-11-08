@@ -10,11 +10,11 @@ import Foundation
 struct ScanGuideSettings {
     private static let hiddenKey = "scanGuide.isHidden"
     private let defaults: UserDefaults
-    
+
     init (defaults: UserDefaults = .standard) {
         self.defaults = defaults
     }
-    
+
     var isHidden: Bool {
             get { defaults.bool(forKey: Self.hiddenKey) }
             nonmutating set { defaults.set(newValue, forKey: Self.hiddenKey) }

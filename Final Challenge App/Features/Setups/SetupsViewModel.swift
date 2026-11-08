@@ -24,7 +24,7 @@ final class SetupsViewModel {
                 isShowingScanGuide = true
             }
         }
-    
+
     func startScanningTapped() {
             scanRequested = true
             isShowingScanGuide = false
