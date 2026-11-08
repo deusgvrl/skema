@@ -41,6 +41,18 @@ struct SetupsView: View {
                     newSetupButton
             }
         }
+        .sheet(isPresented: $viewModel.isShowingScanGuide) {
+            viewModel.scanGuideDismissed()
+        } content: {
+            ScanGuideSheet(
+                onStartScanning: { viewModel.startScanningTapped() },
+                onDontShowAgain: { viewModel.dontShowAgainTapped() }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .fullScreenCover(isPresented: $viewModel.isShowingScan) {
+            ScanView()
+        }
     }
     private var emptyState: some View {
             ContentUnavailableView {
