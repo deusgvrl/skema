@@ -306,3 +306,67 @@ struct FloorDistanceTests {
         #expect(Geometry.floorDistance(from: baseNotSeenCentres(), to: light) == nil)
     }
 }
+
+/// A10-73 test cases. Distances in the written cases are whole centimetres; `cm(_:)` converts them to metres.
+/// The offset is the item's base centre minus the subject's base centre: `.x` is world x, `.y` holds world z.
+@Suite("Floor position (A10-73)")
+struct FloorPositionTests {
+    @Test("An item further along x and at a smaller z has offset +300, -200")
+    func furtherAlongXSmallerZ() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+        let light = measuredCentres(baseX: 500, baseZ: 100)
+
+        let offset = try #require(Geometry.floorOffset(of: light, from: subject))
+
+        #expect(near(offset, SIMD2(cm(300), cm(-200)), 0.001))
+    }
+
+    @Test("An item at a smaller x and a larger z has offset -100, +500")
+    func smallerXLargerZ() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+        let light = measuredCentres(baseX: 100, baseZ: 800)
+
+        let offset = try #require(Geometry.floorOffset(of: light, from: subject))
+
+        #expect(near(offset, SIMD2(cm(-100), cm(500)), 0.001))
+    }
+
+    @Test("It uses the base centres, not the top centres")
+    func usesBaseCentres() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+        // The top centre is 50 cm to the side of the base centre, like a boom reaching out.
+        let light = EquipmentCentres(
+            status: .measured,
+            baseCentre: SIMD2(cm(500), cm(100)),
+            topCentre: SIMD3(cm(550), cm(180), cm(100))
+        )
+
+        let offset = try #require(Geometry.floorOffset(of: light, from: subject))
+
+        #expect(near(offset, SIMD2(cm(300), cm(-200)), 0.001))
+    }
+
+    @Test("A light at the same spot as the subject has offset 0, 0")
+    func sameSpot() throws {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+        let light = measuredCentres(baseX: 200, baseZ: 300)
+
+        let offset = try #require(Geometry.floorOffset(of: light, from: subject))
+
+        #expect(near(offset, SIMD2(0, 0), 0.001))
+    }
+
+    @Test("A light whose base centre is missing is not measured")
+    func itemBaseMissing() {
+        let subject = measuredCentres(baseX: 200, baseZ: 300)
+
+        #expect(Geometry.floorOffset(of: baseNotSeenCentres(), from: subject) == nil)
+    }
+
+    @Test("A subject whose base centre is missing is not measured")
+    func subjectBaseMissing() {
+        let light = measuredCentres(baseX: 500, baseZ: 100)
+
+        #expect(Geometry.floorOffset(of: light, from: baseNotSeenCentres()) == nil)
+    }
+}
