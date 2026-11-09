@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct LoadingPageView: View {
+    
     @State private var progress: Double = 0.0
     @State private var isComplete: Bool = false
-    @State private var navigateToR04: Bool = false
+    @State private var navigateToReviewView: Bool = false
     
     // @State private var viewModel = SetupViewModel()
     
@@ -45,7 +46,7 @@ struct LoadingPageView: View {
                 
                 if isComplete {
                     Button {
-                        navigateToR04 = true
+                        navigateToReviewView = true
                     } label: {
                         Text("Continue to Layout")
                             .font(.headline)
@@ -109,7 +110,7 @@ struct LoadingPageView: View {
             }
             .background(Color(uiColor: .systemBackground))
             .onAppear(perform: startLoadingSimulation)
-            .fullScreenCover(isPresented: $navigateToR04) {
+            .fullScreenCover(isPresented: $navigateToReviewView) {
                 NavigationStack {
                     // R04_ReviewSetupView(isFromLoadingScreen: true, viewModel: viewModel)
                 }
