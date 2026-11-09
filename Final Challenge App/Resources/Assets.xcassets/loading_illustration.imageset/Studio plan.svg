@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="354px" height="260px" viewBox="0 0 354 260" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Illustration / Studio plan</title>
+    <defs>
+        <path d="M38.4,0 L315.6,0 C329.04126,0 335.76189,0 340.895772,2.61584342 C345.411662,4.91680442 349.083196,8.58833778 351.384157,13.104228 C354,18.2381098 354,24.9587399 354,38.4 L354,221.6 C354,235.04126 354,241.76189 351.384157,246.895772 C349.083196,251.411662 345.411662,255.083196 340.895772,257.384157 C335.76189,260 329.04126,260 315.6,260 L38.4,260 C24.9587399,260 18.2381098,260 13.104228,257.384157 C8.58833778,255.083196 4.91680442,251.411662 2.61584342,246.895772 C0,241.76189 0,235.04126 0,221.6 L0,38.4 C0,24.9587399 0,18.2381098 2.61584342,13.104228 C4.91680442,8.58833778 8.58833778,4.91680442 13.104228,2.61584342 C18.2381098,0 24.9587399,0 38.4,0 Z" id="path-1"></path>
+    </defs>
+    <g id="Illustration-/-Studio-plan" stroke="none" fill="none" xlink:href="#path-1">
+        <path stroke-opacity="0.0588235294" stroke="#000000" stroke-width="0.5" d="M340.782274,2.83859505 C345.251124,5.11558771 348.884412,8.74887593 351.161405,13.2177256 C353.423969,17.6582577 353.75,21.6486871 353.75,38.4 L353.75,221.6 C353.75,238.351313 353.423969,242.341742 351.161405,246.782274 C348.884412,251.251124 345.251124,254.884412 340.782274,257.161405 C336.341742,259.423969 332.351313,259.75 315.6,259.75 L38.4,259.75 C21.6486871,259.75 17.6582577,259.423969 13.2177256,257.161405 C8.74887593,254.884412 5.11558771,251.251124 2.83859505,246.782274 C0.576030972,242.341742 0.25,238.351313 0.25,221.6 L0.25,38.4 C0.25,21.6486871 0.576030972,17.6582577 2.83859505,13.2177256 C5.11558771,8.74887593 8.74887593,5.11558771 13.2177256,2.83859505 C17.6582577,0.576030972 21.6486871,0.25 38.4,0.25 L315.6,0.25 C332.351313,0.25 336.341742,0.576030972 340.782274,2.83859505 Z" stroke-linejoin="square" fill="#F7F7F9" fill-rule="evenodd"></path>
+        <path d="M9,0 L9,260 M25,0 L25,260 M41,0 L41,260 M57,0 L57,260 M73,0 L73,260 M89,0 L89,260 M105,0 L105,260 M121,0 L121,260 M137,0 L137,260 M153,0 L153,260 M169,0 L169,260 M185,0 L185,260 M201,0 L201,260 M217,0 L217,260 M233,0 L233,260 M249,0 L249,260 M265,0 L265,260 M281,0 L281,260 M297,0 L297,260 M313,0 L313,260 M329,0 L329,260 M345,0 L345,260 M0,2 L354,2 M0,18 L354,18 M0,34 L354,34 M0,50 L354,50 M0,66 L354,66 M0,82 L354,82 M0,98 L354,98 M0,114 L354,114 M0,130 L354,130 M0,146 L354,146 M0,162 L354,162 M0,178 L354,178 M0,194 L354,194 M0,210 L354,210 M0,226 L354,226 M0,242 L354,242 M0,258 L354,258" id="grid" stroke="#E9EBEF" stroke-width="0.75"></path>
+        <polygon id="backdrop-/-paper" stroke="#3A3A3C" stroke-width="1" fill="#FAFAFA" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" points="88 22 266 22 260 118 94 118"></polygon>
+        <line x1="74" y1="20" x2="280" y2="20" id="backdrop-/-roll" stroke="#3A3A3C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></line>
+        <path d="M74,20 L64,34 M74,20 L84,34 M74,20 L74,36" id="backdrop-/-stand-L" stroke="#3A3A3C" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M280,20 L270,34 M280,20 L290,34 M280,20 L280,36" id="backdrop-/-stand-R" stroke="#3A3A3C" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M150,76 C150,64 204,64 204,76 C204,88 150,88 150,76 Z" id="subject-/-table" stroke="#3A3A3C" stroke-width="1" fill="#F2F2F7" fill-rule="evenodd"></path>
+        <path d="M170,70 C170,64 184,64 184,70 C184,80 170,80 170,70 Z" id="subject-/-bottle" stroke="#3A3A3C" stroke-width="1" fill="#FFFFFF" fill-rule="evenodd"></path>
+        <polygon id="key-/-softbox" stroke="#3A3A3C" stroke-width="1" fill="#FFFFFF" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" points="22 132 78 112 96 160 40 182"></polygon>
+        <polygon id="key-/-head" fill="#3A3A3C" fill-rule="evenodd" points="6 152 20 147 25 160 11 165"></polygon>
+        <polygon id="rim-/-stripbox" stroke="#3A3A3C" stroke-width="1" fill="#FFFFFF" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" points="286 116 336 138 322 172 274 150"></polygon>
+        <polygon id="rim-/-head" fill="#3A3A3C" fill-rule="evenodd" points="333 154 347 159 343 171 329 166"></polygon>
+        <path d="M34,206 C54,186 104,192 120,226 C98,244 54,242 34,206 Z" id="fill-/-umbrella" stroke="#3A3A3C" stroke-width="1" fill="#FFFFFF" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M34,206 L120,226 M52,194 L104,238 M78,190 L78,242" id="fill-/-umbrella-ribs" stroke="#C7C7CC" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"></path>
+        <line x1="77" y1="216" x2="132" y2="178" id="fill-/-shaft" stroke="#3A3A3C" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></line>
+        <polygon id="fill-/-head" fill="#3A3A3C" fill-rule="evenodd" points="128 168 142 172 138 184 124 180"></polygon>
+        <polygon id="octabox" stroke="#3A3A3C" stroke-width="1" fill="#FFFFFF" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" points="238 178 266 172 288 188 292 216 276 238 248 244 226 228 222 200"></polygon>
+        <polygon id="octabox-/-head" fill="#3A3A3C" fill-rule="evenodd" points="296 236 310 240 306 252 292 248"></polygon>
+        <polygon id="camera-/-body" fill="#3A3A3C" fill-rule="evenodd" points="164 228 190 228 190 244 164 244"></polygon>
+        <polygon id="camera-/-lens" fill="#636366" fill-rule="evenodd" points="171 218 183 218 183 228 171 228"></polygon>
+        <line x1="177" y1="76" x2="86" y2="140" id="distance-/-key" stroke="#0088FF" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="3,3"></line>
+        <line x1="177" y1="76" x2="282" y2="142" id="distance-/-rim" stroke="#0088FF" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="3,3"></line>
+        <line x1="177" y1="76" x2="112" y2="214" id="distance-/-fill" stroke="#0088FF" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="3,3"></line>
+        <line x1="177" y1="76" x2="238" y2="196" id="distance-/-octabox" stroke="#0088FF" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="3,3"></line>
+        <line x1="177" y1="80" x2="177" y2="216" id="distance-/-camera-(measuring)" stroke="#AEAEB2" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="3,3"></line>
+        <circle id="found-dot-1" stroke="#FFFFFF" stroke-width="1.5" fill="#0088FF" fill-rule="evenodd" cx="86" cy="140" r="4.75"></circle>
+        <circle id="found-dot-2" stroke="#FFFFFF" stroke-width="1.5" fill="#0088FF" fill-rule="evenodd" cx="282" cy="142" r="4.75"></circle>
+        <circle id="found-dot-3" stroke="#FFFFFF" stroke-width="1.5" fill="#0088FF" fill-rule="evenodd" cx="112" cy="214" r="4.75"></circle>
+        <circle id="found-dot-4" stroke="#FFFFFF" stroke-width="1.5" fill="#0088FF" fill-rule="evenodd" cx="238" cy="196" r="4.75"></circle>
+        <line x1="22" y1="156" x2="31" y2="157" id="key-/-mount" stroke="#3A3A3C" stroke-width="1"></line>
+        <line x1="331" y1="158" x2="329" y2="155" id="rim-/-mount" stroke="#3A3A3C" stroke-width="1"></line>
+        <line x1="284" y1="232" x2="296" y2="240" id="octabox-/-mount" stroke="#3A3A3C" stroke-width="1"></line>
+    </g>
+</svg>
