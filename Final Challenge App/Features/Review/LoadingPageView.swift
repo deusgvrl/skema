@@ -8,10 +8,12 @@
 import SwiftUI
 
 struct LoadingPageView: View {
-    
+    @Environment(\.dismiss) private var dismiss
     @State private var progress: Double = 0.0
     @State private var isComplete: Bool = false
     @State private var navigateToReviewView: Bool = false
+    @State private var showCancelAlert: Bool = false
+    
     
     // @State private var viewModel = SetupViewModel()
     
@@ -87,7 +89,7 @@ struct LoadingPageView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("Close", systemImage: "xmark") {
-                    // Close action
+                    showCancelAlert = true
                 }
                 .accessibilityLabel("Cancel scan processing")
                 .accessibilityHint("Dismisses the loading screen and cancels diagram generation")
@@ -112,6 +114,14 @@ struct LoadingPageView: View {
             NavigationStack {
                 // ReviewView(isFromLoadingScreen: true, viewModel: viewModel)
             }
+        }
+        .alert("Cancel This Scan?", isPresented: $showCancelAlert) {
+            Button("Continue", role: .cancel) { }
+            Button("Cancel Scan", role: .destructive) {
+                dismiss()
+            }
+        } message: {
+            Text("Your scan is still processing and will be lost.")
         }
     }
     
