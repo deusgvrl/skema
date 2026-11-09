@@ -134,6 +134,14 @@ public enum Geometry {
         return simd_distance(subjectBase, equipmentBase)
     }
 
+    /// Returns the height of a piece of equipment above the floor, in metres: top centre's y minus the floor height.
+    ///
+    /// Returns nil when there is no floor height or no top centre (not measured).
+    public static func height(of equipment: EquipmentCentres, floorY: Float?) -> Float? {
+        guard let topCentre = equipment.topCentre, let floorY else { return nil }
+        return heightAboveFloor(topCentre, floorY: floorY)
+    }
+
     /// The average position on the floor of some points: add up all the x values and all the z values, then divide by how many there are.
     private static func meanXZ(_ points: [SIMD3<Float>]) -> SIMD2<Float> {
         // `reduce` walks through the points and keeps a running total of (x, z); `$0` is the total so far, `$1` the next point.
