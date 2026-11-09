@@ -60,3 +60,16 @@ enum SyntheticEquipment {
         points.map { SIMD3($0.x, $0.y + cm(dy), $0.z) }
     }
 }
+
+/// A measured piece of equipment: base centre at (`baseX`, `baseZ`), top `topY` high. Arguments in centimetres.
+func measuredCentres(baseX: Float, baseZ: Float, topY: Float = 180) -> EquipmentCentres {
+    EquipmentCentres(
+        status: .measured,
+        baseCentre: SIMD2(cm(baseX), cm(baseZ)),
+        topCentre: SIMD3(cm(baseX), cm(topY), cm(baseZ)))
+}
+
+/// A piece of equipment whose base was not seen: no base centre and no top centre.
+func baseNotSeenCentres() -> EquipmentCentres {
+    EquipmentCentres(status: .baseNotSeen, baseCentre: nil, topCentre: nil)
+}
