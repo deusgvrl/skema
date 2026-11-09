@@ -306,3 +306,56 @@ struct FloorDistanceTests {
         #expect(Geometry.floorDistance(from: baseNotSeenCentres(), to: light) == nil)
     }
 }
+
+/// A10-19 test cases. Distances in the written cases are whole centimetres; `cm(_:)` converts them to metres.
+/// The AR world starts where the phone started, so the floor is often at a negative y.
+@Suite("Height (A10-19)")
+struct HeightTests {
+    @Test("A light with its top at 180 cm and the floor at 0 is 180 cm high")
+    func knownValue() throws {
+        let light = measuredCentres(baseX: 0, baseZ: 0, topY: 180)
+
+        let height = try #require(Geometry.height(of: light, floorY: 0))
+
+        #expect(near(height, cm(180), 0.001))
+    }
+
+    @Test("The floor at -130 and a top at 50 give 180 cm")
+    func floorNotAtZero() throws {
+        let light = measuredCentres(baseX: 0, baseZ: 0, topY: 50)
+
+        let height = try #require(Geometry.height(of: light, floorY: cm(-130)))
+
+        #expect(near(height, cm(180), 0.001))
+    }
+
+    @Test("A top below the phone's start height still gives its height")
+    func topBelowStartHeight() throws {
+        let stand = measuredCentres(baseX: 0, baseZ: 0, topY: -80)
+
+        let height = try #require(Geometry.height(of: stand, floorY: cm(-130)))
+
+        #expect(near(height, cm(50), 0.001))
+    }
+
+    @Test("Only the top's height counts, not where it is sideways")
+    func onlyTopHeightCounts() throws {
+        let light = measuredCentres(baseX: 300, baseZ: 400, topY: 180)
+
+        let height = try #require(Geometry.height(of: light, floorY: 0))
+
+        #expect(near(height, cm(180), 0.001))
+    }
+
+    @Test("Without a floor height the height is not measured")
+    func floorMissing() {
+        let light = measuredCentres(baseX: 0, baseZ: 0, topY: 180)
+
+        #expect(Geometry.height(of: light, floorY: nil) == nil)
+    }
+
+    @Test("A light whose top centre is missing is not measured")
+    func topCentreMissing() {
+        #expect(Geometry.height(of: baseNotSeenCentres(), floorY: 0) == nil)
+    }
+}
