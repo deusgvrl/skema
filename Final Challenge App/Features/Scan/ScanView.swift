@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Scan guide, camera permission, live scan, processing, leave alert (Sketch R02–R04x · A10-4, A10-5).
 struct ScanView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel = ScanViewModel()
     @State private var showLoadingScreen: Bool = false
 
@@ -18,10 +19,11 @@ struct ScanView: View {
                 LoadingPageView(setup: viewModel.draftSetup)
             }
         }
+        .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel", systemImage: "xmark") {
-                    
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel", systemImage: "chevron.left") {
+                    dismiss()
                 }
             }
         }
