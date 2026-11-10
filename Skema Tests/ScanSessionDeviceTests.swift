@@ -43,4 +43,3 @@ struct ScanSessionDeviceTests {
         #expect(Double(timestamps.count - 1) / seconds <= 16)
     }
 }
-
