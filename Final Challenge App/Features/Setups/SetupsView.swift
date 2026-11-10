@@ -51,7 +51,9 @@ struct SetupsView: View {
             .presentationDetents([.medium, .large])
         }
         .fullScreenCover(isPresented: $viewModel.isShowingScan) {
-            ScanView()
+            NavigationStack {
+                ScanView()
+            }
         }
     }
     private var emptyState: some View {

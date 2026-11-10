@@ -3,28 +3,62 @@ import SwiftUI
 
 /// State and actions for ReviewView.
 /// Reads and writes data only through StorageController, and reloads on appear and after every change.
+
 @Observable
 final class ReviewViewModel {
-    
     var nodes: [Equipment] = []
-    var projectDetails = Setup(
-        setupName: "Skincare / soft daylight",
-        client: "Aesop",
-        project: "November catalog",
-        notes: "Keep the bottle label square to camera. Flag the key light to control the reflection on the cap. Mark tripod feet with tape."
-    )
+    var draftSetup: Setup
     
-    // Undo/Redo State
     var canUndo = false
     var canRedo = false
     
-    // Temporary variable to store setup
-    var draftSetup: Setup
+    init(setup: Setup? = nil) {
+        if let existingSetup = setup {
+            // It receives the setup passed from LoadingPageView!
+            self.draftSetup = existingSetup
+            self.nodes = existingSetup.nodes
+        } else {
+            self.draftSetup = Setup(setupName: "New Setup")
+            self.nodes = []
+        }
+    }
     
-    init() {
-        self.draftSetup = Setup(setupName: "")
+    func updateUndoState(undoManager: UndoManager?) {
+        self.canUndo = undoManager?.canUndo ?? false
+        self.canRedo = undoManager?.canRedo ?? false
+    }
 
-            // Dummy Data for R04 / R08
+    func applyStateChange(oldNodes: [Equipment], undoManager: UndoManager?) {
+        let currentNodes = self.nodes
+        undoManager?.registerUndo(withTarget: self) { target in
+            target.applyStateChange(oldNodes: currentNodes, undoManager: undoManager)
+            target.nodes = oldNodes
+            target.updateUndoState(undoManager: undoManager)
+        }
+        updateUndoState(undoManager: undoManager)
+    }
+}
+
+
+
+
+// @Observable
+//final class ReviewViewModel {
+//    
+//    var nodes: [Equipment] = []
+//    var projectDetails = Setup(
+//        setupName: "Skincare / soft daylight",
+//        client: "Aesop",
+//        project: "November catalog",
+//        notes: "Keep the bottle label square to camera. Flag the key light to control the reflection on the cap. Mark tripod feet with tape."
+//    )
+//    
+//    // Undo/Redo State
+//    var canUndo = false
+//    var canRedo = false
+//    
+//    init() {
+//            // Dummy Data for R04 / R08
 //            self.nodes = [
 //                Equipment(
 //                    category: .light,
@@ -68,24 +102,24 @@ final class ReviewViewModel {
 //                    rotationAngle: 0, accessories: "Tether cable", notes: "Keep low angle"
 //                )
 //            ]
-        }
-    
-    // MARK: Undo/Redo Registration
-    
-    func updateUndoState(undoManager: UndoManager?) {
-        self.canUndo = undoManager?.canUndo ?? false
-        self.canRedo = undoManager?.canRedo ?? false
-    }
-    
-    func applyStateChange(oldNodes: [Equipment], undoManager: UndoManager?) {
-        let currentNodes = self.nodes
-        
-        undoManager?.registerUndo(withTarget: self) { target in
-            target.applyStateChange(oldNodes: currentNodes, undoManager: undoManager)
-            target.nodes = oldNodes
-            target.updateUndoState(undoManager: undoManager)
-        }
-        
-        updateUndoState(undoManager: undoManager)
-    }
-}
+//        }
+//    
+//    // MARK: Undo/Redo Registration
+//    
+//    func updateUndoState(undoManager: UndoManager?) {
+//        self.canUndo = undoManager?.canUndo ?? false
+//        self.canRedo = undoManager?.canRedo ?? false
+//    }
+//    
+//    func applyStateChange(oldNodes: [Equipment], undoManager: UndoManager?) {
+//        let currentNodes = self.nodes
+//        
+//        undoManager?.registerUndo(withTarget: self) { target in
+//            target.applyStateChange(oldNodes: currentNodes, undoManager: undoManager)
+//            target.nodes = oldNodes
+//            target.updateUndoState(undoManager: undoManager)
+//        }
+//        
+//        updateUndoState(undoManager: undoManager)
+//    }
+//}

@@ -8,14 +8,20 @@
 import SwiftUI
 
 struct LoadingPageView: View {
+    
+    let setup: Setup
     @Environment(\.dismiss) private var dismiss
     @State private var progress: Double = 0.0
     @State private var isComplete: Bool = false
     @State private var navigateToReviewView: Bool = false
     @State private var showCancelAlert: Bool = false
+    @State private var viewModel: ReviewViewModel
     
+    init(setup: Setup) {
+        self.setup = setup
+        self._viewModel = State(initialValue: ReviewViewModel(setup: setup))
+    }
     
-    @State private var viewModel = ReviewViewModel()
     
     var body: some View {
         VStack(spacing: 40) {
@@ -146,5 +152,5 @@ struct LoadingPageView: View {
 }
 
 #Preview {
-    LoadingPageView()
+    LoadingPageView(setup: Setup())
 }
