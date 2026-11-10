@@ -8,6 +8,8 @@
 import CoreVideo
 import Testing
 import Foundation
+import ARKit
+import MeasureKit
 @testable import Final_Challenge_App
 
 func makePixelBuffer<Value>(width: Int, height: Int, format: OSType, values: [Value]) throws -> CVPixelBuffer {
@@ -38,4 +40,40 @@ func collect<Element>(_ stream: AsyncStream<Element>) async -> [Element] {
         values.append(value)
     }
     return values
+}
+
+func makeScanFrame(timestamp: TimeInterval) throws -> ScanFrame {
+    let image = try makePixelBuffer(
+        width: 2, height: 2, format: kCVPixelFormatType_32BGRA, values: [UInt32](repeating: 0, count: 4)
+    )
+    return ScanFrame(
+        timestamp: timestamp,
+        image: image,
+        orientation: .right,
+        camera: CameraModel(
+            intrinsics: matrix_identity_float3x3,
+            imageResolution: SIMD2(2, 2),
+            cameraToWorld: matrix_identity_float4x4
+        ),
+        depth: nil,
+        tracking: .normal,
+        ambientIntensity: nil,
+        planes: []
+    )
+}
+
+/// Stands in for `ARSession` and records what `ScanSession` asks of it.
+final class FakeARSession: ARSessionControlling, @unchecked Sendable {
+    weak var delegate: (any ARSessionDelegate)?
+    var delegateQueue: DispatchQueue?
+    private(set) var runs: [(configuration: ARConfiguration, options: ARSession.RunOptions)] = []
+    private(set) var pauseCount = 0
+
+    func run(_ configuration: ARConfiguration, options: ARSession.RunOptions) {
+        runs.append((configuration, options))
+    }
+
+    func pause() {
+        pauseCount += 1
+    }
 }
