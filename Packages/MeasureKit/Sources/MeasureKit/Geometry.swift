@@ -134,6 +134,14 @@ public enum Geometry {
         return simd_distance(subjectBase, equipmentBase)
     }
 
+    /// Returns the height of a piece of equipment above the floor, in metres: top centre's y minus the floor height.
+    ///
+    /// Returns nil when there is no floor height or no top centre (not measured).
+    public static func height(of equipment: EquipmentCentres, floorY: Float?) -> Float? {
+        guard let topCentre = equipment.topCentre, let floorY else { return nil }
+        return heightAboveFloor(topCentre, floorY: floorY)
+    }
+    
     /// Returns where a piece of equipment stands on the floor relative to the subject, in metres.
     ///
     /// The result is the equipment's base centre minus the subject's base centre: x is the world x difference,
