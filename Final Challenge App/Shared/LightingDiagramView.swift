@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Top-down lighting diagram, reused by Review, SetupDetail and the PDF (A10-10).
+
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
@@ -19,14 +20,14 @@ struct LightingDiagramView: View {
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            
+           
             ZStack {
                 // Background Grid
                 GridPattern()
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                     .frame(width: 6000, height: 6000)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                
+                 
                 // Connecting Lines
                 Path { path in
                     for node in viewModel.nodes {
@@ -35,7 +36,7 @@ struct LightingDiagramView: View {
                     }
                 }
                 .stroke(Color.secondary, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                
+                 
                 // Distance Labels
                 ForEach($viewModel.nodes) { $node in
                     let nodeScreenPos = CGPoint(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
@@ -43,7 +44,7 @@ struct LightingDiagramView: View {
                         x: (subjectCenter.x + nodeScreenPos.x) / 2,
                         y: (subjectCenter.y + nodeScreenPos.y) / 2
                     )
-                    
+                     
                     Text(node.distance)
                         .font(.caption)
                         .padding(4)
@@ -51,10 +52,10 @@ struct LightingDiagramView: View {
                         .cornerRadius(4)
                         .position(midPoint)
                 }
-                
+                 
                 // Subject
                 DiagramEntity(title: "Subject", icon: "person.fill", position: subjectCenter)
-                
+                 
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
                     NodeView(
@@ -124,10 +125,13 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
+        // ✅ Scale Meter Overlay positioned at the bottom left corner
+        .overlay(alignment: .bottomLeading) {
+            ScaleMeterView(zoomScale: zoomScale * magnifyBy)
+                .padding(16)
+        }
     }
 }
-
-
 
 struct GridPattern: Shape {
     func path(in rect: CGRect) -> Path {
@@ -382,6 +386,50 @@ struct LightShape: Shape {
     }
 }
 
+struct ScaleMeterView: View {
+    var zoomScale: CGFloat
+    
+    var body: some View {
+        let baseMeters: CGFloat = 1.0
+        let calculatedMeters = baseMeters / zoomScale
+        
+        
+        let labelText: String = {
+            if calculatedMeters < 1.0 {
+                let cm = Int(calculatedMeters * 100)
+                return "\(max(1, cm)) cm"
+            } else if calculatedMeters >= 10.0 {
+                return "\(Int(round(calculatedMeters))) m"
+            } else {
+                return String(format: "%.1f m", calculatedMeters)
+            }
+        }()
+        
+        VStack(spacing: 3) {
+            Text(labelText)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            
+            // Scale bar ticks and line matching your screenshot
+            HStack(spacing: 0) {
+                Rectangle()
+                    .frame(width: 1.5, height: 8)
+                    .foregroundStyle(.secondary)
+                
+                Rectangle()
+                    .frame(height: 1.5)
+                    .foregroundStyle(.secondary)
+                
+                Rectangle()
+                    .frame(width: 1.5, height: 8)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 90)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+}
 
 #Preview {
    LightingDiagramView(viewModel: ReviewViewModel(), isReadOnly: false, undoManager: nil)
