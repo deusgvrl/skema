@@ -7,6 +7,8 @@
 
 import CoreVideo
 import Testing
+import Foundation
+@testable import Final_Challenge_App
 
 func makePixelBuffer<Value>(width: Int, height: Int, format: OSType, values: [Value]) throws -> CVPixelBuffer {
     var buffer: CVPixelBuffer?
@@ -24,4 +26,8 @@ func makePixelBuffer<Value>(width: Int, height: Int, format: OSType, values: [Va
         }
     }
     return pixelBuffer
+}
+
+func makePlane(worldY: Float, isFloor: Bool = false, area: Float = 1, id: UUID = UUID()) -> ScanPlane {
+    ScanPlane(id: id, worldY: worldY, isFloor: isFloor, area: area)
 }
