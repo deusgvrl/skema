@@ -131,3 +131,77 @@ struct EquipmentPointsTests {
         #expect(equipment.points.count == maskOnly.count)
     }
 }
+
+/// A10-20 test cases. A flat wall in front of the iPhone makes the points: a wall 2 m away gives 128 points
+/// from y = +0.7 down to y = -0.7, so its lowest point is at -0.7.
+@Suite("Equipment status (A10-20)")
+struct EquipmentStatusTests {
+    private let wholeImage = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
+    /// A small box that catches only 8 depth pixels of the wall.
+    private let smallBox = NormalizedBox(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
+    /// The lowest point of a wall 2 m away.
+    private let wallBottom: Float = -0.7
+
+    /// An item that was seen once: a wall at `depth` metres, read through `box`, with the given depth confidence.
+    private func seen(atDepth depth: Float, box: NormalizedBox? = nil, confidence: UInt8 = 2) -> EquipmentPoints {
+        var equipment = EquipmentPoints()
+        let frame = makeFrame(depth: depth, confidence: confidence)
+        equipment.add(box: box ?? wholeImage, mask: nil, depth: frame, camera: makeCamera())
+        return equipment
+    }
+
+    @Test("Enough points near the floor are measured")
+    func measured() {
+        let item = seen(atDepth: 2).scanResult(floorY: wallBottom, isSubject: false)
+
+        #expect(item.status == .measured)
+        #expect(item.baseCentre != nil && item.topCentre != nil)
+    }
+
+    @Test("Too few points wins over base not seen")
+    func tooFewPointsWinsOverBaseNotSeen() {
+        let item = seen(atDepth: 2, box: smallBox).scanResult(floorY: -1.2, isSubject: false)
+
+        #expect(item.status == .tooFewPoints)
+        #expect(item.baseCentre == nil && item.topCentre == nil)
+    }
+
+    @Test("A base 50 cm above the floor is not seen")
+    func baseNotSeen() {
+        let item = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: false)
+
+        #expect(item.status == .baseNotSeen)
+    }
+
+    @Test("The subject may float above the floor")
+    func subjectMayFloat() {
+        let subject = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: true)
+
+        #expect(subject.status == .measured)
+    }
+
+    @Test("Seen only beyond the range is out of range, not too few points")
+    func outOfRange() {
+        let item = seen(atDepth: 6).scanResult(floorY: wallBottom, isSubject: false)
+
+        #expect(item.status == .outOfRange)
+        #expect(item.baseCentre == nil && item.topCentre == nil)
+    }
+
+    @Test("No usable depth is not out of range")
+    func noUsableDepthIsNotOutOfRange() {
+        let item = seen(atDepth: 6, confidence: 0).scanResult(floorY: wallBottom, isSubject: false)
+
+        #expect(item.status == .tooFewPoints)
+    }
+
+    @Test("Seen far first and near later is measured")
+    func farThenNear() {
+        var equipment = seen(atDepth: 6)
+        equipment.add(box: wholeImage, mask: nil, depth: makeFrame(depth: 2), camera: makeCamera())
+
+        let item = equipment.scanResult(floorY: wallBottom, isSubject: false)
+
+        #expect(item.status == .measured)
+    }
+}
