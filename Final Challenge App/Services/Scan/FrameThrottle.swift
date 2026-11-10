@@ -18,8 +18,7 @@ nonisolated struct FrameThrottle {
     }
 
     mutating func accepts(_ timestamp: TimeInterval) -> Bool {
-        if let lastAccepted, timestamp >= lastAccepted,
-           timestamp - lastAccepted + Self.tolerance < minimumInterval {
+        if let lastAccepted, timestamp - lastAccepted + Self.tolerance < minimumInterval {
             return false
         }
         lastAccepted = timestamp

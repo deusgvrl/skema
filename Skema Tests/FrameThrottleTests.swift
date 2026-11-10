@@ -49,15 +49,15 @@ struct FrameThrottleTests {
         #expect(accepted.count == 15)
     }
 
-    @Test("A timestamp that goes back starts the count again")
-    func backwardsTimestampRestarts() {
+    @Test("A frame older than the last one is dropped")
+    func olderFrameDropped() {
         var throttle = FrameThrottle(minimumInterval: 0.1)
         _ = throttle.accepts(5.0)
 
-        let restarted = throttle.accepts(1.0)
-        let tooSoon = throttle.accepts(1.05)
+        let older = throttle.accepts(1.0)
+        let next = throttle.accepts(5.1)
 
-        #expect(restarted)
-        #expect(!tooSoon)
+        #expect(!older)
+        #expect(next)
     }
 }
