@@ -91,7 +91,7 @@ public enum Geometry {
     /// y says how high. The base centre (x, z) is where the equipment stands. The top centre (x, y, z) is its highest part.
     /// The subject (`isSubject`) skips the floor rule because the product often sits on a table.
     /// When the equipment cannot be measured, the result says why (`status`) and has no centres.
-    /// `outOfRange` is not decided here: it needs the iPhone position.
+    /// `outOfRange` is not decided here: it needs the whole scan, see `EquipmentPoints.scanResult(floorY:isSubject:)`.
     public static func centres(of points: [SIMD3<Float>], floorY: Float, isSubject: Bool) -> EquipmentCentres {
         // Small helper for every "cannot measure" exit: a status with no centres.
         func notMeasured(_ status: MeasurementStatus) -> EquipmentCentres {

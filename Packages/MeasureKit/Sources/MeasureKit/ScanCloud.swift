@@ -41,7 +41,7 @@ public struct EquipmentPoints: Sendable {
     /// World points, at most one per 1 cm cell.
     public private(set) var points: [SIMD3<Float>] = []
     /// True when a frame showed the equipment only farther than `DepthSampler.maxRange`.
-    /// A10-20 uses it for "out of range".
+    /// `scanResult(floorY:isSubject:)` uses it to decide "out of range".
     public private(set) var sawPointsBeyondRange = false
 
     /// The 1 cm cells that already hold a point, so the same spot seen in many frames is stored once.
@@ -66,6 +66,20 @@ public struct EquipmentPoints: Sendable {
             let cell = SIMD3<Int32>((point / ScanCloud.voxelSize).rounded(.down), rounding: .towardZero)
             if voxels.insert(cell).inserted { points.append(point) }
         }
+    }
+
+    /// The centres of this equipment from everything collected over the scan, with `outOfRange` decided.
+    ///
+    /// An item that was only ever seen too far away (beyond `DepthSampler.maxRange`) is `outOfRange`.
+    /// Everything else is decided by `Geometry.centres`: `tooFewPoints`, `baseNotSeen` or `measured`.
+    /// An item seen far once but near later has points, so it is not `outOfRange`.
+    public func scanResult(floorY: Float, isSubject: Bool) -> EquipmentCentres {
+        // Out of range: no points were kept, but a frame did see the item farther than the range.
+        // No points and nothing seen far away is not out of range: that is `tooFewPoints`.
+        if points.isEmpty, sawPointsBeyondRange {
+            return EquipmentCentres(status: .outOfRange, baseCentre: nil, topCentre: nil)
+        }
+        return Geometry.centres(of: points, floorY: floorY, isSubject: isSubject)
     }
 
     /// The mask's points when there is a mask, else the box's points (the same rule as `Sighting.make`).
