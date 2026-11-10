@@ -16,7 +16,8 @@ final class Equipment {
     var positionY: Double
     
     // Computed property to convert CGPoint in views
-    @Transient var position: CGPoint {
+    @Transient
+    var position: CGPoint {
         get { CGPoint(x: positionX, y: positionY) }
         set {
             positionX = Double(newValue.x)
