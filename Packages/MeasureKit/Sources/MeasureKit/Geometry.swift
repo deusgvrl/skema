@@ -140,6 +140,14 @@ public enum Geometry {
     public static func height(of equipment: EquipmentCentres, floorY: Float?) -> Float? {
         guard let topCentre = equipment.topCentre, let floorY else { return nil }
         return heightAboveFloor(topCentre, floorY: floorY)
+    /// Returns where a piece of equipment stands on the floor relative to the subject, in metres.
+    ///
+    /// The result is the equipment's base centre minus the subject's base centre: x is the world x difference,
+    /// y holds the world z difference (a `SIMD2` has no z slot). Heights are ignored.
+    /// Returns nil when either base centre is missing.
+    public static func floorOffset(of equipment: EquipmentCentres, from subject: EquipmentCentres) -> SIMD2<Float>? {
+        guard let subjectBase = subject.baseCentre, let equipmentBase = equipment.baseCentre else { return nil }
+        return equipmentBase - subjectBase
     }
 
     /// The average position on the floor of some points: add up all the x values and all the z values, then divide by how many there are.
