@@ -55,7 +55,7 @@ public struct VisionDetector: ObjectDetector {
 
 extension ImageOrientation {
     /// Same meaning as `CGImagePropertyOrientation` (see the contract in `Types.swift`).
-    var cgOrientation: CGImagePropertyOrientation {
+    public var cgOrientation: CGImagePropertyOrientation {
         switch self {
         case .up: .up
         case .down: .down
