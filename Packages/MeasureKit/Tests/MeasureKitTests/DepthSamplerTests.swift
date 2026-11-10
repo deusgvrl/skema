@@ -93,3 +93,42 @@ import simd
                                          depth: f, camera: makeCamera()).isEmpty)
     }
 }
+
+/// A10-41 range cases. A flat wall at one depth puts every depth pixel at the same distance from the iPhone.
+@Suite("Range filter (A10-41)")
+struct RangeFilterTests {
+    private let wholeImage = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
+    private let wholeMask = InstanceMask(width: 20, height: 10, pixels: [UInt8](repeating: 1, count: 200))
+
+    private func boxPoints(wallAt depth: Float) -> [SIMD3<Float>] {
+        DepthSampler.worldPoints(in: wholeImage, depth: makeFrame(depth: depth), camera: makeCamera(),
+                                 inset: 0, maxRange: DepthSampler.maxRange)
+    }
+
+    private func maskPoints(wallAt depth: Float) -> [SIMD3<Float>] {
+        DepthSampler.worldPoints(in: wholeMask, depth: makeFrame(depth: depth), camera: makeCamera(),
+                                 erosion: 0, maxRange: DepthSampler.maxRange)
+    }
+
+    @Test("A surface 4 m away is kept")
+    func nearSurfaceKept() {
+        #expect(boxPoints(wallAt: 4).count == 200)
+    }
+
+    @Test("A surface 6 m away is dropped")
+    func farSurfaceDropped() {
+        #expect(boxPoints(wallAt: 6).isEmpty)
+    }
+
+    @Test("A surface exactly 5 m away is kept")
+    func surfaceAtTheLimitKept() {
+        #expect(boxPoints(wallAt: 5).count == 200)
+    }
+
+    @Test("The mask version keeps points up to exactly 5 m and drops the ones beyond")
+    func maskVersionAlsoFilters() {
+        #expect(maskPoints(wallAt: 4).count == 200)
+        #expect(maskPoints(wallAt: 5).count == 200)
+        #expect(maskPoints(wallAt: 6).isEmpty)
+    }
+}
