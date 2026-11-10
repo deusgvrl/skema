@@ -35,3 +35,44 @@ public struct ScanCloud: Sendable {
         points.removeAll()
     }
 }
+
+/// The 3D points of one piece of equipment, merged over many frames while the user walks around.
+public struct EquipmentPoints: Sendable {
+    /// World points, at most one per 1 cm cell.
+    public private(set) var points: [SIMD3<Float>] = []
+    /// True when a frame showed the equipment only farther than `DepthSampler.maxRange`.
+    /// A10-20 uses it for "out of range".
+    public private(set) var sawPointsBeyondRange = false
+
+    /// The 1 cm cells that already hold a point, so the same spot seen in many frames is stored once.
+    private var voxels: Set<SIMD3<Int32>> = []
+
+    public init() {}
+
+    /// Adds the equipment's points from one frame: its mask when it has one, else its box.
+    /// Only points within `DepthSampler.maxRange` are kept, and a cell that already has a point is skipped.
+    public mutating func add(box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel) {
+        let limit = DepthSampler.maxRange
+        let inRange = Self.worldPoints(box: box, mask: mask, depth: depth, camera: camera, maxRange: limit)
+        guard !inRange.isEmpty else {
+            // Nothing within range. Look again without the limit: points farther away mean the equipment
+            // was seen but too far; no points at all mean nothing usable was seen (low confidence, empty region).
+            let anyDistance = Self.worldPoints(box: box, mask: mask, depth: depth, camera: camera, maxRange: .infinity)
+            if !anyDistance.isEmpty { sawPointsBeyondRange = true }
+            return
+        }
+        for point in inRange {
+            // Same cell rule as `ScanCloud`: the cell is the point's position divided by the cell size, rounded down.
+            let cell = SIMD3<Int32>((point / ScanCloud.voxelSize).rounded(.down), rounding: .towardZero)
+            if voxels.insert(cell).inserted { points.append(point) }
+        }
+    }
+
+    /// The mask's points when there is a mask, else the box's points (the same rule as `Sighting.make`).
+    private static func worldPoints(
+        box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel, maxRange: Float
+    ) -> [SIMD3<Float>] {
+        mask.map { DepthSampler.worldPoints(in: $0, depth: depth, camera: camera, maxRange: maxRange) }
+            ?? DepthSampler.worldPoints(in: box, depth: depth, camera: camera, maxRange: maxRange)
+    }
+}

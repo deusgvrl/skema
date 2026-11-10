@@ -16,13 +16,16 @@ public enum DepthSampler {
     /// Share of a box's depth pixels that counts as a real surface rather than stray pixels.
     public static let minSurfaceFraction: Float = 0.2
 
+    /// Depth pixels farther than this many metres from the iPhone are ignored (temporary, finalised in A10-24).
+    public static let maxRange: Float = 5.0
+
     /// Depth pixels inside `box` shrunk by `inset` (fraction of width/height) on each side,
     /// with confidence >= `minConfidence`, kept only within `depthBand` metres of the nearest surface,
     /// unprojected to world space. The nearest surface wins even when background fills most of the box,
     /// because a detected object sits in front of what is behind it.
     public static func worldPoints(
         in box: NormalizedBox, depth: DepthFrame, camera: CameraModel,
-        minConfidence: UInt8 = 2, inset: Double = 0.1, depthBand: Float = 0.15
+        minConfidence: UInt8 = 2, inset: Double = 0.1, depthBand: Float = 0.15, maxRange: Float = .infinity
     ) -> [SIMD3<Float>] {
         guard depth.width > 0, depth.height > 0, box.width > 0, box.height > 0,
               depth.depth.count == depth.width * depth.height,
@@ -41,7 +44,7 @@ public enum DepthSampler {
                 guard cx >= x0, cx <= x1 else { continue }
                 let idx = j * depth.width + i
                 let d = depth.depth[idx]
-                guard depth.confidence[idx] >= minConfidence, d.isFinite, d > 0 else { continue }
+                guard depth.confidence[idx] >= minConfidence, d.isFinite, d > 0, d <= maxRange else { continue }
                 candidates.append((i, j, d))
             }
         }
