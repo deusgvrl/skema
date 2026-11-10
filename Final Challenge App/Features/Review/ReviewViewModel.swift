@@ -37,6 +37,11 @@ final class ReviewViewModel {
         }
         updateUndoState(undoManager: undoManager)
     }
+    
+    // Call this function when project details already filled, and call in inside the sheet checkmark button
+    func finalizeAndSaveSetup() {
+        StorageController.shared.addSetup(draftSetup)
+    }
 }
 
 

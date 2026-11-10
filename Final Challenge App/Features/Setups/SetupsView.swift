@@ -29,7 +29,9 @@ struct SetupsView: View {
                 Spacer(minLength: 0)
             }
             .navigationDestination(isPresented: $viewModel.isShowingScan) {
-                ScanView()
+                ScanView(onDismissToSetups: {
+                    viewModel.isShowingScan = false
+                })
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemGroupedBackground))

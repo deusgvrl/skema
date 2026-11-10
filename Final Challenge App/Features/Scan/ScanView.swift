@@ -5,6 +5,7 @@ struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = ScanViewModel()
     @State private var showLoadingScreen: Bool = false
+    var onDismissToSetups: (() -> Void)? = nil
 
     var body: some View {
         VStack {
@@ -16,7 +17,14 @@ struct ScanView: View {
         }
         .fullScreenCover(isPresented: $showLoadingScreen) {
             NavigationStack {
-                LoadingPageView(setup: viewModel.draftSetup)
+                ReviewView(
+                    isFromLoadingScreen: true,
+                    viewModel: ReviewViewModel(setup: viewModel.draftSetup),
+                    onDismissToSetups: {
+                        showLoadingScreen = false
+                        onDismissToSetups?()
+                    }
+                )
             }
         }
         .navigationBarBackButtonHidden(true)
