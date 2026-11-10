@@ -27,7 +27,12 @@ struct SetupsView: View {
                         .padding(.top, 120)
                 }
                 Spacer(minLength: 0)
-                }
+            }
+            .navigationDestination(isPresented: $viewModel.isShowingScan) {
+                ScanView(onDismissToSetups: {
+                    viewModel.isShowingScan = false
+                })
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle("Setups")
@@ -50,9 +55,7 @@ struct SetupsView: View {
             )
             .presentationDetents([.medium, .large])
         }
-        .fullScreenCover(isPresented: $viewModel.isShowingScan) {
-            ScanView()
-        }
+        
     }
     private var emptyState: some View {
             ContentUnavailableView {
