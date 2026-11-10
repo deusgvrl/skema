@@ -31,3 +31,11 @@ func makePixelBuffer<Value>(width: Int, height: Int, format: OSType, values: [Va
 func makePlane(worldY: Float, isFloor: Bool = false, area: Float = 1, id: UUID = UUID()) -> ScanPlane {
     ScanPlane(id: id, worldY: worldY, isFloor: isFloor, area: area)
 }
+
+func collect<Element>(_ stream: AsyncStream<Element>) async -> [Element] {
+    var values: [Element] = []
+    for await value in stream {
+        values.append(value)
+    }
+    return values
+}
