@@ -15,7 +15,7 @@ struct LoadingPageView: View {
     @State private var showCancelAlert: Bool = false
     
     
-    // @State private var viewModel = SetupViewModel()
+    @State private var viewModel = ReviewViewModel()
     
     var body: some View {
         VStack(spacing: 40) {
@@ -112,7 +112,7 @@ struct LoadingPageView: View {
         .onAppear(perform: startLoadingSimulation)
         .fullScreenCover(isPresented: $navigateToReviewView) {
             NavigationStack {
-                // ReviewView(isFromLoadingScreen: true, viewModel: viewModel)
+                ReviewView(isFromLoadingScreen: true, viewModel: viewModel)
             }
         }
         .alert("Cancel This Scan?", isPresented: $showCancelAlert) {
