@@ -34,6 +34,34 @@ struct StorageControllerTests {
         #expect(fetchedSetups.first?.client == "Apple")
     }
     
+    @Test("Fetch Setup Retrieves Associated Equipment")
+    func fetchSetupRetrievesAssociatedEquipment() {
+        let setup = Setup(setupName: "Studio Interview")
+        let camera = Equipment(category: .camera, name: "Main Camera")
+        let keyLight = Equipment(category: .light, name: "Key Light")
+        let fillLight = Equipment(category: .light, name: "Fill Light")
+        
+        storageController.addSetup(setup)
+        storageController.addEquipment(camera, to: setup)
+        storageController.addEquipment(keyLight, to: setup)
+        storageController.addEquipment(fillLight, to: setup)
+        
+        let fetchedSetups = storageController.fetchAllSetups()
+        let fetchedSetup = fetchedSetups.first
+        
+        #expect(fetchedSetups.count == 1, "Should fetch exactly one setup.")
+        #expect(fetchedSetup != nil, "Fetched setup should not be nil.")
+        #expect(fetchedSetup?.setupName == "Studio Interview")
+        
+        let fetchedNodes = fetchedSetup?.nodes ?? []
+        #expect(fetchedNodes.count == 3, "Setup should contain exactly 3 equipment nodes.")
+        
+        let nodeNames = fetchedNodes.map { $0.name }
+        #expect(nodeNames.contains("Main Camera"))
+        #expect(nodeNames.contains("Key Light"))
+        #expect(nodeNames.contains("Fill Light"))
+    }
+    
     @Test("Update Equipment Persists Changes")
     func updateEquipmentPersistsChanges() {
         let setup = Setup(setupName: "Product Shoot")
