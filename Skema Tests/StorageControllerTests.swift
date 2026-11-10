@@ -103,4 +103,34 @@ struct StorageControllerTests {
         
         #expect(remainingEquipment.isEmpty, "All associated equipment should have been deleted automatically via cascade.")
     }
+    
+    @Test("Draft Flow: Create Equipment First, Then Setup, Then Save")
+        func draftFlowSavesSetupAndEquipment() {
+            let keyLight = Equipment(category: .light, name: "Key Light", power: "100%")
+            let mainCamera = Equipment(category: .camera, name: "Main Camera", lens: "50mm")
+            
+            let draftSetup = Setup(setupName: "Commercial Portrait", client: "Acme Corp")
+            
+            draftSetup.nodes.append(keyLight)
+            draftSetup.nodes.append(mainCamera)
+            
+            #expect(storageController.fetchAllSetups().isEmpty, "Database should be empty before saving.")
+            
+            storageController.addSetup(draftSetup)
+            
+            let fetchedSetups = storageController.fetchAllSetups()
+            let savedSetup = fetchedSetups.first
+            
+            #expect(fetchedSetups.count == 1, "Should save exactly one setup.")
+            #expect(savedSetup?.setupName == "Commercial Portrait", "Setup name should match.")
+            #expect(savedSetup?.client == "Acme Corp", "Client name should match.")
+            
+            // Verify that SwiftData automatically saved the associated equipment
+            let savedNodes = savedSetup?.nodes ?? []
+            #expect(savedNodes.count == 2, "The setup should contain the 2 equipment nodes we added.")
+            
+            let nodeNames = savedNodes.map { $0.name }
+            #expect(nodeNames.contains("Key Light"))
+            #expect(nodeNames.contains("Main Camera"))
+        }
 }
