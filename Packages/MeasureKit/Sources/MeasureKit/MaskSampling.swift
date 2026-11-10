@@ -7,7 +7,7 @@ extension DepthSampler {
     /// Then the same confidence filter and nearest-surface `depthBand` filter as the box version.
     public static func worldPoints(
         in mask: InstanceMask, depth: DepthFrame, camera: CameraModel,
-        erosion: Int = 1, minConfidence: UInt8 = 2, depthBand: Float = 0.15
+        erosion: Int = 1, minConfidence: UInt8 = 2, depthBand: Float = 0.15, maxRange: Float = .infinity
     ) -> [SIMD3<Float>] {
         guard depth.width > 0, depth.height > 0, mask.width > 0, mask.height > 0,
               mask.pixels.count == mask.width * mask.height,
@@ -23,7 +23,7 @@ extension DepthSampler {
                 guard kept[mj * mask.width + mi] != 0 else { continue }
                 let idx = j * depth.width + i
                 let d = depth.depth[idx]
-                guard depth.confidence[idx] >= minConfidence, d.isFinite, d > 0 else { continue }
+                guard depth.confidence[idx] >= minConfidence, d.isFinite, d > 0, d <= maxRange else { continue }
                 candidates.append((i, j, d))
             }
         }
