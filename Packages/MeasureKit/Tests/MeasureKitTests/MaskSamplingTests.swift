@@ -75,3 +75,129 @@ import simd
         #expect(maskTilt < Geometry.uprightToleranceDegrees)
     }
 }
+
+/// A10-41 part 2: marking the depth pixels that belong to an item tapped in the debug screen. An item is a vertical
+/// column around the tapped spot. A wall 2 m away, seen by `makeCamera()`, has its depth pixel centres at
+/// x = 0.2 * column - 1.9 and y = 0.9 - 0.2 * row (metres), all at z = -2.
+@Suite("Column region (A10-41)")
+struct ColumnRegionTests {
+    private let anyHeight: ClosedRange<Float> = -10...10
+
+    private func marked(_ mask: InstanceMask, column: Int, row: Int) -> Bool {
+        mask.pixels[row * mask.width + column] == 1
+    }
+
+    private func markedCount(_ mask: InstanceMask) -> Int {
+        mask.pixels.filter { $0 == 1 }.count
+    }
+
+    @Test("A column covers the item from top to bottom")
+    func columnCoversTheWholeHeight() {
+        let frame = makeFrame(depth: 2)
+
+        let mask = DepthSampler.mask(
+            inColumnsAround: [SIMD3(0.1, 0, -2)], radius: 0.15, betweenY: anyHeight, depth: frame, camera: makeCamera()
+        )
+
+        for row in 0..<frame.height {
+            #expect(marked(mask, column: 10, row: row))
+        }
+        #expect(markedCount(mask) == frame.height)
+    }
+
+    @Test("The height of the tap does not matter")
+    func tapHeightDoesNotMatter() {
+        let frame = makeFrame(depth: 2)
+
+        let camera = makeCamera()
+        let low = DepthSampler.mask(
+            inColumnsAround: [SIMD3(0.1, -0.5, -2)], radius: 0.15, betweenY: anyHeight, depth: frame, camera: camera
+        )
+        let high = DepthSampler.mask(
+            inColumnsAround: [SIMD3(0.1, 0.7, -2)], radius: 0.15, betweenY: anyHeight, depth: frame, camera: camera
+        )
+
+        #expect(markedCount(low) > 0)
+        #expect(low == high)
+    }
+
+    @Test("Only the chosen heights are marked")
+    func onlyTheChosenHeights() {
+        let frame = makeFrame(depth: 2)
+
+        let mask = DepthSampler.mask(
+            inColumnsAround: [SIMD3(0.1, 0, -2)], radius: 0.15, betweenY: 0.0...0.45, depth: frame, camera: makeCamera()
+        )
+
+        // Rows 3 and 4 are at y = 0.3 and y = 0.1.
+        #expect(marked(mask, column: 10, row: 3) && marked(mask, column: 10, row: 4))
+        #expect(markedCount(mask) == 2)
+    }
+
+    @Test("The distance is measured across the floor: a wall behind the axis is not marked")
+    func distanceIsAcrossTheFloor() {
+        // The wall is 3 m away, 1 m behind the axis.
+        let mask = DepthSampler.mask(
+            inColumnsAround: [SIMD3(0.1, 0, -2)], radius: 0.3, betweenY: anyHeight,
+            depth: makeFrame(depth: 3), camera: makeCamera()
+        )
+
+        #expect(mask.pixels.allSatisfy { $0 == 0 })
+    }
+
+    @Test("The axis is a place in the room: a moved camera marks the same world columns")
+    func axisIsAWorldPlace() {
+        var pose = matrix_identity_float4x4
+        pose.columns.3 = SIMD4(0.5, 0, 1, 1)
+        let axis = SIMD3<Float>(-0.25, 0, -2)
+        let radius: Float = 0.4
+        // The wall is at world z = -2, which is 3 m in front of a camera at z = 1.
+        let frame = makeFrame(depth: 3)
+
+        let mask = DepthSampler.mask(
+            inColumnsAround: [axis], radius: radius, betweenY: anyHeight, depth: frame, camera: makeCamera(pose: pose)
+        )
+
+        // World x of each depth pixel, worked out by hand: x = 0.3 * column - 2.35.
+        // The wall is at z = -2, like the axis, so only x decides.
+        for row in 0..<frame.height {
+            for column in 0..<frame.width {
+                let inside = abs(0.3 * Float(column) - 2.35 - axis.x) <= radius
+                #expect(marked(mask, column: column, row: row) == inside)
+            }
+        }
+        #expect(markedCount(mask) == 3 * frame.height)
+    }
+
+    @Test("Two axes give two columns")
+    func twoAxesTwoColumns() {
+        let frame = makeFrame(depth: 2)
+        // Each axis sits exactly on a pixel column: column 4 (x = -1.1) and column 15 (x = 1.1).
+        let axes = [SIMD3<Float>(-1.1, 0, -2), SIMD3<Float>(1.1, 0, -2)]
+
+        let mask = DepthSampler.mask(
+            inColumnsAround: axes, radius: 0.05, betweenY: anyHeight, depth: frame, camera: makeCamera()
+        )
+
+        for row in 0..<frame.height {
+            #expect(marked(mask, column: 4, row: row) && marked(mask, column: 15, row: row))
+        }
+        #expect(markedCount(mask) == 2 * frame.height)
+    }
+
+    @Test("Depth that is zero, negative or not a number is never marked")
+    func unusableDepthNeverMarked() {
+        // A zero depth lands on the camera itself, so an axis at the camera would catch it if it were not skipped.
+        var depth = [Float](repeating: 2, count: 200)
+        depth[4 * 20 + 9] = 0
+        depth[4 * 20 + 10] = -0.05
+        depth[5 * 20 + 9] = .nan
+        let frame = DepthFrame(width: 20, height: 10, depth: depth, confidence: [UInt8](repeating: 2, count: 200))
+
+        let mask = DepthSampler.mask(
+            inColumnsAround: [SIMD3(0, 0, 0)], radius: 0.3, betweenY: -1...1, depth: frame, camera: makeCamera()
+        )
+
+        #expect(mask.pixels.allSatisfy { $0 == 0 })
+    }
+}

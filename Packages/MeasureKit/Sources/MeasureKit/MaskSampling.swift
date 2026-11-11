@@ -64,6 +64,37 @@ extension DepthSampler {
         return points
     }
 
+    /// A mask the size of the depth frame: 1 for each depth pixel whose world point is within `radius` metres of one of
+    /// the vertical axes through the `anchors` (measured across the floor, x and z only) and whose height is inside
+    /// `heights`, 0 for every other pixel. One tap on an upright item marks it from its foot to its top.
+    public static func mask(
+        inColumnsAround anchors: [SIMD3<Float>], radius: Float, betweenY heights: ClosedRange<Float>,
+        depth: DepthFrame, camera: CameraModel
+    ) -> InstanceMask {
+        var pixels = [UInt8](repeating: 0, count: depth.width * depth.height)
+        guard !pixels.isEmpty, depth.depth.count == pixels.count else {
+            return InstanceMask(width: depth.width, height: depth.height, pixels: pixels)
+        }
+        let scaleU = camera.imageResolution.x / Float(depth.width)
+        let scaleV = camera.imageResolution.y / Float(depth.height)
+        for row in 0..<depth.height {
+            for column in 0..<depth.width {
+                let pixelDepth = depth.depth[row * depth.width + column]
+                // Depth that is zero, negative or not a number says nothing about where the surface is.
+                guard pixelDepth.isFinite, pixelDepth > 0 else { continue }
+                let imagePixel = SIMD2<Float>((Float(column) + 0.5) * scaleU, (Float(row) + 0.5) * scaleV)
+                let world = unproject(pixel: imagePixel, depth: pixelDepth, camera: camera)
+                guard heights.contains(world.y) else { continue }
+                // Across the floor only: x and z count, so it does not matter how high the tap was.
+                let onTheFloor = SIMD2(world.x, world.z)
+                if anchors.contains(where: { simd_distance(SIMD2($0.x, $0.z), onTheFloor) <= radius }) {
+                    pixels[row * depth.width + column] = 1
+                }
+            }
+        }
+        return InstanceMask(width: depth.width, height: depth.height, pixels: pixels)
+    }
+
     private static func eroded(_ mask: InstanceMask, by steps: Int) -> [UInt8] {
         var cur = mask.pixels
         let w = mask.width, h = mask.height

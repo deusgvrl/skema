@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import simd
 @testable import MeasureKit
@@ -203,5 +204,167 @@ struct EquipmentStatusTests {
         let item = equipment.scanResult(floorY: wallBottom, isSubject: false)
 
         #expect(item.status == .measured)
+    }
+}
+
+/// A10-41 part 2: the depth band is switched off for regions that are already bounded in 3D (the tapped spheres).
+@Suite("Depth band (A10-41)")
+struct DepthBandTests {
+    @Test("The band keeps the nearest strip by default and both strips when switched off")
+    func bandCanBeSwitchedOff() {
+        // The left half of the frame is a strip 1 m away, the right half a strip 2 m away. The mask covers all of it.
+        var depth = [Float](repeating: 2, count: 200)
+        for row in 0..<10 { for column in 0..<10 { depth[row * 20 + column] = 1 } }
+        let frame = DepthFrame(width: 20, height: 10, depth: depth, confidence: [UInt8](repeating: 2, count: 200))
+        let mask = InstanceMask(width: 20, height: 10, pixels: [UInt8](repeating: 1, count: 200))
+        let whole = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
+
+        var byDefault = EquipmentPoints()
+        byDefault.add(box: whole, mask: mask, depth: frame, camera: makeCamera())
+        var bandOff = EquipmentPoints()
+        bandOff.add(box: whole, mask: mask, depth: frame, camera: makeCamera(), depthBand: .infinity)
+
+        #expect(!byDefault.points.isEmpty)
+        #expect(byDefault.points.allSatisfy { near($0.z, -1) })
+        #expect(bandOff.points.contains { near($0.z, -2) })
+        #expect(bandOff.points.count > byDefault.points.count)
+    }
+}
+
+/// A10-41 part 2: results for a whole scan. A wall 2 m away gives 128 points, 1.4 m tall, with the floor at y = -0.7.
+@Suite("Scan measurements (A10-41)")
+struct ScanMeasurementsTests {
+    private let wholeImage = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
+    private let floorY: Float = -0.7
+    private let subject = UUID()
+    private let item = UUID()
+
+    /// A camera `metres` further along x: the same wall then lands `metres` to the right in the world.
+    private func camera(movedAlongX metres: Float) -> CameraModel {
+        var pose = matrix_identity_float4x4
+        pose.columns.3 = SIMD4(metres, 0, 0, 1)
+        return makeCamera(pose: pose)
+    }
+
+    private func see(
+        _ id: UUID, wallAt depth: Float, from camera: CameraModel = makeCamera(), in scan: inout ScanMeasurements
+    ) {
+        scan.add(to: id, box: wholeImage, mask: nil, depth: makeFrame(depth: depth), camera: camera)
+    }
+
+    @Test("A subject and an item, both measured, give distance, floor position and height")
+    func bothMeasured() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, from: camera(movedAlongX: 1), in: &scan)
+
+        let result = try #require(scan.results(subject: subject, floorY: floorY)[item])
+        let distance = try #require(result.distanceToSubject)
+        let offset = try #require(result.floorOffset)
+        let height = try #require(result.height)
+
+        #expect(result.status == .measured)
+        #expect(near(distance, 1, 0.001))
+        #expect(near(offset, SIMD2(1, 0), 0.001))
+        #expect(near(height, 1.4, 0.001))
+    }
+
+    @Test("An out-of-range subject blocks distances but not heights")
+    func outOfRangeSubject() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 6, in: &scan)
+        see(item, wallAt: 2, in: &scan)
+
+        let results = scan.results(subject: subject, floorY: floorY)
+        let result = try #require(results[item])
+        let height = try #require(result.height)
+
+        #expect(try #require(results[subject]).status == .outOfRange)
+        #expect(result.distanceToSubject == nil)
+        #expect(result.floorOffset == nil)
+        #expect(near(height, 1.4, 0.001))
+    }
+
+    @Test("An out-of-range item has no values, and the subject is unaffected")
+    func outOfRangeItem() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 6, in: &scan)
+
+        let results = scan.results(subject: subject, floorY: floorY)
+        let result = try #require(results[item])
+        let subjectResult = try #require(results[subject])
+
+        #expect(result.status == .outOfRange)
+        #expect(result.distanceToSubject == nil && result.height == nil && result.floorOffset == nil)
+        #expect(subjectResult.status == .measured)
+        #expect(subjectResult.height != nil)
+    }
+
+    @Test("Without a subject there are no distances, and heights follow each item")
+    func noSubject() throws {
+        var scan = ScanMeasurements()
+        see(item, wallAt: 2, in: &scan)
+
+        let result = try #require(scan.results(subject: UUID(), floorY: floorY)[item])
+        let height = try #require(result.height)
+
+        #expect(result.status == .measured)
+        #expect(result.distanceToSubject == nil)
+        #expect(result.floorOffset == nil)
+        #expect(near(height, 1.4, 0.001))
+    }
+
+    @Test("The result says how many points the item has")
+    func pointCount() throws {
+        var scan = ScanMeasurements()
+        see(item, wallAt: 2, in: &scan)
+
+        let result = try #require(scan.results(subject: subject, floorY: floorY)[item])
+
+        #expect(result.pointCount == 128)
+    }
+
+    @Test("A subject floating above the floor is still measured, an item is not")
+    func floatingSubject() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, in: &scan)
+
+        // The floor is 50 cm below the lowest point of both walls: a product on a table is fine, a light stand is not.
+        let results = scan.results(subject: subject, floorY: -1.2)
+
+        #expect(try #require(results[subject]).status == .measured)
+        #expect(try #require(results[item]).status == .baseNotSeen)
+    }
+
+    @Test("The centres are available, for drawing markers")
+    func centresForMarkers() throws {
+        var scan = ScanMeasurements()
+        see(item, wallAt: 2, from: camera(movedAlongX: 1), in: &scan)
+
+        let centres = try #require(scan.centres(subject: subject, floorY: floorY)[item])
+        let base = try #require(centres.baseCentre)
+        let top = try #require(centres.topCentre)
+
+        // The wall is centred on x = 1 here, 2 m away (z = -2), and 0.7 m above the camera at its top.
+        #expect(centres.status == .measured)
+        #expect(near(base, SIMD2(1, -2), 0.001))
+        #expect(near(top, SIMD3(1, 0.7, -2), 0.001))
+    }
+
+    @Test("Removing an item forgets its points and keeps the others")
+    func removeForgetsOneItem() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, in: &scan)
+
+        scan.remove(item)
+        scan.remove(UUID())
+
+        let results = scan.results(subject: subject, floorY: floorY)
+        let subjectResult = try #require(results[subject])
+        #expect(results[item] == nil)
+        #expect(subjectResult.pointCount == 128)
     }
 }
