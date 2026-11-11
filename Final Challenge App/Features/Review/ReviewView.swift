@@ -80,10 +80,6 @@ struct ReviewView: View {
             ProjectDetailsView(
                 setup: viewModel.draftSetup,
                 isPresentedModally: false,
-                onSave: { updatedSetup in
-                    viewModel.draftSetup = updatedSetup
-                    viewModel.finalizeAndSaveSetup()
-                },
                 onDismissToSetups: onDismissToSetups
             )
         }
@@ -246,11 +242,11 @@ struct ReviewView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                VStack(alignment: viewModel.canUndo || viewModel.canRedo ?  .leading : .center, spacing: 2) {
-                    Text(isFromLoadingScreen ? "Review Setup" : "Edit Layout")
+                VStack(spacing: 2) {
+                    Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
                         .font(.headline)
                         .fontWeight(.bold)
-                    Text("\(viewModel.nodes.count) Lights")
+                    Text("\(viewModel.nodes.count) Equipment Items")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

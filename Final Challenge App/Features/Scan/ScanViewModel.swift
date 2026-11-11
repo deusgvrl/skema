@@ -31,7 +31,7 @@ final class ScanViewModel {
     ) {
         self.makeScan = makeScan
         self.camera = camera
-        self.draftSetup = Setup(setupName: "")
+        self.draftSetup = Setup(setupName: "Untitled Setup")
     }
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
@@ -83,11 +83,13 @@ final class ScanViewModel {
     }
 
     func finishTapped() {
+        insertDraftSetup()
         stopListening()
         scan?.stop()
     }
 
     func closeTapped() {
+        deleteDraftSetup()
         stopListening()
         scan?.discard()
     }
@@ -147,5 +149,13 @@ final class ScanViewModel {
         case .alreadyStarted: "The scan was already started."
         case .cameraDenied, .lidarUnsupported: ""
         }
+    }
+    
+    func deleteDraftSetup() {
+        StorageController.shared.deleteSetup(draftSetup)
+    }
+    
+    func insertDraftSetup() {
+        StorageController.shared.addSetup(draftSetup)
     }
 }

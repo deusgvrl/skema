@@ -1,25 +1,15 @@
 import SwiftUI
 
 /// Setup name, client, project and notes (Sketch R07 · A10-11, A10-13).
+import SwiftUI
+
+/// Setup name, client, project and notes (Sketch R07 · A10-11, A10-13).
 struct ProjectDetailsView: View {
-    @State private var setup: Setup
+    @Bindable var setup: Setup
     var isPresentedModally: Bool = false
-    var onSave: (Setup) -> Void
     var onDismissToSetups: (() -> Void)? = nil
     
     @Environment(\.dismiss) private var dismiss
-    
-    init(
-        setup: Setup,
-        isPresentedModally: Bool = false,
-        onSave: @escaping (Setup) -> Void,
-        onDismissToSetups: (() -> Void)? = nil
-    ) {
-        self._setup = State(initialValue: setup)
-        self.isPresentedModally = isPresentedModally
-        self.onSave = onSave
-        self.onDismissToSetups = onDismissToSetups
-    }
     
     private var isFormValid: Bool {
         !setup.setupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -73,8 +63,8 @@ struct ProjectDetailsView: View {
             
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done", systemImage: "checkmark") {
-                    // Pass the edited setup back via the closure
-                    onSave(setup)
+                    // ✅ Save context once when user finishes
+                    StorageController.shared.save()
                     
                     if let onDismissToSetups {
                         onDismissToSetups()
@@ -92,6 +82,5 @@ struct ProjectDetailsView: View {
 #Preview {
     ProjectDetailsView(
         setup: Setup(),
-        onSave: { _ in }
     )
 }
