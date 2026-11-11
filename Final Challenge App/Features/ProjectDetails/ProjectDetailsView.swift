@@ -8,6 +8,7 @@ struct ProjectDetailsView: View {
     @Bindable var setup: Setup
     var isPresentedModally: Bool = false
     var onDismissToSetups: (() -> Void)? = nil
+    var viewModel: ProjectDetailsViewModel = ProjectDetailsViewModel()
     
     @Environment(\.dismiss) private var dismiss
     
@@ -63,8 +64,7 @@ struct ProjectDetailsView: View {
             
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done", systemImage: "checkmark") {
-                    // ✅ Save context once when user finishes
-                    StorageController.shared.save()
+                    viewModel.handleClose()
                     
                     if let onDismissToSetups {
                         onDismissToSetups()

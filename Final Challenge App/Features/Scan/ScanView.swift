@@ -43,7 +43,7 @@ struct ScanView: View {
             NavigationStack {
                 ReviewView(
                     isFromLoadingScreen: true,
-                    viewModel: vm, // ✅ Passes unwrapped instance automatically
+                    viewModel: vm, 
                     onDismissToSetups: {
                         reviewViewModel = nil // Dismisses cover
                         onDismissToSetups?()
