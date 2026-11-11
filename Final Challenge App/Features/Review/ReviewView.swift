@@ -88,10 +88,10 @@ struct ReviewView: View {
             )
         }
         .sheet(item: $editingNode) { node in
-//            R05_R06_EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
+            EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
         }
         .sheet(isPresented: $isAddingNode) {
-//            R05_R06_EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
+            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
         }
     }
     

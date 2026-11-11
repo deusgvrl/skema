@@ -40,6 +40,7 @@ final class ReviewViewModel {
     
     // Call this function when project details already filled, and call in inside the sheet checkmark button
     func finalizeAndSaveSetup() {
+        draftSetup.nodes = nodes
         StorageController.shared.addSetup(draftSetup)
     }
 }
