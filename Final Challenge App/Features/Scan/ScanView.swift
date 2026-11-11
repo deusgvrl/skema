@@ -26,6 +26,10 @@ struct ScanView: View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
+            if viewModel.screen == .scanning, let session = viewModel.arSession {
+                RoomScanView(session: session, scene: viewModel.pointCloud.scene)
+                    .ignoresSafeArea()
+                }
             content
                 .padding(.horizontal, 24)
         }
@@ -99,10 +103,7 @@ struct ScanView: View {
         case .starting:
             ProgressView()
         case .scanning:
-
-            Label("Scanning", systemImage: "camera.metering.matrix")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+            EmptyView()
         case .cameraDenied:
             cameraDenied
         case .lidarUnsupported:
