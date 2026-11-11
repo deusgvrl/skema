@@ -25,6 +25,19 @@ struct SetupsView: View {
                     emptyState
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 120)
+                } else {
+                    List(viewModel.setups) { setup in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(setup.setupName)
+                                .font(.headline)
+                            if !setup.client.isEmpty || !setup.project.isEmpty {
+                                Text("\(setup.client) • \(setup.project)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
                 }
                 Spacer(minLength: 0)
             }
@@ -44,6 +57,9 @@ struct SetupsView: View {
                 )
                 .overlay(alignment: .bottomTrailing) {
                     newSetupButton
+            }
+            .onAppear {
+                viewModel.fetchSetups()
             }
         }
         .sheet(isPresented: $viewModel.isShowingScanGuide) {

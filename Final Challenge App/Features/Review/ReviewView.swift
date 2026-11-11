@@ -77,7 +77,15 @@ struct ReviewView: View {
             Text("If you leave now, this scan and it's diagram will be lost.")
         }
         .navigationDestination(isPresented: $navigateToR07) {
-//            R07_ProjectDetailsView(viewModel: viewModel, isPresentedModally: false)
+            ProjectDetailsView(
+                setup: viewModel.draftSetup,
+                isPresentedModally: false,
+                onSave: { updatedSetup in
+                    viewModel.draftSetup = updatedSetup
+                    viewModel.finalizeAndSaveSetup()
+                },
+                onDismissToSetups: onDismissToSetups
+            )
         }
         .sheet(item: $editingNode) { node in
 //            R05_R06_EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
@@ -268,6 +276,7 @@ struct ReviewView: View {
                     }
                 }
             }
+            
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done", systemImage: isFromLoadingScreen ? "chevron.right" : "checkmark") {
                     undoManager?.removeAllActions()
