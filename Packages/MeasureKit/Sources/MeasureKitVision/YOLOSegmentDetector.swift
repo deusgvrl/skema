@@ -88,7 +88,7 @@ public struct YOLOSegmentDetector: ObjectDetector {
     }
 
     /// Copies an MLMultiArray into a row-major [Float], honouring dataType (Float16, Float32, Double, Int32) and strides.
-    static func floats(from array: MLMultiArray) throws -> [Float] {
+    public static func floats(from array: MLMultiArray) throws -> [Float] {
         let shape = array.shape.map(\.intValue)
         let strides = array.strides.map(\.intValue)
         let total = shape.reduce(1, *)
