@@ -24,13 +24,16 @@ final class ScanViewModel {
     @ObservationIgnored private var stateTask: Task<Void, Never>?
     @ObservationIgnored private var pointsTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
+    @ObservationIgnored var storageController: StorageController
 
     init(
         makeScan: @escaping () -> ScanSession = { ScanSession() },
-        camera: any CameraPermission = SystemCameraPermission()
+        camera: any CameraPermission = SystemCameraPermission(),
+        storageController: StorageController? = nil
     ) {
         self.makeScan = makeScan
         self.camera = camera
+        self.storageController = storageController ?? StorageController.shared
         self.draftSetup = Setup(setupName: "Untitled Setup")
     }
 
@@ -152,10 +155,10 @@ final class ScanViewModel {
     }
     
     func deleteDraftSetup() {
-        StorageController.shared.deleteSetup(draftSetup)
+        storageController.deleteSetup(draftSetup)
     }
     
     func insertDraftSetup() {
-        StorageController.shared.addSetup(draftSetup)
+        storageController.addSetup(draftSetup)
     }
 }
