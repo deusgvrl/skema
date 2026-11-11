@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor  
 struct ScanGuideSettings {
     private static let hiddenKey = "scanGuide.isHidden"
     private let defaults: UserDefaults
@@ -16,7 +17,7 @@ struct ScanGuideSettings {
     }
 
     var isHidden: Bool {
-            get { defaults.bool(forKey: Self.hiddenKey) }
-            nonmutating set { defaults.set(newValue, forKey: Self.hiddenKey) }
-        }
+        get { defaults.bool(forKey: Self.hiddenKey) }
+        nonmutating set { defaults.set(newValue, forKey: Self.hiddenKey) }
+    }
 }
