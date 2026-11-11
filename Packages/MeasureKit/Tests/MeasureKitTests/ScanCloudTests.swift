@@ -159,19 +159,22 @@ struct EquipmentStatusTests {
         #expect(item.baseCentre != nil && item.topCentre != nil)
     }
 
-    @Test("Too few points wins over base not seen")
-    func tooFewPointsWinsOverBaseNotSeen() {
+    @Test("Too few points gives no centres")
+    func tooFewPointsGivesNoCentres() {
         let item = seen(atDepth: 2, box: smallBox).scanResult(floorY: -1.2, isSubject: false)
 
         #expect(item.status == .tooFewPoints)
         #expect(item.baseCentre == nil && item.topCentre == nil)
     }
 
-    @Test("A base 50 cm above the floor is not seen")
-    func baseNotSeen() {
+    @Test("An item 50 cm above the floor is measured from its top")
+    func itemAboveTheFloor() throws {
         let item = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: false)
 
-        #expect(item.status == .baseNotSeen)
+        #expect(item.status == .measured)
+        let base = try #require(item.baseCentre)
+        let top = try #require(item.topCentre)
+        #expect(near(base, SIMD2(top.x, top.z)))
     }
 
     @Test("The subject may float above the floor")
@@ -325,17 +328,17 @@ struct ScanMeasurementsTests {
         #expect(result.pointCount == 128)
     }
 
-    @Test("A subject floating above the floor is still measured, an item is not")
-    func floatingSubject() throws {
+    @Test("A subject and an item above the floor are both measured")
+    func floatingSubjectAndItem() throws {
         var scan = ScanMeasurements()
         see(subject, wallAt: 2, in: &scan)
         see(item, wallAt: 2, in: &scan)
 
-        // The floor is 50 cm below the lowest point of both walls: a product on a table is fine, a light stand is not.
+        // The floor is 50 cm below the lowest point of both walls: a product on a table and a light head are fine.
         let results = scan.results(subject: subject, floorY: -1.2)
 
         #expect(try #require(results[subject]).status == .measured)
-        #expect(try #require(results[item]).status == .baseNotSeen)
+        #expect(try #require(results[item]).status == .measured)
     }
 
     @Test("The centres are available, for drawing markers")
@@ -351,6 +354,46 @@ struct ScanMeasurementsTests {
         #expect(centres.status == .measured)
         #expect(near(base, SIMD2(1, -2), 0.001))
         #expect(near(top, SIMD3(1, 0.7, -2), 0.001))
+    }
+
+    /// `subject` is the wall seen from the origin, centred on x = 0, y = 0, z = -2; `item` is the same wall seen from a
+    /// camera `metres` further along x, so it is centred on x = `metres`.
+    private func twoItems(metresApart metres: Float) -> ScanMeasurements {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, from: camera(movedAlongX: metres), in: &scan)
+        return scan
+    }
+
+    @Test("The nearest item within range is found")
+    func nearestItemWithinRange() {
+        let scan = twoItems(metresApart: 2)
+
+        #expect(scan.nearestItem(to: SIMD3(0.1, 0, -2), maxDistance: 0.4, among: [subject, item]) == subject)
+        #expect(scan.nearestItem(to: SIMD3(1.9, 0, -2), maxDistance: 0.4, among: [subject, item]) == item)
+    }
+
+    @Test("Of two items in range, the nearer wins, whatever the order")
+    func nearerOfTwoWins() {
+        let scan = twoItems(metresApart: 0.5)
+
+        #expect(scan.nearestItem(to: SIMD3(0.2, 0, -2), maxDistance: 1, among: [subject, item]) == subject)
+        #expect(scan.nearestItem(to: SIMD3(0.2, 0, -2), maxDistance: 1, among: [item, subject]) == subject)
+        #expect(scan.nearestItem(to: SIMD3(0.4, 0, -2), maxDistance: 1, among: [subject, item]) == item)
+        #expect(scan.nearestItem(to: SIMD3(0.4, 0, -2), maxDistance: 1, among: [item, subject]) == item)
+    }
+
+    @Test("No item is returned when nothing qualifies")
+    func noItemWhenNothingQualifies() {
+        let scan = twoItems(metresApart: 2)
+
+        // Nothing within 0.4 m of a point between the two items.
+        #expect(scan.nearestItem(to: SIMD3(1, 0, -2), maxDistance: 0.4, among: [subject, item]) == nil)
+        // Only the listed candidates count: the first item is near the point but not listed.
+        #expect(scan.nearestItem(to: SIMD3(0.1, 0, -2), maxDistance: 0.4, among: [item]) == nil)
+        // An id that was never added, and no candidates at all.
+        #expect(scan.nearestItem(to: SIMD3(0, 0, -2), maxDistance: 10, among: [UUID()]) == nil)
+        #expect(scan.nearestItem(to: SIMD3(0, 0, -2), maxDistance: 10, among: []) == nil)
     }
 
     @Test("Removing an item forgets its points and keeps the others")

@@ -201,3 +201,132 @@ struct ColumnRegionTests {
         #expect(mask.pixels.allSatisfy { $0 == 0 })
     }
 }
+
+/// A10-41 part 2: the detector's mask as a few boxes to draw on the screen.
+@Suite("Mask run boxes (A10-41)")
+struct RunBoxesTests {
+    /// A mask of `size` by `size` pixels with the given (column, row) pixels marked.
+    private func mask(size: Int = 8, marked: [(column: Int, row: Int)]) -> InstanceMask {
+        var pixels = [UInt8](repeating: 0, count: size * size)
+        for pixel in marked { pixels[pixel.row * size + pixel.column] = 1 }
+        return InstanceMask(width: size, height: size, pixels: pixels)
+    }
+
+    @Test("A filled block gives one box for the sampled row it covers")
+    func filledBlock() {
+        // Columns 2 to 5 and rows 2 and 3 are marked.
+        let block = (2...5).flatMap { column in (2...3).map { row in (column: column, row: row) } }
+
+        let boxes = mask(marked: block).runBoxes(everyPixels: 2)
+
+        #expect(boxes == [NormalizedBox(x: 0.25, y: 0.25, width: 0.5, height: 0.25)])
+    }
+
+    @Test("A gap splits a row into two runs")
+    func gapSplitsARow() {
+        let row = [0, 1, 4, 5].map { (column: $0, row: 0) }
+
+        let boxes = mask(marked: row).runBoxes(everyPixels: 2)
+
+        #expect(boxes == [
+            NormalizedBox(x: 0, y: 0, width: 0.25, height: 0.25),
+            NormalizedBox(x: 0.5, y: 0, width: 0.25, height: 0.25)
+        ])
+    }
+
+    @Test("The step skips pixels: a full mask gives one wide box per sampled row")
+    func stepSkipsPixels() {
+        let all = (0..<8).flatMap { column in (0..<8).map { row in (column: column, row: row) } }
+
+        let boxes = mask(marked: all).runBoxes(everyPixels: 4)
+
+        #expect(boxes == [
+            NormalizedBox(x: 0, y: 0, width: 1, height: 0.5),
+            NormalizedBox(x: 0, y: 0.5, width: 1, height: 0.5)
+        ])
+    }
+
+    @Test("A box at the edge is cut to the mask when the size is not a multiple of the step")
+    func boxIsCutAtTheEdge() {
+        // 5 by 5 fully marked, every 4 pixels: the second sampled row and column only have 1 pixel left.
+        let all = (0..<5).flatMap { column in (0..<5).map { row in (column: column, row: row) } }
+
+        let boxes = mask(size: 5, marked: all).runBoxes(everyPixels: 4)
+
+        #expect(boxes == [
+            NormalizedBox(x: 0, y: 0, width: 1, height: 0.8),
+            NormalizedBox(x: 0, y: 0.8, width: 1, height: 0.2)
+        ])
+    }
+
+    @Test("An empty mask, an empty size or a bad step gives no boxes")
+    func nothingToDraw() {
+        #expect(mask(marked: []).runBoxes(everyPixels: 2).isEmpty)
+        #expect(InstanceMask(width: 0, height: 0, pixels: []).runBoxes(everyPixels: 2).isEmpty)
+        #expect(mask(marked: [(column: 1, row: 1)]).runBoxes(everyPixels: 0).isEmpty)
+    }
+}
+
+/// How much of one mask lies on another, to tell whether two detections are the same object.
+@Suite("Mask overlap (A10-41)")
+struct MaskOverlapTests {
+    /// A mask of `size` by `size` pixels with the given (column, row) pixels marked.
+    private func mask(size: Int = 8, marked: [(column: Int, row: Int)]) -> InstanceMask {
+        var pixels = [UInt8](repeating: 0, count: size * size)
+        for pixel in marked { pixels[pixel.row * size + pixel.column] = 1 }
+        return InstanceMask(width: size, height: size, pixels: pixels)
+    }
+
+    private func block(columns: ClosedRange<Int>, rows: ClosedRange<Int>) -> [(column: Int, row: Int)] {
+        columns.flatMap { column in rows.map { row in (column: column, row: row) } }
+    }
+
+    @Test("Identical masks share everything")
+    func identical() {
+        let one = mask(marked: block(columns: 2...3, rows: 2...3))
+
+        #expect(one.overlapShare(with: one) == 1)
+    }
+
+    @Test("Masks that do not touch share nothing")
+    func apart() {
+        let left = mask(marked: block(columns: 0...1, rows: 0...1))
+        let right = mask(marked: block(columns: 5...6, rows: 5...6))
+
+        #expect(left.overlapShare(with: right) == 0)
+    }
+
+    @Test("A small mask inside a big one counts as the same object, whichever way round")
+    func inside() {
+        let small = mask(marked: block(columns: 1...2, rows: 1...2))
+        let big = mask(marked: block(columns: 0...3, rows: 0...3))
+
+        #expect(small.overlapShare(with: big) == 1)
+        #expect(big.overlapShare(with: small) == 1)
+    }
+
+    @Test("A partial overlap is a fraction of the smaller mask")
+    func partial() {
+        let first = mask(marked: block(columns: 0...1, rows: 0...1))
+        let second = mask(marked: block(columns: 1...2, rows: 0...1))
+
+        #expect(first.overlapShare(with: second) == 0.5)
+    }
+
+    @Test("Empty masks and masks of different sizes share nothing, without crashing")
+    func nothingToCompare() {
+        let marked = mask(marked: block(columns: 0...1, rows: 0...1))
+        let empty = mask(marked: [])
+        let otherSize = mask(size: 4, marked: block(columns: 0...1, rows: 0...1))
+        let zeroSize = InstanceMask(width: 0, height: 0, pixels: [])
+        // The same number of pixels in a different shape is not comparable either.
+        let wide = InstanceMask(width: 16, height: 4, pixels: [UInt8](repeating: 1, count: 64))
+        let square = InstanceMask(width: 8, height: 8, pixels: [UInt8](repeating: 1, count: 64))
+
+        #expect(wide.overlapShare(with: square) == 0)
+        #expect(marked.overlapShare(with: empty) == 0)
+        #expect(empty.overlapShare(with: empty) == 0)
+        #expect(marked.overlapShare(with: otherSize) == 0)
+        #expect(zeroSize.overlapShare(with: zeroSize) == 0)
+    }
+}

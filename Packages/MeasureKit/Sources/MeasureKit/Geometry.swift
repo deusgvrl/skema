@@ -14,11 +14,8 @@ public enum Geometry {
     public static let minPointCount = 100
 
     /// Height of the "base band": the thin slice of points from the lowest point up to this much higher.
-    /// Averaging only this slice gives where the equipment stands. Example: for the stand, the points from 0 to 10 cm.
+    /// Averaging only this slice gives where the subject stands. Example: for a bottle, the points from 0 to 10 cm.
     public static let baseBandHeight: Float = 0.10
-
-    /// If the lowest point is higher than this above the floor, the base is not on the floor
-    public static let maxBaseGapAboveFloor: Float = 0.15
 
     /// The top is the height that this many percent of the points lie under (98 = the 98th percentile), not the single highest point.
     public static let topPercentile = 98
@@ -88,41 +85,33 @@ public enum Geometry {
     /// Base centre and top centre of one piece of equipment from its world points (metres, y up).
     ///
     /// `points` are the 3D dots the LiDAR scan put on this equipment: x and z say where it is on the floor,
-    /// y says how high. The base centre (x, z) is where the equipment stands. The top centre (x, y, z) is its highest part.
-    /// The subject (`isSubject`) skips the floor rule because the product often sits on a table.
+    /// y says how high. The top centre (x, y, z) is the highest part of the points: the lighting point of a light or
+    /// the camera body. For equipment the base centre is the top centre's x and z (team decision, 11 Nov 2026: the
+    /// position of the light head or camera counts, not the stand), so the equipment does not need to touch the floor.
+    /// The subject (`isSubject`) is a product: its base centre is the bottom of its points, which can be on a table.
     /// When the equipment cannot be measured, the result says why (`status`) and has no centres.
     /// `outOfRange` is not decided here: it needs the whole scan, see `EquipmentPoints.scanResult(floorY:isSubject:)`.
+    /// `floorY` is not used any more: the floor no longer decides whether equipment is measured.
     public static func centres(of points: [SIMD3<Float>], floorY: Float, isSubject: Bool) -> EquipmentCentres {
-        // Small helper for every "cannot measure" exit: a status with no centres.
-        func notMeasured(_ status: MeasurementStatus) -> EquipmentCentres {
-            EquipmentCentres(status: status, baseCentre: nil, topCentre: nil)
-        }
-
-        // Step 1: too few points means too little information to trust a base or a top. `lowest` is the height of the lowest point.
+        // Too few points means too little information to trust a base or a top.
+        // `lowest` is the height of the lowest point.
         guard points.count >= minPointCount, let lowest = points.map(\.y).min() else {
-            return notMeasured(.tooFewPoints)
+            return EquipmentCentres(status: .tooFewPoints, baseCentre: nil, topCentre: nil)
         }
 
-        // Step 2: a normal piece of equipment must touch the floor. If its lowest point is well above the floor,
-        // the base was not seen. The subject is exempt: its base is the bottom of the product, which can sit on a table.
-        if !isSubject, lowest - floorY > maxBaseGapAboveFloor {
-            return notMeasured(.baseNotSeen)
-        }
-
-        // Step 3: base centre. Take only a thin band of points just above the lowest point and average their x and z.
-        // A band, not the single lowest point, because one point is noisy.
-        let band = points.filter { $0.y <= lowest + baseBandHeight }
-        let baseCentre = meanXZ(band)
-
-        // Step 4: top height. Use a high percentile, not the highest point, so a few stray points cannot make the equipment look taller.
+        // Top height. Use a high percentile, not the highest point,
+        // so a few stray points cannot make the equipment look taller.
         let topY = percentile(points.map(\.y), topPercentile)
 
-        // Step 5: top centre x and z. Average a thin slice of points just under the top height: one point would be noisy.
+        // Top centre x and z. Average a thin slice of points just under the top height: one point would be noisy.
         // The slice also stops at the top height, because the points above it are the strays we just chose to ignore.
         let slice = points.filter { $0.y >= topY - topEpsilon && $0.y <= topY }
         let topXZ = meanXZ(slice)
 
-        // Done: measured, with the base centre (x, z) and the top centre (x, y, z). The top's height is the percentile.
+        // Base centre. Equipment: straight under the top. Subject: a thin band of points just above the lowest point
+        // (a band, not the single lowest point, because one point is noisy).
+        let baseCentre = isSubject ? meanXZ(points.filter { $0.y <= lowest + baseBandHeight }) : topXZ
+
         return EquipmentCentres(status: .measured, baseCentre: baseCentre, topCentre: SIMD3(topXZ.x, topY, topXZ.y))
     }
 

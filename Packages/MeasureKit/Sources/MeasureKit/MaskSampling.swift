@@ -113,3 +113,55 @@ extension DepthSampler {
         return cur
     }
 }
+
+extension InstanceMask {
+    /// The marked pixels as a small number of boxes to draw. It looks at every `step`-th pixel of every `step`-th row
+    /// and makes one box for each run of marked pixels in a row. Boxes are normalised to the mask (0 to 1, top-left
+    /// origin), and each covers `step` pixels in height and `step` pixels for each sampled pixel in width.
+    public func runBoxes(everyPixels step: Int) -> [NormalizedBox] {
+        guard step > 0, width > 0, height > 0, pixels.count == width * height else { return [] }
+        var boxes: [NormalizedBox] = []
+        for row in stride(from: 0, to: height, by: step) {
+            // The first and last sampled column of the run of marked pixels being followed in this row.
+            var run: (first: Int, last: Int)?
+            for column in stride(from: 0, to: width, by: step) {
+                if pixels[row * width + column] != 0 {
+                    run = (run?.first ?? column, column)
+                } else if let finished = run {
+                    boxes.append(box(of: finished, row: row, step: step))
+                    run = nil
+                }
+            }
+            if let finished = run { boxes.append(box(of: finished, row: row, step: step)) }
+        }
+        return boxes
+    }
+
+    /// The box for a run: from its first sampled column to the end of its last, and `step` rows high (cut at the edge).
+    private func box(of run: (first: Int, last: Int), row: Int, step: Int) -> NormalizedBox {
+        let right = min(run.last + step, width)
+        let bottom = min(row + step, height)
+        return NormalizedBox(
+            x: Double(run.first) / Double(width), y: Double(row) / Double(height),
+            width: Double(right - run.first) / Double(width), height: Double(bottom - row) / Double(height)
+        )
+    }
+}
+
+extension InstanceMask {
+    /// How much of the smaller mask lies on the other one: the marked pixels both share, divided by the marked pixels
+    /// of the mask with fewer. 1 means one lies inside the other, 0 means they do not touch. Two detections that share
+    /// most of the smaller one are the same object. 0 when either mask has no marked pixel or the sizes differ.
+    public func overlapShare(with other: InstanceMask) -> Double {
+        guard width == other.width, height == other.height, pixels.count == other.pixels.count else { return 0 }
+        var shared = 0, ownCount = 0, otherCount = 0
+        for index in pixels.indices {
+            let own = pixels[index] != 0, theirs = other.pixels[index] != 0
+            if own { ownCount += 1 }
+            if theirs { otherCount += 1 }
+            if own && theirs { shared += 1 }
+        }
+        let smaller = min(ownCount, otherCount)
+        return smaller == 0 ? 0 : Double(shared) / Double(smaller)
+    }
+}

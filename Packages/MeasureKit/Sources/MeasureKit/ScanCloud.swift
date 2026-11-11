@@ -85,7 +85,7 @@ public struct EquipmentPoints: Sendable {
     /// The centres of this equipment from everything collected over the scan, with `outOfRange` decided.
     ///
     /// An item that was only ever seen too far away (beyond `DepthSampler.maxRange`) is `outOfRange`.
-    /// Everything else is decided by `Geometry.centres`: `tooFewPoints`, `baseNotSeen` or `measured`.
+    /// Everything else is decided by `Geometry.centres`: `tooFewPoints` or `measured`.
     /// An item seen far once but near later has points, so it is not `outOfRange`.
     public func scanResult(floorY: Float, isSubject: Bool) -> EquipmentCentres {
         // Out of range: no points were kept, but a frame did see the item farther than the range.
@@ -111,6 +111,21 @@ public struct ScanMeasurements: Sendable {
         equipment[id, default: EquipmentPoints()].add(
             box: box, mask: mask, depth: depth, camera: camera, depthBand: depthBand
         )
+    }
+
+    /// Of the `candidates`, the equipment whose points are centred nearest to `point` (the centre is the mean of its
+    /// points), when that is within `maxDistance` metres. Nil when no candidate has points that close.
+    public func nearestItem(to point: SIMD3<Float>, maxDistance: Float, among candidates: [UUID]) -> UUID? {
+        var best: (id: UUID, distance: Float)?
+        for id in candidates {
+            guard let points = equipment[id]?.points, !points.isEmpty else { continue }
+            let centre = points.reduce(SIMD3<Float>.zero, +) / Float(points.count)
+            let distance = simd_distance(centre, point)
+            guard distance <= maxDistance else { continue }
+            if let current = best, current.distance <= distance { continue }
+            best = (id, distance)
+        }
+        return best?.id
     }
 
     /// Forgets everything collected for the equipment `id`. An id that was never added does nothing.
