@@ -215,6 +215,20 @@ struct ScanViewModelTests {
         #expect(arSession.pauseCount == 1)
     }
 
+    @Test("Finish stops the camera and keeps the scan")
+    func finishStops() async throws {
+        let made = MadeScans()
+        let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized), made: made)
+        await viewModel.start()
+
+        viewModel.finishTapped()
+        viewModel.closeTapped()
+
+        let scan = try #require(made.all.first)
+        #expect(scan.state == .stopped)
+        #expect(arSession.pauseCount == 1)
+    }
+
     @Test("Close before the scan started does nothing")
     func closeBeforeStart() {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .denied))

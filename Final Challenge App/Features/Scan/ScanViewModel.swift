@@ -74,6 +74,11 @@ final class ScanViewModel {
         await start()
     }
 
+    func finishTapped() {
+            stateTask?.cancel()
+            scan?.stop()
+        }
+
     /// Cancel, or back to Setups from Review: stops the camera and throws the scan away.
     func closeTapped() {
         stateTask?.cancel()
