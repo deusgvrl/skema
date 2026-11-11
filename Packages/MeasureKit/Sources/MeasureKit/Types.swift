@@ -138,9 +138,9 @@ public struct ObjectMeasurement: Equatable, Sendable {
 }
 
 /// Why a piece of equipment has, or has no, measured values. Precedence when several apply:
-/// `outOfRange`, then `tooFewPoints`, then `baseNotSeen`, then `measured`.
+/// `outOfRange`, then `tooFewPoints`, then `measured`.
 public enum MeasurementStatus: String, Codable, Sendable {
-    case measured, baseNotSeen, tooFewPoints, outOfRange
+    case measured, tooFewPoints, outOfRange
 }
 
 /// Base centre and top centre of one piece of equipment (the subject included), or the reason they could not be computed.
@@ -155,5 +155,28 @@ public struct EquipmentCentres: Equatable, Sendable {
         self.status = status
         self.baseCentre = baseCentre
         self.topCentre = topCentre
+    }
+}
+
+/// What a scan found for one piece of equipment (the subject included): its status and, when measured, its values.
+/// Lengths in metres. Nil means "Not measured". A10-22 saves it and A10-23 shows it.
+public struct EquipmentResult: Equatable, Sendable {
+    public let status: MeasurementStatus
+    /// Distance on the floor from the subject's base centre to this equipment's base centre.
+    public let distanceToSubject: Float?
+    /// Height from the floor to this equipment's top centre.
+    public let height: Float?
+    /// This equipment's base centre minus the subject's base centre: x and z on the floor.
+    public let floorOffset: SIMD2<Float>?
+    /// How many points the equipment has.
+    public let pointCount: Int
+
+    public init(status: MeasurementStatus, distanceToSubject: Float?, height: Float?,
+                floorOffset: SIMD2<Float>?, pointCount: Int) {
+        self.status = status
+        self.distanceToSubject = distanceToSubject
+        self.height = height
+        self.floorOffset = floorOffset
+        self.pointCount = pointCount
     }
 }

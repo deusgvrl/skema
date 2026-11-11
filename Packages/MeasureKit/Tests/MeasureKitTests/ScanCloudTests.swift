@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import simd
 @testable import MeasureKit
@@ -139,8 +140,6 @@ struct EquipmentStatusTests {
     private let wholeImage = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
     /// A small box that catches only 8 depth pixels of the wall.
     private let smallBox = NormalizedBox(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
-    /// The lowest point of a wall 2 m away.
-    private let wallBottom: Float = -0.7
 
     /// An item that was seen once: a wall at `depth` metres, read through `box`, with the given depth confidence.
     private func seen(atDepth depth: Float, box: NormalizedBox? = nil, confidence: UInt8 = 2) -> EquipmentPoints {
@@ -150,39 +149,35 @@ struct EquipmentStatusTests {
         return equipment
     }
 
-    @Test("Enough points near the floor are measured")
+    @Test("Enough points are measured")
     func measured() {
-        let item = seen(atDepth: 2).scanResult(floorY: wallBottom, isSubject: false)
+        let item = seen(atDepth: 2).scanResult(isSubject: false)
 
         #expect(item.status == .measured)
         #expect(item.baseCentre != nil && item.topCentre != nil)
     }
 
-    @Test("Too few points wins over base not seen")
-    func tooFewPointsWinsOverBaseNotSeen() {
-        let item = seen(atDepth: 2, box: smallBox).scanResult(floorY: -1.2, isSubject: false)
+    @Test("Too few points gives no centres")
+    func tooFewPointsGivesNoCentres() {
+        let item = seen(atDepth: 2, box: smallBox).scanResult(isSubject: false)
 
         #expect(item.status == .tooFewPoints)
         #expect(item.baseCentre == nil && item.topCentre == nil)
     }
 
-    @Test("A base 50 cm above the floor is not seen")
-    func baseNotSeen() {
-        let item = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: false)
+    @Test("An item is measured from its top, with its base under it")
+    func itemMeasuredFromItsTop() throws {
+        let item = seen(atDepth: 2).scanResult(isSubject: false)
 
-        #expect(item.status == .baseNotSeen)
-    }
-
-    @Test("The subject may float above the floor")
-    func subjectMayFloat() {
-        let subject = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: true)
-
-        #expect(subject.status == .measured)
+        #expect(item.status == .measured)
+        let base = try #require(item.baseCentre)
+        let top = try #require(item.topCentre)
+        #expect(near(base, SIMD2(top.x, top.z)))
     }
 
     @Test("Seen only beyond the range is out of range, not too few points")
     func outOfRange() {
-        let item = seen(atDepth: 6).scanResult(floorY: wallBottom, isSubject: false)
+        let item = seen(atDepth: 6).scanResult(isSubject: false)
 
         #expect(item.status == .outOfRange)
         #expect(item.baseCentre == nil && item.topCentre == nil)
@@ -190,7 +185,7 @@ struct EquipmentStatusTests {
 
     @Test("No usable depth is not out of range")
     func noUsableDepthIsNotOutOfRange() {
-        let item = seen(atDepth: 6, confidence: 0).scanResult(floorY: wallBottom, isSubject: false)
+        let item = seen(atDepth: 6, confidence: 0).scanResult(isSubject: false)
 
         #expect(item.status == .tooFewPoints)
     }
@@ -200,8 +195,116 @@ struct EquipmentStatusTests {
         var equipment = seen(atDepth: 6)
         equipment.add(box: wholeImage, mask: nil, depth: makeFrame(depth: 2), camera: makeCamera())
 
-        let item = equipment.scanResult(floorY: wallBottom, isSubject: false)
+        let item = equipment.scanResult(isSubject: false)
 
         #expect(item.status == .measured)
+    }
+}
+
+/// A10-41 part 2: results for a whole scan. A wall 2 m away gives 128 points, 1.4 m tall, with the floor at y = -0.7.
+@Suite("Scan measurements (A10-41)")
+struct ScanMeasurementsTests {
+    private let wholeImage = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
+    private let floorY: Float = -0.7
+    private let subject = UUID()
+    private let item = UUID()
+
+    /// A camera `metres` further along x: the same wall then lands `metres` to the right in the world.
+    private func camera(movedAlongX metres: Float) -> CameraModel {
+        var pose = matrix_identity_float4x4
+        pose.columns.3 = SIMD4(metres, 0, 0, 1)
+        return makeCamera(pose: pose)
+    }
+
+    private func see(
+        _ id: UUID, wallAt depth: Float, from camera: CameraModel = makeCamera(), in scan: inout ScanMeasurements
+    ) {
+        scan.add(to: id, box: wholeImage, mask: nil, depth: makeFrame(depth: depth), camera: camera)
+    }
+
+    @Test("A subject and an item, both measured, give distance, floor position and height")
+    func bothMeasured() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, from: camera(movedAlongX: 1), in: &scan)
+
+        let result = try #require(scan.results(subject: subject, floorY: floorY)[item])
+        let distance = try #require(result.distanceToSubject)
+        let offset = try #require(result.floorOffset)
+        let height = try #require(result.height)
+
+        #expect(result.status == .measured)
+        #expect(near(distance, 1, 0.001))
+        #expect(near(offset, SIMD2(1, 0), 0.001))
+        #expect(near(height, 1.4, 0.001))
+    }
+
+    @Test("An out-of-range subject blocks distances but not heights")
+    func outOfRangeSubject() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 6, in: &scan)
+        see(item, wallAt: 2, in: &scan)
+
+        let results = scan.results(subject: subject, floorY: floorY)
+        let result = try #require(results[item])
+        let height = try #require(result.height)
+
+        #expect(try #require(results[subject]).status == .outOfRange)
+        #expect(result.distanceToSubject == nil)
+        #expect(result.floorOffset == nil)
+        #expect(near(height, 1.4, 0.001))
+    }
+
+    @Test("An out-of-range item has no values, and the subject is unaffected")
+    func outOfRangeItem() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 6, in: &scan)
+
+        let results = scan.results(subject: subject, floorY: floorY)
+        let result = try #require(results[item])
+        let subjectResult = try #require(results[subject])
+
+        #expect(result.status == .outOfRange)
+        #expect(result.distanceToSubject == nil && result.height == nil && result.floorOffset == nil)
+        #expect(subjectResult.status == .measured)
+        #expect(subjectResult.height != nil)
+    }
+
+    @Test("Without a subject there are no distances, and heights follow each item")
+    func noSubject() throws {
+        var scan = ScanMeasurements()
+        see(item, wallAt: 2, in: &scan)
+
+        let result = try #require(scan.results(subject: UUID(), floorY: floorY)[item])
+        let height = try #require(result.height)
+
+        #expect(result.status == .measured)
+        #expect(result.distanceToSubject == nil)
+        #expect(result.floorOffset == nil)
+        #expect(near(height, 1.4, 0.001))
+    }
+
+    @Test("The result says how many points the item has")
+    func pointCount() throws {
+        var scan = ScanMeasurements()
+        see(item, wallAt: 2, in: &scan)
+
+        let result = try #require(scan.results(subject: subject, floorY: floorY)[item])
+
+        #expect(result.pointCount == 128)
+    }
+
+    @Test("A subject and an item above the floor are both measured")
+    func floatingSubjectAndItem() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, in: &scan)
+
+        // The floor is 50 cm below the lowest point of both walls: a product on a table and a light head are fine.
+        let results = scan.results(subject: subject, floorY: -1.2)
+
+        #expect(try #require(results[subject]).status == .measured)
+        #expect(try #require(results[item]).status == .measured)
     }
 }
