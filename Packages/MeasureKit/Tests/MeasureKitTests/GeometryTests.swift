@@ -89,7 +89,7 @@ struct EquipmentCentresTests {
 
     @Test("A vertical item gets its base centre and top centre")
     func verticalItem() throws {
-        let result = Geometry.centres(of: equipment(bottom: 0, top: 180), floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: equipment(bottom: 0, top: 180), isSubject: false)
 
         #expect(result.status == .measured)
         let base = try #require(result.baseCentre)
@@ -103,7 +103,7 @@ struct EquipmentCentresTests {
         let legs = SyntheticEquipment.tripodLegs(x: 200, z: 300, radius: 40, height: 10, pointsPerLeg: 10)
         let column = SyntheticEquipment.column(x: 230, z: 300, bottom: 20, top: 180, total: 80)
 
-        let result = Geometry.centres(of: legs + column, floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: legs + column, isSubject: false)
 
         #expect(result.status == .measured)
         let base = try #require(result.baseCentre)
@@ -115,7 +115,7 @@ struct EquipmentCentresTests {
         let stand = SyntheticEquipment.column(x: 200, z: 300, bottom: 0, top: 180, total: 80)
         let modifier = SyntheticEquipment.column(x: 230, z: 300, bottom: 200, top: 220, total: 20)
 
-        let result = Geometry.centres(of: stand + modifier, floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: stand + modifier, isSubject: false)
 
         #expect(result.status == .measured)
         let base = try #require(result.baseCentre)
@@ -125,25 +125,12 @@ struct EquipmentCentresTests {
         #expect(near(base, SIMD2(cm(230), cm(300)), cm(1)))
     }
 
-    @Test("A floor that is not at zero gives the same result as a floor at zero")
-    func floorNotAtZero() throws {
-        let points = SyntheticEquipment.shifted(equipment(bottom: 0, top: 180), dy: -120)
-
-        let result = Geometry.centres(of: points, floorY: cm(-120), isSubject: false)
-
-        #expect(result.status == .measured)
-        let base = try #require(result.baseCentre)
-        let top = try #require(result.topCentre)
-        #expect(near(base, SIMD2(cm(200), cm(300)), cm(1)))
-        #expect(near(top, SIMD3(cm(200), cm(-120 + 180), cm(300)), cm(1)))
-    }
-
     @Test("A boom arm that reaches higher than the stand moves the base with the top")
     func boomMovesTheBase() throws {
         let stand = SyntheticEquipment.column(x: 200, z: 300, bottom: 0, top: 180, total: 60)
         let boom = SyntheticEquipment.column(x: 260, z: 300, bottom: 100, top: 200, total: 40, capCount: 0)
 
-        let result = Geometry.centres(of: stand + boom, floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: stand + boom, isSubject: false)
 
         #expect(result.status == .measured)
         let base = try #require(result.baseCentre)
@@ -154,8 +141,8 @@ struct EquipmentCentresTests {
 
     @Test("An item is measured wherever it is above the floor")
     func itemAtAnyHeight() throws {
-        let floating = Geometry.centres(of: equipment(bottom: 50, top: 180), floorY: 0, isSubject: false)
-        let tableHigh = Geometry.centres(of: equipment(bottom: 75, top: 95), floorY: 0, isSubject: false)
+        let floating = Geometry.centres(of: equipment(bottom: 50, top: 180), isSubject: false)
+        let tableHigh = Geometry.centres(of: equipment(bottom: 75, top: 95), isSubject: false)
 
         #expect(floating.status == .measured)
         #expect(near(try #require(floating.topCentre), SIMD3(cm(200), cm(180), cm(300)), cm(1)))
@@ -168,7 +155,7 @@ struct EquipmentCentresTests {
 
     @Test("99 points is too few points")
     func belowMinimum() {
-        let result = Geometry.centres(of: equipment(bottom: 0, top: 180, total: 99), floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: equipment(bottom: 0, top: 180, total: 99), isSubject: false)
 
         #expect(result.status == .tooFewPoints)
         #expect(result.baseCentre == nil)
@@ -177,14 +164,14 @@ struct EquipmentCentresTests {
 
     @Test("Exactly 100 points is measured")
     func atMinimum() {
-        let result = Geometry.centres(of: equipment(bottom: 0, top: 180, total: 100), floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: equipment(bottom: 0, top: 180, total: 100), isSubject: false)
 
         #expect(result.status == .measured)
     }
 
     @Test("No points is too few points, without a crash")
     func noPoints() {
-        let result = Geometry.centres(of: [], floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: [], isSubject: false)
 
         #expect(result.status == .tooFewPoints)
         #expect(result.baseCentre == nil)
@@ -193,7 +180,7 @@ struct EquipmentCentresTests {
 
     @Test("A floating item with too few points has no centres")
     func tooFewWhenFloating() {
-        let result = Geometry.centres(of: equipment(bottom: 50, top: 180, total: 50), floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: equipment(bottom: 50, top: 180, total: 50), isSubject: false)
 
         #expect(result.status == .tooFewPoints)
     }
@@ -203,7 +190,7 @@ struct EquipmentCentresTests {
     @Test("One stray point above and to the side does not move the top")
     func strayPointAbove() throws {
         let stray = SIMD3<Float>(cm(260), cm(280), cm(300))   // 100 cm above the real top at 180, and 60 cm to the side
-        let result = Geometry.centres(of: equipment(bottom: 0, top: 180) + [stray], floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: equipment(bottom: 0, top: 180) + [stray], isSubject: false)
 
         #expect(result.status == .measured)
         let top = try #require(result.topCentre)
@@ -215,7 +202,7 @@ struct EquipmentCentresTests {
     func twoStrayPointsAbove() throws {
         let strays = [SIMD3<Float>(cm(200), cm(280), cm(300)), SIMD3<Float>(cm(200), cm(290), cm(300))]
         // 98 item points + 2 strays = 100 points, so the top 2% are exactly the strays.
-        let result = Geometry.centres(of: equipment(bottom: 0, top: 180, total: 98) + strays, floorY: 0, isSubject: false)
+        let result = Geometry.centres(of: equipment(bottom: 0, top: 180, total: 98) + strays, isSubject: false)
 
         #expect(result.status == .measured)
         let top = try #require(result.topCentre)
@@ -229,7 +216,7 @@ struct EquipmentCentresTests {
         let product = SyntheticEquipment.column(x: 200, z: 300, bottom: 75, top: 95, total: 80)
         let lid = SyntheticEquipment.column(x: 230, z: 300, bottom: 110, top: 130, total: 20)
 
-        let result = Geometry.centres(of: product + lid, floorY: 0, isSubject: true)
+        let result = Geometry.centres(of: product + lid, isSubject: true)
 
         let base = try #require(result.baseCentre)
         let top = try #require(result.topCentre)
@@ -239,7 +226,7 @@ struct EquipmentCentresTests {
 
     @Test("The subject on a table is measured from the product's bottom")
     func subjectOnTable() throws {
-        let result = Geometry.centres(of: equipment(bottom: 75, top: 95), floorY: 0, isSubject: true)
+        let result = Geometry.centres(of: equipment(bottom: 75, top: 95), isSubject: true)
 
         #expect(result.status == .measured)
         let base = try #require(result.baseCentre)
@@ -296,14 +283,14 @@ struct FloorDistanceTests {
     func itemBaseMissing() {
         let subject = measuredCentres(baseX: 200, baseZ: 300)
 
-        #expect(Geometry.floorDistance(from: subject, to: baseNotSeenCentres()) == nil)
+        #expect(Geometry.floorDistance(from: subject, to: notMeasuredCentres()) == nil)
     }
 
     @Test("A subject whose base centre is missing is not measured")
     func subjectBaseMissing() {
         let light = measuredCentres(baseX: 300, baseZ: 300)
 
-        #expect(Geometry.floorDistance(from: baseNotSeenCentres(), to: light) == nil)
+        #expect(Geometry.floorDistance(from: notMeasuredCentres(), to: light) == nil)
     }
 }
 
@@ -356,7 +343,7 @@ struct HeightTests {
     
     @Test("A light whose top centre is missing is not measured")
     func topCentreMissing() {
-        #expect(Geometry.height(of: baseNotSeenCentres(), floorY: 0) == nil)
+        #expect(Geometry.height(of: notMeasuredCentres(), floorY: 0) == nil)
     }
 }
     
@@ -413,13 +400,13 @@ struct FloorPositionTests {
     func itemBaseMissing() {
         let subject = measuredCentres(baseX: 200, baseZ: 300)
 
-        #expect(Geometry.floorOffset(of: baseNotSeenCentres(), from: subject) == nil)
+        #expect(Geometry.floorOffset(of: notMeasuredCentres(), from: subject) == nil)
     }
 
     @Test("A subject whose base centre is missing is not measured")
     func subjectBaseMissing() {
         let light = measuredCentres(baseX: 500, baseZ: 100)
 
-        #expect(Geometry.floorOffset(of: light, from: baseNotSeenCentres()) == nil)
+        #expect(Geometry.floorOffset(of: light, from: notMeasuredCentres()) == nil)
     }
 }

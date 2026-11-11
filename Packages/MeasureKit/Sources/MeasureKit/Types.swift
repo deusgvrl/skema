@@ -138,11 +138,9 @@ public struct ObjectMeasurement: Equatable, Sendable {
 }
 
 /// Why a piece of equipment has, or has no, measured values. Precedence when several apply:
-/// `outOfRange`, then `tooFewPoints`, then `measured`. `baseNotSeen` is not produced for now: equipment is measured at
-/// its lighting point (team decision, 11 Nov 2026), so it does not need to touch the floor. The case stays because
-/// A10-22 saves it and A10-23 shows it.
+/// `outOfRange`, then `tooFewPoints`, then `measured`.
 public enum MeasurementStatus: String, Codable, Sendable {
-    case measured, baseNotSeen, tooFewPoints, outOfRange
+    case measured, tooFewPoints, outOfRange
 }
 
 /// Base centre and top centre of one piece of equipment (the subject included), or the reason they could not be computed.

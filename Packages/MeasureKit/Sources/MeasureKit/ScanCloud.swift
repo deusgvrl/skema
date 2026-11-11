@@ -42,7 +42,7 @@ public struct EquipmentPoints: Sendable {
     /// World points, at most one per 1 cm cell.
     public private(set) var points: [SIMD3<Float>] = []
     /// True when a frame showed the equipment only farther than `DepthSampler.maxRange`.
-    /// `scanResult(floorY:isSubject:)` uses it to decide "out of range".
+    /// `scanResult(isSubject:)` uses it to decide "out of range".
     public private(set) var sawPointsBeyondRange = false
 
     /// The 1 cm cells that already hold a point, so the same spot seen in many frames is stored once.
@@ -52,21 +52,13 @@ public struct EquipmentPoints: Sendable {
 
     /// Adds the equipment's points from one frame: its mask when it has one, else its box.
     /// Only points within `DepthSampler.maxRange` are kept, and a cell that already has a point is skipped.
-    /// `depthBand` is how far from the nearest surface a point may be (metres); pass `.infinity` for a region that is
-    /// already bounded in 3D, such as the spheres around tapped points.
-    public mutating func add(
-        box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel, depthBand: Float = 0.15
-    ) {
+    public mutating func add(box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel) {
         // The mask's points when there is a mask, else the box's points (the same rule as `Sighting.make`).
         func worldPoints(maxRange: Float) -> [SIMD3<Float>] {
             if let mask {
-                return DepthSampler.worldPoints(
-                    in: mask, depth: depth, camera: camera, depthBand: depthBand, maxRange: maxRange
-                )
+                return DepthSampler.worldPoints(in: mask, depth: depth, camera: camera, maxRange: maxRange)
             }
-            return DepthSampler.worldPoints(
-                in: box, depth: depth, camera: camera, depthBand: depthBand, maxRange: maxRange
-            )
+            return DepthSampler.worldPoints(in: box, depth: depth, camera: camera, maxRange: maxRange)
         }
         let inRange = worldPoints(maxRange: DepthSampler.maxRange)
         guard !inRange.isEmpty else {
@@ -87,13 +79,13 @@ public struct EquipmentPoints: Sendable {
     /// An item that was only ever seen too far away (beyond `DepthSampler.maxRange`) is `outOfRange`.
     /// Everything else is decided by `Geometry.centres`: `tooFewPoints` or `measured`.
     /// An item seen far once but near later has points, so it is not `outOfRange`.
-    public func scanResult(floorY: Float, isSubject: Bool) -> EquipmentCentres {
+    public func scanResult(isSubject: Bool) -> EquipmentCentres {
         // Out of range: no points were kept, but a frame did see the item farther than the range.
         // No points and nothing seen far away is not out of range: that is `tooFewPoints`.
         if points.isEmpty, sawPointsBeyondRange {
             return EquipmentCentres(status: .outOfRange, baseCentre: nil, topCentre: nil)
         }
-        return Geometry.centres(of: points, floorY: floorY, isSubject: isSubject)
+        return Geometry.centres(of: points, isSubject: isSubject)
     }
 }
 
@@ -105,39 +97,16 @@ public struct ScanMeasurements: Sendable {
 
     /// Adds one frame's view of the equipment `id` (see `EquipmentPoints.add`).
     public mutating func add(
-        to id: UUID, box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel,
-        depthBand: Float = 0.15
+        to id: UUID, box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel
     ) {
-        equipment[id, default: EquipmentPoints()].add(
-            box: box, mask: mask, depth: depth, camera: camera, depthBand: depthBand
-        )
-    }
-
-    /// Of the `candidates`, the equipment whose points are centred nearest to `point` (the centre is the mean of its
-    /// points), when that is within `maxDistance` metres. Nil when no candidate has points that close.
-    public func nearestItem(to point: SIMD3<Float>, maxDistance: Float, among candidates: [UUID]) -> UUID? {
-        var best: (id: UUID, distance: Float)?
-        for id in candidates {
-            guard let points = equipment[id]?.points, !points.isEmpty else { continue }
-            let centre = points.reduce(SIMD3<Float>.zero, +) / Float(points.count)
-            let distance = simd_distance(centre, point)
-            guard distance <= maxDistance else { continue }
-            if let current = best, current.distance <= distance { continue }
-            best = (id, distance)
-        }
-        return best?.id
-    }
-
-    /// Forgets everything collected for the equipment `id`. An id that was never added does nothing.
-    public mutating func remove(_ id: UUID) {
-        equipment[id] = nil
+        equipment[id, default: EquipmentPoints()].add(box: box, mask: mask, depth: depth, camera: camera)
     }
 
     /// The centres of every piece of equipment, or the reason there are none (see `EquipmentPoints.scanResult`).
-    public func centres(subject: UUID, floorY: Float) -> [UUID: EquipmentCentres] {
+    private func centres(subject: UUID) -> [UUID: EquipmentCentres] {
         var centres: [UUID: EquipmentCentres] = [:]
         for (id, points) in equipment {
-            centres[id] = points.scanResult(floorY: floorY, isSubject: id == subject)
+            centres[id] = points.scanResult(isSubject: id == subject)
         }
         return centres
     }
@@ -147,7 +116,7 @@ public struct ScanMeasurements: Sendable {
     /// A distance or floor position needs both the equipment and the subject to be measured, so without a measured
     /// subject they are all nil. A height needs only the equipment itself.
     public func results(subject: UUID, floorY: Float) -> [UUID: EquipmentResult] {
-        let centres = centres(subject: subject, floorY: floorY)
+        let centres = centres(subject: subject)
         let subjectCentres = centres[subject]
         var results: [UUID: EquipmentResult] = [:]
         for (id, own) in centres {

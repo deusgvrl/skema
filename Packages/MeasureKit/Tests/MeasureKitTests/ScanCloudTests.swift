@@ -140,8 +140,6 @@ struct EquipmentStatusTests {
     private let wholeImage = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
     /// A small box that catches only 8 depth pixels of the wall.
     private let smallBox = NormalizedBox(x: 0.4, y: 0.4, width: 0.2, height: 0.2)
-    /// The lowest point of a wall 2 m away.
-    private let wallBottom: Float = -0.7
 
     /// An item that was seen once: a wall at `depth` metres, read through `box`, with the given depth confidence.
     private func seen(atDepth depth: Float, box: NormalizedBox? = nil, confidence: UInt8 = 2) -> EquipmentPoints {
@@ -151,9 +149,9 @@ struct EquipmentStatusTests {
         return equipment
     }
 
-    @Test("Enough points near the floor are measured")
+    @Test("Enough points are measured")
     func measured() {
-        let item = seen(atDepth: 2).scanResult(floorY: wallBottom, isSubject: false)
+        let item = seen(atDepth: 2).scanResult(isSubject: false)
 
         #expect(item.status == .measured)
         #expect(item.baseCentre != nil && item.topCentre != nil)
@@ -161,15 +159,15 @@ struct EquipmentStatusTests {
 
     @Test("Too few points gives no centres")
     func tooFewPointsGivesNoCentres() {
-        let item = seen(atDepth: 2, box: smallBox).scanResult(floorY: -1.2, isSubject: false)
+        let item = seen(atDepth: 2, box: smallBox).scanResult(isSubject: false)
 
         #expect(item.status == .tooFewPoints)
         #expect(item.baseCentre == nil && item.topCentre == nil)
     }
 
-    @Test("An item 50 cm above the floor is measured from its top")
-    func itemAboveTheFloor() throws {
-        let item = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: false)
+    @Test("An item is measured from its top, with its base under it")
+    func itemMeasuredFromItsTop() throws {
+        let item = seen(atDepth: 2).scanResult(isSubject: false)
 
         #expect(item.status == .measured)
         let base = try #require(item.baseCentre)
@@ -177,16 +175,9 @@ struct EquipmentStatusTests {
         #expect(near(base, SIMD2(top.x, top.z)))
     }
 
-    @Test("The subject may float above the floor")
-    func subjectMayFloat() {
-        let subject = seen(atDepth: 2).scanResult(floorY: -1.2, isSubject: true)
-
-        #expect(subject.status == .measured)
-    }
-
     @Test("Seen only beyond the range is out of range, not too few points")
     func outOfRange() {
-        let item = seen(atDepth: 6).scanResult(floorY: wallBottom, isSubject: false)
+        let item = seen(atDepth: 6).scanResult(isSubject: false)
 
         #expect(item.status == .outOfRange)
         #expect(item.baseCentre == nil && item.topCentre == nil)
@@ -194,7 +185,7 @@ struct EquipmentStatusTests {
 
     @Test("No usable depth is not out of range")
     func noUsableDepthIsNotOutOfRange() {
-        let item = seen(atDepth: 6, confidence: 0).scanResult(floorY: wallBottom, isSubject: false)
+        let item = seen(atDepth: 6, confidence: 0).scanResult(isSubject: false)
 
         #expect(item.status == .tooFewPoints)
     }
@@ -204,33 +195,9 @@ struct EquipmentStatusTests {
         var equipment = seen(atDepth: 6)
         equipment.add(box: wholeImage, mask: nil, depth: makeFrame(depth: 2), camera: makeCamera())
 
-        let item = equipment.scanResult(floorY: wallBottom, isSubject: false)
+        let item = equipment.scanResult(isSubject: false)
 
         #expect(item.status == .measured)
-    }
-}
-
-/// A10-41 part 2: the depth band is switched off for regions that are already bounded in 3D (the tapped spheres).
-@Suite("Depth band (A10-41)")
-struct DepthBandTests {
-    @Test("The band keeps the nearest strip by default and both strips when switched off")
-    func bandCanBeSwitchedOff() {
-        // The left half of the frame is a strip 1 m away, the right half a strip 2 m away. The mask covers all of it.
-        var depth = [Float](repeating: 2, count: 200)
-        for row in 0..<10 { for column in 0..<10 { depth[row * 20 + column] = 1 } }
-        let frame = DepthFrame(width: 20, height: 10, depth: depth, confidence: [UInt8](repeating: 2, count: 200))
-        let mask = InstanceMask(width: 20, height: 10, pixels: [UInt8](repeating: 1, count: 200))
-        let whole = NormalizedBox(x: 0, y: 0, width: 1, height: 1)
-
-        var byDefault = EquipmentPoints()
-        byDefault.add(box: whole, mask: mask, depth: frame, camera: makeCamera())
-        var bandOff = EquipmentPoints()
-        bandOff.add(box: whole, mask: mask, depth: frame, camera: makeCamera(), depthBand: .infinity)
-
-        #expect(!byDefault.points.isEmpty)
-        #expect(byDefault.points.allSatisfy { near($0.z, -1) })
-        #expect(bandOff.points.contains { near($0.z, -2) })
-        #expect(bandOff.points.count > byDefault.points.count)
     }
 }
 
@@ -339,75 +306,5 @@ struct ScanMeasurementsTests {
 
         #expect(try #require(results[subject]).status == .measured)
         #expect(try #require(results[item]).status == .measured)
-    }
-
-    @Test("The centres are available, for drawing markers")
-    func centresForMarkers() throws {
-        var scan = ScanMeasurements()
-        see(item, wallAt: 2, from: camera(movedAlongX: 1), in: &scan)
-
-        let centres = try #require(scan.centres(subject: subject, floorY: floorY)[item])
-        let base = try #require(centres.baseCentre)
-        let top = try #require(centres.topCentre)
-
-        // The wall is centred on x = 1 here, 2 m away (z = -2), and 0.7 m above the camera at its top.
-        #expect(centres.status == .measured)
-        #expect(near(base, SIMD2(1, -2), 0.001))
-        #expect(near(top, SIMD3(1, 0.7, -2), 0.001))
-    }
-
-    /// `subject` is the wall seen from the origin, centred on x = 0, y = 0, z = -2; `item` is the same wall seen from a
-    /// camera `metres` further along x, so it is centred on x = `metres`.
-    private func twoItems(metresApart metres: Float) -> ScanMeasurements {
-        var scan = ScanMeasurements()
-        see(subject, wallAt: 2, in: &scan)
-        see(item, wallAt: 2, from: camera(movedAlongX: metres), in: &scan)
-        return scan
-    }
-
-    @Test("The nearest item within range is found")
-    func nearestItemWithinRange() {
-        let scan = twoItems(metresApart: 2)
-
-        #expect(scan.nearestItem(to: SIMD3(0.1, 0, -2), maxDistance: 0.4, among: [subject, item]) == subject)
-        #expect(scan.nearestItem(to: SIMD3(1.9, 0, -2), maxDistance: 0.4, among: [subject, item]) == item)
-    }
-
-    @Test("Of two items in range, the nearer wins, whatever the order")
-    func nearerOfTwoWins() {
-        let scan = twoItems(metresApart: 0.5)
-
-        #expect(scan.nearestItem(to: SIMD3(0.2, 0, -2), maxDistance: 1, among: [subject, item]) == subject)
-        #expect(scan.nearestItem(to: SIMD3(0.2, 0, -2), maxDistance: 1, among: [item, subject]) == subject)
-        #expect(scan.nearestItem(to: SIMD3(0.4, 0, -2), maxDistance: 1, among: [subject, item]) == item)
-        #expect(scan.nearestItem(to: SIMD3(0.4, 0, -2), maxDistance: 1, among: [item, subject]) == item)
-    }
-
-    @Test("No item is returned when nothing qualifies")
-    func noItemWhenNothingQualifies() {
-        let scan = twoItems(metresApart: 2)
-
-        // Nothing within 0.4 m of a point between the two items.
-        #expect(scan.nearestItem(to: SIMD3(1, 0, -2), maxDistance: 0.4, among: [subject, item]) == nil)
-        // Only the listed candidates count: the first item is near the point but not listed.
-        #expect(scan.nearestItem(to: SIMD3(0.1, 0, -2), maxDistance: 0.4, among: [item]) == nil)
-        // An id that was never added, and no candidates at all.
-        #expect(scan.nearestItem(to: SIMD3(0, 0, -2), maxDistance: 10, among: [UUID()]) == nil)
-        #expect(scan.nearestItem(to: SIMD3(0, 0, -2), maxDistance: 10, among: []) == nil)
-    }
-
-    @Test("Removing an item forgets its points and keeps the others")
-    func removeForgetsOneItem() throws {
-        var scan = ScanMeasurements()
-        see(subject, wallAt: 2, in: &scan)
-        see(item, wallAt: 2, in: &scan)
-
-        scan.remove(item)
-        scan.remove(UUID())
-
-        let results = scan.results(subject: subject, floorY: floorY)
-        let subjectResult = try #require(results[subject])
-        #expect(results[item] == nil)
-        #expect(subjectResult.pointCount == 128)
     }
 }

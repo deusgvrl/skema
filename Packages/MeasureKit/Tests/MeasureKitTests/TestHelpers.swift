@@ -69,7 +69,7 @@ func measuredCentres(baseX: Float, baseZ: Float, topY: Float = 180) -> Equipment
         topCentre: SIMD3(cm(baseX), cm(topY), cm(baseZ)))
 }
 
-/// A piece of equipment whose base was not seen: no base centre and no top centre.
-func baseNotSeenCentres() -> EquipmentCentres {
-    EquipmentCentres(status: .baseNotSeen, baseCentre: nil, topCentre: nil)
+/// A piece of equipment that could not be measured: no base centre and no top centre.
+func notMeasuredCentres() -> EquipmentCentres {
+    EquipmentCentres(status: .tooFewPoints, baseCentre: nil, topCentre: nil)
 }

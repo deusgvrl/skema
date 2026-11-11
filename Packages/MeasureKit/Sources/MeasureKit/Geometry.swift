@@ -90,9 +90,8 @@ public enum Geometry {
     /// position of the light head or camera counts, not the stand), so the equipment does not need to touch the floor.
     /// The subject (`isSubject`) is a product: its base centre is the bottom of its points, which can be on a table.
     /// When the equipment cannot be measured, the result says why (`status`) and has no centres.
-    /// `outOfRange` is not decided here: it needs the whole scan, see `EquipmentPoints.scanResult(floorY:isSubject:)`.
-    /// `floorY` is not used any more: the floor no longer decides whether equipment is measured.
-    public static func centres(of points: [SIMD3<Float>], floorY: Float, isSubject: Bool) -> EquipmentCentres {
+    /// `outOfRange` is not decided here: it needs the whole scan, see `EquipmentPoints.scanResult(isSubject:)`.
+    public static func centres(of points: [SIMD3<Float>], isSubject: Bool) -> EquipmentCentres {
         // Too few points means too little information to trust a base or a top.
         // `lowest` is the height of the lowest point.
         guard points.count >= minPointCount, let lowest = points.map(\.y).min() else {
