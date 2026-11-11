@@ -72,7 +72,7 @@ struct ProjectDetailsView: View {
             }
             
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
+                Button("Done", systemImage: "checkmark") {
                     // Pass the edited setup back via the closure
                     onSave(setup)
                     

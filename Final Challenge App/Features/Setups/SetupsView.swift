@@ -58,6 +58,9 @@ struct SetupsView: View {
                 .overlay(alignment: .bottomTrailing) {
                     newSetupButton
             }
+            .onAppear {
+                viewModel.fetchSetups()
+            }
         }
         .sheet(isPresented: $viewModel.isShowingScanGuide) {
             viewModel.scanGuideDismissed()
@@ -68,9 +71,7 @@ struct SetupsView: View {
             )
             .presentationDetents([.medium, .large])
         }
-        .onAppear {
-            viewModel.fetchSetups()
-        }
+        
     }
     private var emptyState: some View {
             ContentUnavailableView {
