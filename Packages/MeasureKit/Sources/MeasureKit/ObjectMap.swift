@@ -23,6 +23,21 @@ public struct TrackedItem: Equatable, Sendable, Identifiable {
     public let status: ItemStatus
     public let number: Int?
     public let position: SIMD3<Float>
+    /// How far along the 1 second to acceptance, 0...1 (A10-62's ring). Accepted items are 1.
+    public let progress: Double
+    /// Seen at the latest look, so the screen draws its mask now (A10-62).
+    public let isSeen: Bool
+
+    public init(id: Int, label: String, status: ItemStatus, number: Int?, position: SIMD3<Float>,
+                progress: Double, isSeen: Bool) {
+        self.id = id
+        self.label = label
+        self.status = status
+        self.number = number
+        self.position = position
+        self.progress = progress
+        self.isSeen = isSeen
+    }
 }
 
 public struct MapMeasurement: Equatable, Sendable {
@@ -51,6 +66,7 @@ public struct ObjectMap: Sendable {
         var number: Int?
         var seenTime: Double = 0     // seconds of seen time so far (real time, gaps not counted)
         var lastSeen: Double = 0     // time of the last look that saw this item
+        var isSeen = false           // seen at the latest look (A10-62: draw its mask now)
 
         /// One look of the detector. `seen`: the item was seen at this look. `wait`: seconds since the previous look.
         /// Each wait counts toward `seenTime` when the item is seen at the end of it.
@@ -142,28 +158,41 @@ public struct ObjectMap: Sendable {
 
     /// Tracked items in creation order.
     public var items: [TrackedItem] {
-        entries.map { TrackedItem(id: $0.id, label: $0.label, status: $0.status, number: $0.number, position: $0.position) }
+        entries.map {
+            TrackedItem(id: $0.id, label: $0.label, status: $0.status, number: $0.number, position: $0.position,
+                        progress: $0.status == .accepted ? 1 : min(1, $0.seenTime / ObjectMap.acceptAfter),
+                        isSeen: $0.isSeen)
+        }
     }
 
     /// One look of the detector at `time` (seconds, from the frame's timestamp). Call it for EVERY look,
     /// also when nothing was found, so gaps are measured. Sightings merge as in `add`; new ones start pending.
-    public mutating func update(_ sightings: [Sighting], at time: Double) {
+    /// Returns the id of the item each sighting joined, in the same order as `sightings`,
+    /// so a caller can match each detection's mask to its item (A10-62).
+    @discardableResult
+    public mutating func update(_ sightings: [Sighting], at time: Double) -> [Int] {
         let wait = lastLook.map { time - $0 } ?? 0
         lastLook = time
         var seen = Set<Int>()
         var created = Set<Int>()
+        var joined: [Int] = []
         for s in sightings {
             if let i = nearestIndex(for: s) {
                 entries[i].merge(s)
                 seen.insert(entries[i].id)
+                joined.append(entries[i].id)
             } else {
                 var entry = Entry(id: nextID, label: s.label)
                 nextID += 1
                 entry.merge(s)
                 entry.lastSeen = time
                 created.insert(entry.id)
+                joined.append(entry.id)
                 entries.append(entry)
             }
+        }
+        for i in entries.indices {
+            entries[i].isSeen = seen.contains(entries[i].id) || created.contains(entries[i].id)
         }
         var flickers = Set<Int>()
         for i in entries.indices where !created.contains(entries[i].id) {
@@ -180,6 +209,7 @@ public struct ObjectMap: Sendable {
             entries[i].status = .accepted
             entries[i].number = number
         }
+        return joined
     }
 
     /// Forgets an item, for example one the user deleted on the Review page (A10-63).
