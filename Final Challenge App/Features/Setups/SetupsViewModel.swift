@@ -48,7 +48,7 @@ final class SetupsViewModel {
         self.setups = StorageController.shared.fetchAllSetups()
         print("[SwiftData Test] Fetched \(setups.count) setup(s):")
         for s in setups {
-            print(" '\(s.setupName)' | Client: '\(s.client)' | Project: '\(s.project)'")
+            print(" '\(s.setupName)' | Client: '\(s.client)' | Project: '\(s.project)' | Equipment total: '\(s.nodes.count)'")
         }
     }
 }
