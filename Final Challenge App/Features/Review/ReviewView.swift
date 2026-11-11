@@ -184,7 +184,7 @@ struct ReviewView: View {
                     .padding(16)
                 }
                 
-                if showHint {
+                if showHint && !viewModel.nodes.isEmpty {
                     HStack {
                         Text("Long press to move/rotate, or tap to edit details")
                             .font(.subheadline)
