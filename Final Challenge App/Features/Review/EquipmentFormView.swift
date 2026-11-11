@@ -155,7 +155,7 @@ struct EquipmentFormView: View {
                         Button("Done", systemImage: "checkmark") {
                             saveNode()
                         }
-                        .disabled(!isFormValid)z
+                        .disabled(!isFormValid)
                     }
                 }
             }

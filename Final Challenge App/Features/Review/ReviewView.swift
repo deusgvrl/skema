@@ -246,7 +246,7 @@ struct ReviewView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
+                VStack(alignment: viewModel.canUndo || viewModel.canRedo ?  .leading : .center, spacing: 2) {
                     Text(isFromLoadingScreen ? "Review Setup" : "Edit Layout")
                         .font(.headline)
                         .fontWeight(.bold)
@@ -337,7 +337,7 @@ struct EquipmentCarousel: View {
             HStack(spacing: 12) {
                 ForEach(viewModel.nodes) { node in
                     VStack(alignment: .leading) {
-                        Text("\(node.label) \(node.role)")
+                        Text("\(node.name)")
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
