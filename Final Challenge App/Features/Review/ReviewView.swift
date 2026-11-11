@@ -88,10 +88,10 @@ struct ReviewView: View {
             )
         }
         .sheet(item: $editingNode) { node in
-//            R05_R06_EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
+            EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
         }
         .sheet(isPresented: $isAddingNode) {
-//            R05_R06_EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
+            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
         }
     }
     
@@ -184,7 +184,7 @@ struct ReviewView: View {
                     .padding(16)
                 }
                 
-                if showHint {
+                if showHint && !viewModel.nodes.isEmpty {
                     HStack {
                         Text("Long press to move/rotate, or tap to edit details")
                             .font(.subheadline)
@@ -246,7 +246,7 @@ struct ReviewView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
+                VStack(alignment: viewModel.canUndo || viewModel.canRedo ?  .leading : .center, spacing: 2) {
                     Text(isFromLoadingScreen ? "Review Setup" : "Edit Layout")
                         .font(.headline)
                         .fontWeight(.bold)
@@ -337,7 +337,7 @@ struct EquipmentCarousel: View {
             HStack(spacing: 12) {
                 ForEach(viewModel.nodes) { node in
                     VStack(alignment: .leading) {
-                        Text("\(node.label) \(node.role)")
+                        Text("\(node.name)")
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
