@@ -31,10 +31,15 @@ final class MeasureDebugViewModel {
     var depthText = "Depth: no frame yet"
     var validationText = "Tap something: the depth is compared with ARKit's raycast."
     var rows: [MeasureDebugRow] = []
+    /// The Detector switch (A10-60's model finds the items) and the depth band switch for the detector's items.
+    var detectorEnabled = false
+    var bandOn = false
 
     let arView: ARView
+    let detector: MeasureDebugDetectorLoop
     @ObservationIgnored private let scan: ScanSession
-    @ObservationIgnored private let engine = MeasureDebugEngine()
+    @ObservationIgnored private let engine: MeasureDebugEngine
+    @ObservationIgnored private var appliedVersion = 0
     @ObservationIgnored private let subjectID = UUID()
     @ObservationIgnored private var itemIDs: [UUID] = []
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
@@ -42,8 +47,18 @@ final class MeasureDebugViewModel {
 
     init() {
         // `ScanSession` runs this session. The view only draws the camera, so it must not configure the session itself.
-        arView = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
-        scan = ScanSession(session: arView.session)
+        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
+        arView = view
+        // The view's default visual effects cost a lot of power and this screen has no use for them.
+        arView.renderOptions.insert([
+            .disableMotionBlur, .disableDepthOfField, .disableGroundingShadows,
+            .disableCameraGrain, .disableHDR, .disablePersonOcclusion, .disableFaceMesh
+        ])
+        // Five frames a second are plenty for items that do not move, and a third of the work of fifteen.
+        scan = ScanSession(session: arView.session, frameInterval: 1.0 / 5.0)
+        let engine = MeasureDebugEngine()
+        self.engine = engine
+        detector = MeasureDebugDetectorLoop(engine: engine) { [weak view] in Self.displayTransform(of: view) }
     }
 
     // MARK: - Scan
@@ -81,6 +96,7 @@ final class MeasureDebugViewModel {
     }
 
     func stop() {
+        detector.stop()
         scan.stop()
         tasks.forEach { $0.cancel() }
         tasks = []
@@ -109,6 +125,15 @@ final class MeasureDebugViewModel {
     func newItem() {
         itemIDs.append(UUID())
         target = .item
+    }
+
+    func detectorToggled() {
+        detector.setEnabled(detectorEnabled)
+    }
+
+    func bandToggled() {
+        let band: Float = bandOn ? 0.15 : .infinity
+        Task { await engine.setDepthBand(band) }
     }
 
     func radiusChanged() {
@@ -140,6 +165,9 @@ final class MeasureDebugViewModel {
     }
 
     private func apply(_ snapshot: MeasureDebugSnapshot) {
+        // The engine hands out the same snapshot until something changes, so nothing is redrawn in between.
+        guard snapshot.version != appliedVersion else { return }
+        appliedVersion = snapshot.version
         if let floorY = snapshot.floorY {
             floorText = String(format: "Floor: y = %.2f m (%d planes). Tracking: %@",
                                floorY, snapshot.planeCount, String(describing: snapshot.tracking))
@@ -150,22 +178,32 @@ final class MeasureDebugViewModel {
             depthText = String(format: "Depth: %.0f %% of the picture has a reading, %.0f %% high confidence",
                                valid * 100, high * 100)
         }
-        rows = ([subjectID] + itemIDs).compactMap { id in
-            guard snapshot.anchors[id] != nil else { return nil }
-            let topOnlyHeight = snapshot.floorY.flatMap { floorY in snapshot.topsWithoutBase[id].map { $0.y - floorY } }
-            let text = Self.summary(name: name(of: id), result: snapshot.results[id], topOnlyHeight: topOnlyHeight)
+        rows = ([subjectID] + itemIDs + snapshot.detectedOrder).compactMap { id in
+            guard snapshot.anchors[id] != nil || snapshot.detectedKinds[id] != nil else { return nil }
+            let itemName = name(of: id, in: snapshot)
+            let text = Self.summary(name: itemName, result: snapshot.results[id])
             return MeasureDebugRow(id: id, text: text)
         }
         redrawMarkers(snapshot)
     }
 
-    private func name(of id: UUID) -> String {
+    /// How the native camera image lands on the screen (normalised to normalised), for drawing over the picture.
+    private static func displayTransform(of view: ARView?) -> CGAffineTransform? {
+        guard let view, let frame = view.session.currentFrame, view.bounds.width > 0 else { return nil }
+        return frame.displayTransform(viewRotationAngle: 90, viewportSize: view.bounds.size)
+    }
+
+    private func name(of id: UUID, in snapshot: MeasureDebugSnapshot) -> String {
         if id == subjectID { return "Subject" }
+        if let kind = snapshot.detectedKinds[id] {
+            let sameKind = snapshot.detectedOrder.filter { snapshot.detectedKinds[$0] == kind }
+            return "\(kind.debugName) \((sameKind.firstIndex(of: id) ?? 0) + 1)"
+        }
         let number = (itemIDs.firstIndex(of: id) ?? 0) + 1
         return "Item \(number)"
     }
 
-    private static func summary(name: String, result: EquipmentResult?, topOnlyHeight: Float?) -> String {
+    private static func summary(name: String, result: EquipmentResult?) -> String {
         guard let result else { return "\(name): no result yet (the floor is needed)" }
         var parts = ["\(name): \(result.status)", "\(result.pointCount) points"]
         if result.status == .measured {
@@ -174,10 +212,6 @@ final class MeasureDebugViewModel {
             if let offset = result.floorOffset {
                 parts.append(String(format: "floor position (%.0f, %.0f) cm", offset.x * 100, offset.y * 100))
             }
-        }
-        // The base was not seen, so the real rule says "not measured". This number is only for comparing with a tape.
-        if let topOnlyHeight {
-            parts.append("top-only height \(centimetres(topOnlyHeight)) (magenta marker, not a measurement)")
         }
         return parts.joined(separator: " · ")
     }
@@ -226,8 +260,7 @@ final class MeasureDebugViewModel {
     // MARK: - Markers in the AR view
 
     /// Thin flat shapes, no balls: a small white cube on each tap; for each measured item a flat square on the floor
-    /// at its base (green, orange for the subject) and one at its top (blue), joined by a thin vertical line; and a
-    /// magenta square with a magenta line for the top found without a base ("top-only height").
+    /// at its base (green, orange for the subject) and one at its top (blue), joined by a thin vertical line.
     private func redrawMarkers(_ snapshot: MeasureDebugSnapshot) {
         removeMarkers()
         for points in snapshot.anchors.values {
@@ -240,10 +273,6 @@ final class MeasureDebugViewModel {
             addSquare(at: foot, color: id == subjectID ? .orange : .green)
             addSquare(at: top, color: .blue)
             addLine(from: foot, toHeight: top.y, color: .white)
-        }
-        for top in snapshot.topsWithoutBase.values {
-            addSquare(at: top, color: .magenta)
-            addLine(from: SIMD3(top.x, floorY, top.z), toHeight: top.y, color: .magenta)
         }
     }
 

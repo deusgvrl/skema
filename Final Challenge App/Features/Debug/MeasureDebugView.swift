@@ -13,11 +13,17 @@ struct MeasureDebugView: View {
         ZStack(alignment: .bottom) {
             MeasureARView(arView: viewModel.arView) { viewModel.tapped(at: $0) }
                 .ignoresSafeArea()
+            MeasureDebugDetectionOverlay(
+                detections: viewModel.detector.detections, imageToView: viewModel.detector.imageToView
+            )
+            .ignoresSafeArea()
             MeasureDebugPanel(viewModel: viewModel) { dismiss() }
         }
         .onAppear { viewModel.start() }
         .onDisappear { viewModel.stop() }
         .onChange(of: viewModel.radiusCentimetres) { viewModel.radiusChanged() }
+        .onChange(of: viewModel.detectorEnabled) { viewModel.detectorToggled() }
+        .onChange(of: viewModel.bandOn) { viewModel.bandToggled() }
     }
 }
 
@@ -31,6 +37,7 @@ private struct MeasureDebugPanel: View {
             Text(viewModel.floorText).font(.footnote.bold())
             Text(viewModel.depthText).font(.caption)
             Text(viewModel.validationText).font(.caption)
+            Text(viewModel.detector.statusText).font(.caption)
 
             Picker("Painting", selection: $viewModel.target) {
                 ForEach(MeasureDebugViewModel.Target.allCases, id: \.self) { target in
@@ -45,6 +52,11 @@ private struct MeasureDebugPanel: View {
                     "Column radius \(Int(viewModel.radiusCentimetres)) cm",
                     value: $viewModel.radiusCentimetres, in: 5...30, step: 5
                 )
+            }
+
+            HStack {
+                Toggle("Detector", isOn: $viewModel.detectorEnabled)
+                Toggle("Band 15 cm", isOn: $viewModel.bandOn)
             }
 
             HStack {
