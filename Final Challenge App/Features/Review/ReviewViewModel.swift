@@ -60,4 +60,8 @@ final class ReviewViewModel: Identifiable {
         draftSetup.nodes = nodes
         StorageController.shared.save()
     }
+    
+    func discardSetup() {
+        StorageController.shared.deleteSetup(draftSetup)
+    }
 }

@@ -57,6 +57,7 @@ struct ReviewView: View {
         .alert("Cancel This Scan?", isPresented: $showCancelAlert) {
             Button("Continue", role: .cancel) { }
             Button("Cancel Scan", role: .destructive) {
+                viewModel.discardSetup()
                 dismissAll()
             }
         } message: {
@@ -70,6 +71,7 @@ struct ReviewView: View {
             .keyboardShortcut(.defaultAction)
             
             Button("Discard Setup", role: .destructive) {
+                viewModel.discardSetup()
                 dismissAll()
             }
             Button("Cancel", role: .cancel) { }
