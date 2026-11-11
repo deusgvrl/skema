@@ -1,7 +1,5 @@
+import ARKit
 import Observation
-
-/// State and actions for ScanView.
-/// Reads and writes data only through StorageController, and reloads on appear and after every change.
 
 enum ScanScreen: Equatable {
 
@@ -18,10 +16,13 @@ final class ScanViewModel {
 
     var draftSetup: Setup
 
+    @ObservationIgnored let pointCloud = PointCloudScene()
+
     @ObservationIgnored private let makeScan: () -> ScanSession
     @ObservationIgnored private let camera: any CameraPermission
     @ObservationIgnored private var scan: ScanSession?
     @ObservationIgnored private var stateTask: Task<Void, Never>?
+    @ObservationIgnored private var pointsTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
 
     init(
@@ -33,6 +34,12 @@ final class ScanViewModel {
         self.draftSetup = Setup(setupName: "")
     }
 
+    /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
+    var arSession: ARSession? {
+        scan?.session as? ARSession
+    }
+
+    // call this function when scanning, adding an equipment when model catch equipment
     func addDraftEquipment(_ equipment: Equipment) {
         draftSetup.nodes.append(equipment)
     }
@@ -52,15 +59,16 @@ final class ScanViewModel {
             return
         }
         listen(to: newScan)
+        collectPoints(from: newScan)
         do {
             try newScan.start()
             scan = newScan
             screen = .scanning
         } catch let error as ScanSessionError {
-            stateTask?.cancel()
+            stopListening()
             handle(.failed(error))
         } catch {
-            stateTask?.cancel()
+            stopListening()
             handle(.failed(ScanSessionError(error)))
         }
     }
@@ -75,18 +83,16 @@ final class ScanViewModel {
     }
 
     func finishTapped() {
-            stateTask?.cancel()
-            scan?.stop()
-        }
+        stopListening()
+        scan?.stop()
+    }
 
-    /// Cancel, or back to Setups from Review: stops the camera and throws the scan away.
     func closeTapped() {
-        stateTask?.cancel()
+        stopListening()
         scan?.discard()
     }
 
-    /// Turns a session state into what the screen shows. Internal so tests can call it.
-    func handle(_ state: ScanSessionState) {
+     func handle(_ state: ScanSessionState) {
         switch state {
         case .failed(.cameraDenied):
             screen = .cameraDenied
@@ -115,6 +121,24 @@ final class ScanViewModel {
                 self?.handle(state)
             }
         }
+    }
+
+    private func collectPoints(from scan: ScanSession) {
+        pointsTask?.cancel()
+        let frames = scan.frames()
+        let collector = RoomPointsCollector()
+        pointsTask = Task { [weak self] in
+            for await frame in frames {
+                let added = await collector.add(frame)
+                guard !Task.isCancelled else { return }
+                self?.pointCloud.add(added)
+            }
+        }
+    }
+
+    private func stopListening() {
+        stateTask?.cancel()
+        pointsTask?.cancel()
     }
 
     private static func message(for error: ScanSessionError) -> String {

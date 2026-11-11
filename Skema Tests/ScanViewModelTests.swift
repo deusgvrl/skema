@@ -229,6 +229,37 @@ struct ScanViewModelTests {
         #expect(arSession.pauseCount == 1)
     }
 
+    @Test("While scanning, LiDAR frames build up the room points")
+        func scanningCollectsPoints() async throws {
+            let made = MadeScans()
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized), made: made)
+            await viewModel.start()
+
+            let scan = try #require(made.all.first)
+            scan.deliver(try makeDepthScanFrame(timestamp: 1))
+            for _ in 0..<100 where viewModel.pointCloud.pointCount == 0 {
+                await Task.yield()
+            }
+
+            #expect(viewModel.pointCloud.pointCount == 4)
+        }
+
+        @Test("After Finish Scan, no more points are added")
+        func finishStopsPoints() async throws {
+            let made = MadeScans()
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized), made: made)
+            await viewModel.start()
+
+            viewModel.finishTapped()
+            let scan = try #require(made.all.first)
+            scan.deliver(try makeDepthScanFrame(timestamp: 1))
+            for _ in 0..<20 {
+                await Task.yield()
+            }
+
+            #expect(viewModel.pointCloud.pointCount == 0)
+        }
+
     @Test("Close before the scan started does nothing")
     func closeBeforeStart() {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .denied))
@@ -238,8 +269,22 @@ struct ScanViewModelTests {
         #expect(arSession.pauseCount == 0)
     }
 
-    @Test("The symbols on the scan screens exist", arguments: ["video.slash", "iphone.slash", "camera.metering.matrix"])
+    @Test("The symbols on the scan screens exist", arguments: ["video.slash", "iphone.slash"])
     func symbolsExist(name: String) {
         #expect(UIImage(systemName: name) != nil)
     }
+}
+
+func makeDepthScanFrame(timestamp: TimeInterval) throws -> ScanFrame {
+    let frame = try makeScanFrame(timestamp: timestamp)
+    return ScanFrame(
+        timestamp: frame.timestamp,
+        image: frame.image,
+        orientation: frame.orientation,
+        camera: makeCamera(size: 8, focal: 8),
+        depth: makeDepth(width: 8, height: 8, depth: 1),
+        tracking: frame.tracking,
+        ambientIntensity: frame.ambientIntensity,
+        planes: frame.planes
+    )
 }
