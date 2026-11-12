@@ -30,19 +30,20 @@ final class ScanViewModel {
     @ObservationIgnored private var detectTask: Task<Void, Never>?
     @ObservationIgnored private var isDetecting = false
     private var tracker = EquipmentTracker()
-
-    init(
+    
+    init (
         makeScan: @escaping () -> ScanSession = { ScanSession() },
         camera: any CameraPermission = SystemCameraPermission(),
-        storageController: StorageController? = nil,
-        detector: (any EquipmentDetecting)? = nil
+        detector: (any EquipmentDetecting)? = nil,
+        storageController: StorageController? = nil
     ) {
         self.makeScan = makeScan
         self.camera = camera
         self.storageController = storageController ?? StorageController.shared
-        self.detector = detector
         self.draftSetup = Setup(setupName: "Untitled Setup")
+        self.detector = detector
     }
+
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
     var arSession: ARSession? {
