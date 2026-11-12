@@ -17,10 +17,11 @@ public struct Sighting: Equatable, Sendable {
     }
 
     /// Samples the detection's mask when it has one, else its box; nil when fewer than `minPoints` points.
+    /// Depth pixels farther than `maxRange` metres are ignored (default: no limit).
     public static func make(from detection: Detection, depth: DepthFrame, camera: CameraModel,
-                            minPoints: Int = 20) -> Sighting? {
-        let points = detection.mask.map { DepthSampler.worldPoints(in: $0, depth: depth, camera: camera) }
-            ?? DepthSampler.worldPoints(in: detection.box, depth: depth, camera: camera)
+                            minPoints: Int = 20, maxRange: Float = .infinity) -> Sighting? {
+        let points = detection.mask.map { DepthSampler.worldPoints(in: $0, depth: depth, camera: camera, maxRange: maxRange) }
+            ?? DepthSampler.worldPoints(in: detection.box, depth: depth, camera: camera, maxRange: maxRange)
         guard points.count >= minPoints, let position = Geometry.medianPoint(points) else { return nil }
         return Sighting(label: detection.label, confidence: detection.confidence, position: position,
                         axis: Geometry.principalAxis(points), pointCount: points.count)

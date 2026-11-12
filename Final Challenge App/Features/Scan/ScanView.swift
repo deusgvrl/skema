@@ -29,9 +29,17 @@ struct ScanView: View {
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 RoomScanView(session: session, scene: viewModel.pointCloud.scene)
                     .ignoresSafeArea()
+                ScanOverlayView(viewModel: viewModel)
+                    .ignoresSafeArea()
                 }
             content
                 .padding(.horizontal, 24)
+        }
+        .overlay(alignment: .top) {
+            if viewModel.screen == .scanning {
+                ScanChips(viewModel: viewModel)
+                    .padding(.top, 8)
+            }
         }
         .overlay(alignment: .bottom) {
             if showsFinishScan {

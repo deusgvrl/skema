@@ -31,6 +31,12 @@ private func greyFrame() throws -> ScanFrame {
     )
 }
 
+/// Shared yes/no flags for case 11, only touched on the main actor.
+@MainActor private final class MainActorFlags {
+    var tickedDuringDetect = false
+    var detectFinished = false
+}
+
 @Suite("Equipment detector")
 struct EquipmentDetectorTests {
     @Test("Case 1: the bundled model loads and knows exactly studio lighting and camera")
@@ -94,13 +100,12 @@ struct EquipmentDetectorTests {
     func detectLeavesTheMainActorFree() async throws {
         let detector = try BundledDetector.shared.get()
         let frame = try greyFrame()
-        var tickedDuringDetect = false
-        var detectFinished = false
-        let ticker = Task { @MainActor in tickedDuringDetect = !detectFinished }
+        let flags = MainActorFlags()
+        let ticker = Task { @MainActor in flags.tickedDuringDetect = !flags.detectFinished }
         _ = try await detector.detect(in: frame)
-        detectFinished = true
+        flags.detectFinished = true
         await ticker.value
-        #expect(tickedDuringDetect)
+        #expect(flags.tickedDuringDetect)
     }
 
     @Test("Case 12: the detector keeps no reference to the frame's image after detect")
