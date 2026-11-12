@@ -1,3 +1,4 @@
+import Testing
 import XCTest
 import simd
 @testable import MeasureKit
@@ -60,5 +61,33 @@ final class PlanLayoutTests: XCTestCase {
     func testScaleWithNoPointsIsMaxScale() {
         XCTAssertEqual(PlanLayout.scale(fitting: [], in: SIMD2(200, 100), margin: 10), 400)
         XCTAssertEqual(PlanLayout.scale(fitting: [.zero], in: SIMD2(200, 100), margin: 10, maxScale: 80), 80)
+    }
+}
+
+/// A10-62 follow-up: a floor offset (x, z of equipment minus subject, metres) turned into plan axes.
+@Suite("Plan offset")
+struct PlanOffsetTests {
+    private func close(_ a: SIMD2<Float>, _ b: SIMD2<Float>) -> Bool { simd_length(a - b) < 1e-4 }
+
+    @Test("Phone on the +z side of the subject: the offset is unchanged (plan down is +z)")
+    func phoneAlongPlusZ() {
+        #expect(close(PlanLayout.planOffset(SIMD2(1, 0), towardViewer: SIMD2(0, 3)), SIMD2(1, 0)))
+        #expect(close(PlanLayout.planOffset(SIMD2(0, 1), towardViewer: SIMD2(0, 3)), SIMD2(0, 1)))
+    }
+
+    @Test("Phone on the +x side: world -z becomes plan right, world +x becomes plan down")
+    func phoneAlongPlusX() {
+        #expect(close(PlanLayout.planOffset(SIMD2(0, -1), towardViewer: SIMD2(2, 0)), SIMD2(1, 0)))
+        #expect(close(PlanLayout.planOffset(SIMD2(1, 0), towardViewer: SIMD2(2, 0)), SIMD2(0, 1)))
+    }
+
+    @Test("The length does not depend on how far the phone is")
+    func distanceOfThePhoneDoesNotMatter() {
+        #expect(close(PlanLayout.planOffset(SIMD2(0, -1), towardViewer: SIMD2(20, 0)), SIMD2(1, 0)))
+    }
+
+    @Test("A phone right over the subject falls back to +z, like planPoint")
+    func phoneOnTheSubject() {
+        #expect(close(PlanLayout.planOffset(SIMD2(1, 2), towardViewer: .zero), SIMD2(1, 2)))
     }
 }

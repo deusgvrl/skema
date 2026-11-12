@@ -307,4 +307,71 @@ struct ScanMeasurementsTests {
         #expect(try #require(results[subject]).status == .measured)
         #expect(try #require(results[item]).status == .measured)
     }
+
+    @Test("Removing an item forgets its points and keeps the others")
+    func removeForgetsOneItem() throws {
+        var scan = ScanMeasurements()
+        see(subject, wallAt: 2, in: &scan)
+        see(item, wallAt: 2, in: &scan)
+
+        scan.remove(item)
+        scan.remove(UUID())
+
+        let results = scan.results(subject: subject, floorY: floorY)
+        let subjectResult = try #require(results[subject])
+        #expect(results[item] == nil)
+        #expect(subjectResult.pointCount == 128)
+    }
+}
+
+/// Equipment points handed over directly (a painted column), with the same rules as points from a mask.
+@Suite("Adding points directly")
+struct AddPointsTests {
+    @Test("Points in the same 1 cm cell are kept once")
+    func sameCellOnce() {
+        var points = EquipmentPoints()
+
+        points.add(points: [SIMD3(0.101, 0.5, -2), SIMD3(0.105, 0.5, -2), SIMD3(0.2, 0.5, -2)], camera: makeCamera())
+        points.add(points: [SIMD3(0.102, 0.5, -2)], camera: makeCamera())
+
+        #expect(points.points.count == 2)
+    }
+
+    @Test("Points beyond the range are dropped, and only far points mean out of range")
+    func beyondRange() {
+        var far = EquipmentPoints()
+        far.add(points: [SIMD3(0, 0.5, -6), SIMD3(0.5, 0.5, -7)], camera: makeCamera())
+        #expect(far.points.isEmpty)
+        #expect(far.scanResult(isSubject: false).status == .outOfRange)
+
+        var mixed = EquipmentPoints()
+        mixed.add(points: [SIMD3(0, 0.5, -6), SIMD3(0, 0.5, -2)], camera: makeCamera())
+        #expect(mixed.points.count == 1)
+        #expect(mixed.scanResult(isSubject: false).status == .tooFewPoints)
+    }
+
+    @Test("No points at all is not out of range")
+    func noPoints() {
+        var points = EquipmentPoints()
+        points.add(points: [], camera: makeCamera())
+        #expect(points.scanResult(isSubject: false).status == .tooFewPoints)
+    }
+
+    @Test("A scan result from added points gives the item's measurements")
+    func resultFromPoints() throws {
+        let subject = UUID(), light = UUID()
+        var scan = ScanMeasurements()
+        let camera = makeCamera()
+        scan.add(points: SyntheticEquipment.column(x: 0, z: -300, bottom: 0, top: 100, total: 120),
+                 to: subject, camera: camera)
+        // The 98th percentile of evenly spread points lies a little under the top, by design.
+        scan.add(points: SyntheticEquipment.column(x: 100, z: -300, bottom: 0, top: 120, total: 120),
+                 to: light, camera: camera)
+
+        let result = try #require(scan.results(subject: subject, floorY: 0)[light])
+
+        #expect(result.status == .measured)
+        #expect(near(try #require(result.distanceToSubject), 1, 0.001))
+        #expect(near(try #require(result.height), 1.2, 0.03))
+    }
 }

@@ -21,6 +21,16 @@ public struct NormalizedBox: Equatable, Sendable {
     }
 }
 
+extension NormalizedBox {
+    /// A box of `2 * halfSize` around the point (x, y), cut at the edges of the picture (0...1).
+    /// Used for a tap on the picture: the depth pixels inside it are what the tap points at.
+    public static func around(x: Double, y: Double, halfSize: Double) -> NormalizedBox {
+        let left = max(0, x - halfSize), right = min(1, x + halfSize)
+        let top = max(0, y - halfSize), bottom = min(1, y + halfSize)
+        return NormalizedBox(x: left, y: top, width: right - left, height: bottom - top)
+    }
+}
+
 /// Which pixels belong to one object. Same frame as `NormalizedBox`: the native image,
 /// origin top-left, row-major. Usually lower resolution than the image; scale by normalized position.
 public struct InstanceMask: Equatable, Sendable {

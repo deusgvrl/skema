@@ -10,6 +10,13 @@ public enum PlanLayout {
         rotate(world - subject, subject: subject, viewer: viewer)
     }
 
+    /// A floor offset (equipment base minus subject base: x = world x, y = world z, metres) in plan axes.
+    /// `towardViewer` is the horizontal direction (x, z) from the subject to the phone; its length does not matter.
+    /// Plan +y then points toward the phone and plan +x is the phone's right, as in `planPoint`.
+    public static func planOffset(_ floorOffset: SIMD2<Float>, towardViewer: SIMD2<Float>) -> SIMD2<Float> {
+        rotate(SIMD3(floorOffset.x, 0, floorOffset.y), subject: .zero, viewer: SIMD3(towardViewer.x, 0, towardViewer.y))
+    }
+
     /// Unit plan direction of an axis's horizontal part; nil if that part is shorter than 1e-3.
     public static func planDirection(_ axis: SIMD3<Float>, subject: SIMD3<Float>, viewer: SIMD3<Float>) -> SIMD2<Float>? {
         guard simd_length(SIMD2(axis.x, axis.z)) >= 1e-3 else { return nil }
