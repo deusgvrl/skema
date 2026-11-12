@@ -27,15 +27,26 @@ struct SetupsView: View {
                         .padding(.top, 120)
                 } else {
                     List(viewModel.setups) { setup in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(setup.setupName) - \(setup.nodes.count) equipment")
-                                .font(.headline)
-                            if !setup.client.isEmpty || !setup.project.isEmpty {
-                                Text("\(setup.client) • \(setup.project)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                        NavigationLink(value: setup) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(setup.setupName) • \(setup.nodes.count) equipment")
+                                    .font(.headline)
+                                
+                                let subtitle = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " › ")
+                                if !subtitle.isEmpty {
+                                    Text(subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                            NavigationLink(setup.setupName, value: setup)
+                            .padding(.vertical, 2)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                viewModel.deleteSetup(setup)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
                     .listStyle(.insetGrouped)

@@ -147,17 +147,18 @@ struct SetupDetailView: View {
             }
 
             if viewModel.selectedTab == 1 {
+                ToolbarSpacer(placement: .bottomBar)
                 ToolbarItem(placement: .bottomBar) {
                     if !viewModel.isSelectionMode {
                         Menu {
                             Button {
-                                showCamera = true
+                                // showCamera = true
                             } label: {
                                 Label("Take Photo", systemImage: "camera")
                             }
 
                             Button {
-                                showPhotoPicker = true
+                                // showPhotoPicker = true
                             } label: {
                                 Label("Choose from Library", systemImage: "photo.on.rectangle")
                             }
