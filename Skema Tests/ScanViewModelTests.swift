@@ -50,7 +50,8 @@ struct ScanViewModelTests {
                 made.all.append(scan)
                 return scan
             },
-            camera: camera
+            camera: camera,
+            detector: FakeEquipmentDetector()
         )
     }
 
