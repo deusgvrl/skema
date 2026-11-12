@@ -77,22 +77,24 @@ final class Equipment {
 }
 
 extension Equipment {
-    /// 1. Call during position dragging: updates `distance` from (positionX, positionY) using Pythagoras
+    static let pointsPerMeter: Double = 100.0
+
+    /// Updates `distance` string as a clean number (e.g. "2.50") from (positionX, positionY)
     func syncDistanceFromPosition() {
         let dx = positionX
         let dy = positionY
         let distanceInPoints = sqrt(dx * dx + dy * dy)
-        let distanceInMeters = distanceInPoints / 100.0
-        self.distance = String(format: "%.2f m", distanceInMeters)
+        let distanceInMeters = distanceInPoints / Self.pointsPerMeter
+        self.distance = String(format: "%.2f", distanceInMeters)
     }
 
-    /// 2. Call during rotation handle gesture: updates `horizontalAim` string from `rotationAngle`
+    /// Updates `horizontalAim` string as a clean number (e.g. "45") from `rotationAngle`
     func syncHorizontalAimFromRotation() {
         let displayAngle = (360 - Int(rotationAngle)) % 360
-        self.horizontalAim = "\(displayAngle)°"
+        self.horizontalAim = "\(displayAngle)"
     }
 
-    /// 3. Call when saving form edits: converts typed `horizontalAim` string back to `rotationAngle`
+    /// Updates `rotationAngle` from a typed numeric `horizontalAim` string
     func syncRotationFromHorizontalAim() {
         let cleaned = horizontalAim.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
         if let displayAngle = Double(cleaned) {
@@ -100,22 +102,20 @@ extension Equipment {
             self.rotationAngle = rawAngle < 0 ? rawAngle + 360.0 : rawAngle
         }
     }
-    
+
+    /// Scales (positionX, positionY) along vector from a typed numeric `distance` string
     func syncPositionFromDistance() {
-        // Parse numeric distance value (e.g., "3.50 m" -> 3.5)
         let cleaned = distance.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
         guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
         
-        let targetPoints = targetMeters * 100.0 // 100 points = 1.0 meter
+        let targetPoints = targetMeters * Self.pointsPerMeter
         let currentPoints = sqrt(positionX * positionX + positionY * positionY)
         
         if currentPoints > 0 {
-            // Scale existing vector to match new magnitude
             let scaleFactor = targetPoints / currentPoints
             positionX *= scaleFactor
             positionY *= scaleFactor
         } else {
-            // Fallback direction if node is at (0,0) (placed directly above subject)
             positionX = 0
             positionY = -targetPoints
         }

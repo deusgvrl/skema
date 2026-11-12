@@ -45,7 +45,7 @@ struct LightingDiagramView: View {
                         y: (subjectCenter.y + nodeScreenPos.y) / 2
                     )
                      
-                    Text(node.distance)
+                    Text("\(node.distance) m")
                         .font(.caption)
                         .padding(4)
                         .background(Color(uiColor: .systemBackground).opacity(0.8))
