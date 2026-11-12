@@ -139,7 +139,7 @@ struct EquipmentFormView: View {
                             Spacer()
                             TextField("-", text: $formViewModel.tilt)
                                 .multilineTextAlignment(.trailing)
-                                .keyboardType(.numbersAndPunctuation)
+                                .keyboardType(.numberPad)
                             Text("°")
                                 .foregroundStyle(.secondary)
                         }
@@ -150,7 +150,7 @@ struct EquipmentFormView: View {
                                 Spacer()
                                 TextField("-", text: $formViewModel.horizontalAim)
                                     .multilineTextAlignment(.trailing)
-                                    .keyboardType(.numbersAndPunctuation)
+                                    .keyboardType(.numberPad)
                                 Text("°")
                                     .foregroundStyle(.secondary)
                             }
