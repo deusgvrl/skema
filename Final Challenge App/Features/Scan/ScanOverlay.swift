@@ -71,14 +71,19 @@ nonisolated struct ScanOverlay: Equatable, Sendable {
         }
     }
 
-    /// The full name in the app (naming rule, A10-62): "Camera 1 ✓", "Studio Lighting 2 ✓".
-    private static func acceptedTag(for item: TrackedItem) -> String {
+    /// The full name in the app (naming rule, A10-62): "Camera 1", "Studio Lighting 2".
+    static func name(for item: TrackedItem) -> String {
         let name = switch EquipmentKind(modelLabel: item.label) {
         case .camera: "Camera"
         case .studioLighting: "Studio Lighting"
         case nil: item.label
         }
-        return item.number.map { "\(name) \($0) ✓" } ?? "\(name) ✓"
+        return item.number.map { "\(name) \($0)" } ?? name
+    }
+
+    /// The accepted tag: "Camera 1 ✓", "Studio Lighting 2 ✓".
+    private static func acceptedTag(for item: TrackedItem) -> String {
+        "\(name(for: item)) ✓"
     }
 
     /// 3D spot → picture pixel (`DepthSampler.project`) → upright picture → screen.
