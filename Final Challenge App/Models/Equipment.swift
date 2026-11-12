@@ -94,18 +94,20 @@ extension Equipment {
         self.horizontalAim = "\(displayAngle)"
     }
 
-    /// Updates `rotationAngle` from a typed numeric `horizontalAim` string
+    /// Updates `rotationAngle` from a typed numeric `horizontalAim` string (handles both '.' and ',')
     func syncRotationFromHorizontalAim() {
-        let cleaned = horizontalAim.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        let normalized = horizontalAim.replacingOccurrences(of: ",", with: ".")
+        let cleaned = normalized.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
         if let displayAngle = Double(cleaned) {
             let rawAngle = (360.0 - displayAngle).truncatingRemainder(dividingBy: 360.0)
             self.rotationAngle = rawAngle < 0 ? rawAngle + 360.0 : rawAngle
         }
     }
 
-    /// Scales (positionX, positionY) along vector from a typed numeric `distance` string
+    /// Scales (positionX, positionY) along vector from a typed numeric `distance` string (handles both '.' and ',')
     func syncPositionFromDistance() {
-        let cleaned = distance.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+        let normalized = distance.replacingOccurrences(of: ",", with: ".")
+        let cleaned = normalized.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
         guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
         
         let targetPoints = targetMeters * Self.pointsPerMeter
