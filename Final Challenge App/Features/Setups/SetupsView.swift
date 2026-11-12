@@ -35,9 +35,14 @@ struct SetupsView: View {
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
+                            NavigationLink(setup.setupName, value: setup)
                         }
                     }
                     .listStyle(.insetGrouped)
+                    .navigationDestination(for: Setup.self) { selectedSetup in
+                        
+                        SetupDetailView(setup: selectedSetup)
+                    }
                 }
                 Spacer(minLength: 0)
             }
