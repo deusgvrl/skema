@@ -131,7 +131,7 @@ struct EquipmentFormView: View {
                             TextField("-", text: $formViewModel.height)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.decimalPad)
-                            Text("cm")
+                            Text("m")
                                 .foregroundStyle(.secondary)
                         }
                         HStack {
