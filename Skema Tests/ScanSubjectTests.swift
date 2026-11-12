@@ -158,8 +158,8 @@ struct ScanSubjectTests {
         let viewModel = try await finishedSetup()
 
         let light = try #require(viewModel.draftSetup.nodes.first)
-        #expect(light.distance == "1.00 m")
-        #expect(light.height == "1.20 m")
+        #expect(light.distance == "1.00")
+        #expect(light.height == "1.20")
         // On the phone's side of the subject, so below it on the plan: 1 m is 100 points.
         #expect(abs(light.position.x) < 2)
         #expect(abs(light.position.y - 100) < 2)
@@ -171,7 +171,7 @@ struct ScanSubjectTests {
 
         let light = try #require(viewModel.draftSetup.nodes.first)
         #expect(light.height.isEmpty)
-        #expect(light.distance == "1.00 m")
+        #expect(light.distance == "1.00")
     }
 
     @Test("Without a subject nothing is written")

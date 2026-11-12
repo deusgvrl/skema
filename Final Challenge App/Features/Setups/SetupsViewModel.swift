@@ -2,6 +2,7 @@ import Observation
 
 /// State and actions for SetupsView.
 /// Reads and writes data only through StorageController, and reloads on appear and after every change.
+@MainActor
 @Observable
 final class SetupsViewModel {
     
@@ -11,10 +12,13 @@ final class SetupsViewModel {
     var showsEmptyState: Bool { setups.isEmpty }
 
     @ObservationIgnored private let scanGuide: ScanGuideSettings
+    @ObservationIgnored private let storageController: StorageController
     @ObservationIgnored private var scanRequested = false
 
-    init(scanGuide: ScanGuideSettings = ScanGuideSettings()) {
-        self.scanGuide = scanGuide
+    init(scanGuide: ScanGuideSettings? = nil,
+         storageController: StorageController? = nil) {
+        self.scanGuide = scanGuide ?? ScanGuideSettings()
+        self.storageController = storageController ?? StorageController.shared
         self.fetchSetups()
     }
     
@@ -45,7 +49,7 @@ final class SetupsViewModel {
     }
     
     func fetchSetups() {
-        self.setups = StorageController.shared.fetchAllSetups()
+        self.setups = storageController.fetchAllSetups()
         print("[SwiftData Test] Fetched \(setups.count) setup(s):")
         for s in setups {
             print(" '\(s.setupName)' | Client: '\(s.client)' | Project: '\(s.project)' | Equipment total: '\(s.nodes.count)'")

@@ -9,7 +9,7 @@ struct LiDARScanView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: LiDARScanViewModel
-    @State private var showReview = false
+    @State private var reviewViewModel: ReviewViewModel?
     var onDismissToSetups: (() -> Void)?
 
     init(viewModel: LiDARScanViewModel = LiDARScanViewModel(), onDismissToSetups: (() -> Void)? = nil) {
@@ -48,14 +48,13 @@ struct LiDARScanView: View {
             }
         }
         .environment(\.colorScheme, .dark)
-        .fullScreenCover(isPresented: $showReview) {
+        .fullScreenCover(item: $reviewViewModel) { reviewModel in
             NavigationStack {
                 ReviewView(
                     isFromLoadingScreen: true,
-                    viewModel: ReviewViewModel(setup: viewModel.draftSetup),
+                    viewModel: reviewModel,
                     onDismissToSetups: {
-                        viewModel.closeTapped()
-                        showReview = false
+                        reviewViewModel = nil
                         onDismissToSetups?()
                     }
                 )
@@ -114,7 +113,7 @@ struct LiDARScanView: View {
 
             Button {
                 viewModel.finishTapped()
-                showReview = true
+                reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup)
             } label: {
                 HStack(spacing: 10) {
                     Text("Finish Scan")

@@ -29,6 +29,7 @@ final class ScanViewModel {
     @ObservationIgnored private var isStarting = false
     @ObservationIgnored private let subjectSegmenter: any SubjectSegmenting
     @ObservationIgnored private var subjectTask: Task<Void, Never>?
+    @ObservationIgnored var storageController: StorageController
     @ObservationIgnored private var detector: (any EquipmentDetecting)?
     @ObservationIgnored private var detectTask: Task<Void, Never>?
     @ObservationIgnored private var isDetecting = false
@@ -48,13 +49,15 @@ final class ScanViewModel {
         makeScan: @escaping () -> ScanSession = { ScanSession() },
         camera: any CameraPermission = SystemCameraPermission(),
         detector: (any EquipmentDetecting)? = nil,
-        subjectSegmenter: any SubjectSegmenting = SubjectSegmenter()
+        subjectSegmenter: any SubjectSegmenting = SubjectSegmenter(),
+        storageController: StorageController? = nil
     ) {
         self.subjectSegmenter = subjectSegmenter
         self.makeScan = makeScan
         self.camera = camera
+        self.storageController = storageController ?? StorageController.shared
+        self.draftSetup = Setup(setupName: "Untitled Setup")
         self.detector = detector
-        self.draftSetup = Setup(setupName: "")
     }
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
@@ -200,9 +203,9 @@ final class ScanViewModel {
         }
     }
 
-    /// "1.28 m", the same text the diagram writes when a node is dragged.
+    /// "1.28": a plain number of metres, as `Equipment.syncDistanceFromPosition` writes it. The views add the unit.
     private static func metres(_ value: Float) -> String {
-        String(format: "%.2f m", value)
+        String(format: "%.2f", value)
     }
 
     func start() async {
@@ -245,12 +248,14 @@ final class ScanViewModel {
     }
 
     func finishTapped() {
+        insertDraftSetup()
         stopListening()
         writeMeasurements()
         scan?.stop()
     }
 
     func closeTapped() {
+        deleteDraftSetup()
         stopListening()
         scan?.discard()
     }
@@ -340,5 +345,13 @@ final class ScanViewModel {
         case .alreadyStarted: "The scan was already started."
         case .cameraDenied, .lidarUnsupported: ""
         }
+    }
+    
+    func deleteDraftSetup() {
+        storageController.deleteSetup(draftSetup)
+    }
+    
+    func insertDraftSetup() {
+        storageController.addSetup(draftSetup)
     }
 }

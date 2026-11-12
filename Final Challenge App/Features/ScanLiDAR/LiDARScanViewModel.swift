@@ -42,6 +42,7 @@ final class LiDARScanViewModel {
 
     @ObservationIgnored private let makeScan: () -> ScanSession
     @ObservationIgnored private let cameraPermission: any CameraPermission
+    @ObservationIgnored private let storageController: StorageController
     @ObservationIgnored private var scan: ScanSession?
     @ObservationIgnored private var stateTask: Task<Void, Never>?
     @ObservationIgnored private var framesTask: Task<Void, Never>?
@@ -63,10 +64,12 @@ final class LiDARScanViewModel {
 
     init(
         makeScan: @escaping () -> ScanSession = { ScanSession() },
-        camera: any CameraPermission = SystemCameraPermission()
+        camera: any CameraPermission = SystemCameraPermission(),
+        storageController: StorageController? = nil
     ) {
         self.makeScan = makeScan
         self.cameraPermission = camera
+        self.storageController = storageController ?? StorageController.shared
     }
 
     var arSession: ARSession? { scan?.session as? ARSession }
@@ -187,7 +190,7 @@ final class LiDARScanViewModel {
         guard let values = Self.values(of: item.result, hasFloor: floorY != nil), let height = values.height else {
             return "\(item.name) ✓"
         }
-        return "\(item.name) · \(Self.metres(values.distance)) · \(Self.metres(height))"
+        return "\(item.name) · \(Self.metres(values.distance)) m · \(Self.metres(height)) m"
     }
 
     /// The line under an item's name: whether its values are saved on the equipment, or why not.
@@ -238,12 +241,14 @@ final class LiDARScanViewModel {
     // MARK: Finish and the plan
 
     func finishTapped() {
+        storageController.addSetup(draftSetup)
         stopListening()
         write(measurements.results(subject: subjectID, floorY: floorY ?? 0))
         scan?.stop()
     }
 
     func closeTapped() {
+        storageController.deleteSetup(draftSetup)
         stopListening()
         scan?.discard()
     }
@@ -266,8 +271,9 @@ final class LiDARScanViewModel {
         }
     }
 
+    /// "1.28": a plain number of metres, as `Equipment.syncDistanceFromPosition` writes it. The views add the unit.
     private static func metres(_ value: Float) -> String {
-        String(format: "%.2f m", value)
+        String(format: "%.2f", value)
     }
 
     private func stopListening() {

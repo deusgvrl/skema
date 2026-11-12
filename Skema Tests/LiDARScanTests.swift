@@ -27,12 +27,13 @@ struct LiDARScanTests {
     let arSession = FakeARSession()
     private let floor = [makePlane(worldY: -1, isFloor: true)]
 
-    func makeViewModel() -> LiDARScanViewModel {
+    func makeViewModel(storage: StorageController? = nil) -> LiDARScanViewModel {
         LiDARScanViewModel(
             makeScan: { [arSession] in
                 ScanSession(session: arSession, frameInterval: 1.0 / 15.0, supportsLiDAR: { true })
             },
-            camera: FakeCameraPermission(status: .authorized))
+            camera: FakeCameraPermission(status: .authorized),
+            storageController: storage ?? StorageController(inMemory: true))
     }
 
     private func tap(_ viewModel: LiDARScanViewModel, _ kind: LiDARTapKind, at point: CGPoint = middle,
@@ -161,7 +162,7 @@ struct LiDARScanTests {
         // The subject wall is 3 m ahead, the light's wall 2 m ahead: 1 m apart, on the phone's side (plan down).
         let light = try #require(viewModel.draftSetup.nodes.first)
         let height = try #require(Double(light.height.replacingOccurrences(of: " m", with: "")))
-        #expect(light.distance == "1.00 m")
+        #expect(light.distance == "1.00")
         // The column runs from 3 cm above the floor up to the top of the wall at 2 m, 2.39 m above the floor.
         #expect(abs(height - 2.39) < 0.05)
         #expect(abs(light.position.x) < 2 && abs(light.position.y - 100) < 2)
@@ -202,7 +203,7 @@ struct LiDARScanTests {
         let item = try #require(viewModel.items.first)
         let light = try #require(viewModel.draftSetup.nodes.first)
         #expect(viewModel.statusText(for: item) == "Saved" && viewModel.isSaved(item))
-        #expect(light.distance == "1.00 m" && !light.height.isEmpty)
+        #expect(light.distance == "1.00" && !light.height.isEmpty)
         #expect(abs(light.position.y - 100) < 2)
         #expect(viewModel.subjectStatusText == "Saved" && viewModel.subjectIsSaved)
     }
@@ -253,5 +254,31 @@ struct LiDARScanTests {
         let item = try #require(viewModel.items.first)
         #expect(viewModel.statusText(for: item) == "Subject not measured, see its tag")
         #expect(!viewModel.isSaved(item))
+    }
+
+    // MARK: Saving the setup (dev's flow)
+
+    @Test("Finish Scan puts the draft setup, with its equipment, into storage")
+    func finishInsertsTheSetup() throws {
+        let storage = StorageController(inMemory: true)
+        let viewModel = makeViewModel(storage: storage)
+        try tap(viewModel, .light)
+
+        viewModel.finishTapped()
+
+        let saved = try #require(storage.fetchAllSetups().first)
+        #expect(saved.nodes.map(\.name) == ["Studio Lighting 1"])
+    }
+
+    @Test("Closing the scan removes the draft setup from storage")
+    func closeDeletesTheSetup() throws {
+        let storage = StorageController(inMemory: true)
+        let viewModel = makeViewModel(storage: storage)
+        try tap(viewModel, .light)
+        viewModel.finishTapped()
+
+        viewModel.closeTapped()
+
+        #expect(storage.fetchAllSetups().isEmpty)
     }
 }

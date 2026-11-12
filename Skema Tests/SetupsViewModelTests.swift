@@ -18,8 +18,16 @@ struct SetupsViewModelTests {
 
     @Test("Starts on the empty state with nothing presented")
     func startsEmpty() {
-        let viewModel = SetupsViewModel(scanGuide: settings)
+        let settings = ScanGuideSettings()
+        let testStorage = StorageController(inMemory: true)
+        
+        let viewModel = SetupsViewModel(
+            scanGuide: settings,
+            storageController: testStorage 
+        )
 
+        viewModel.fetchSetups()
+        
         #expect(viewModel.showsEmptyState)
         #expect(!viewModel.isShowingScanGuide)
         #expect(!viewModel.isShowingScan)

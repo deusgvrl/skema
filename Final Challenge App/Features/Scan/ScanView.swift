@@ -6,7 +6,7 @@ struct ScanView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ScanViewModel
-    @State private var showLoadingScreen: Bool = false
+    @State private var reviewViewModel: ReviewViewModel? = nil
     var onDismissToSetups: (() -> Void)?
 
     /// "Add Equipment Manually", when the camera is off or there is no LiDAR.
@@ -56,14 +56,13 @@ struct ScanView: View {
             }
         }
         .environment(\.colorScheme, .dark)
-        .fullScreenCover(isPresented: $showLoadingScreen) {
+        .fullScreenCover(item: $reviewViewModel) { vm in
             NavigationStack {
                 ReviewView(
                     isFromLoadingScreen: true,
-                    viewModel: ReviewViewModel(setup: viewModel.draftSetup),
+                    viewModel: vm, 
                     onDismissToSetups: {
-                        viewModel.closeTapped()
-                        showLoadingScreen = false
+                        reviewViewModel = nil // Dismisses cover
                         onDismissToSetups?()
                     }
                 )
@@ -98,7 +97,7 @@ struct ScanView: View {
     private var finishScanButton: some View {
             Button {
                 viewModel.finishTapped()
-                showLoadingScreen = true
+                reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup)
             } label: {
                 HStack(spacing: 10) {
                     Text("Finish Scan")
