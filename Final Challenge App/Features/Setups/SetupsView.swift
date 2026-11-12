@@ -5,6 +5,7 @@ struct SetupsView: View {
     @State private var viewModel = SetupsViewModel()
     @State private var searchText = ""
     @State private var grouping = SetupsGrouping.recent
+    @State private var isShowingLiDARScan = false
     @ScaledMetric(relativeTo: .title2) private var newSetupButtonSize: CGFloat = 48
 
     var body: some View {
@@ -44,6 +45,11 @@ struct SetupsView: View {
             .navigationDestination(isPresented: $viewModel.isShowingScan) {
                 ScanView(onDismissToSetups: {
                     viewModel.isShowingScan = false
+                })
+            }
+            .navigationDestination(isPresented: $isShowingLiDARScan) {
+                LiDARScanView(onDismissToSetups: {
+                    isShowingLiDARScan = false
                 })
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -109,6 +115,11 @@ struct SetupsView: View {
 
             }
             .accessibilityLabel("New Setup")
+            #if DEBUG
+            .contextMenu {
+                Button("LiDAR tap scan (test)") { isShowingLiDARScan = true }
+            }
+            #endif
             .padding(16)
     }
 }
