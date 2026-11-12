@@ -62,6 +62,7 @@ struct LightingDiagramView: View {
                         node: $node,
                         subjectCenter: subjectCenter,
                         isSelected: !isReadOnly && selectedNodeId == node.id,
+                        zoomScale: zoomScale * magnifyBy,
                         onTap: {
                             onNodeTap?(node)
                         },
@@ -167,12 +168,11 @@ struct DiagramEntity: View {
     }
 }
 
-
-
 struct NodeView: View {
     @Binding var node: Equipment
     let subjectCenter: CGPoint
     let isSelected: Bool
+    var zoomScale: CGFloat = 1.0
     
     var onTap: () -> Void
     var onLongPress: () -> Void
@@ -182,6 +182,8 @@ struct NodeView: View {
     @State private var isRotating = false
     @State private var isDragging = false
     @State private var globalCenter: CGPoint = .zero
+    @State private var dragStartPosition: CGPoint = .zero
+    
     
     // Haptic State
     @State private var lastHapticAngle: Double = 0.0
@@ -279,6 +281,7 @@ struct NodeView: View {
                                         }
                                         
                                         node.rotationAngle = visualAngle
+                                        node.syncHorizontalAimFromRotation() 
                                     }
                                     .onEnded { _ in
                                         if isRotating {
@@ -340,24 +343,25 @@ struct NodeView: View {
             if !isRotating { onLongPress() }
         }
         .gesture(
-            DragGesture(minimumDistance: isSelected ? 5 : 10000)
+            DragGesture(coordinateSpace: .global)
                 .onChanged { value in
                     guard isSelected, !isRotating else { return }
                     
                     if !isDragging {
                         isDragging = true
+                        dragStartPosition = node.position
                         onGestureStart()
                     }
                     
-                    let dx = value.location.x - subjectCenter.x
-                    let dy = value.location.y - subjectCenter.y
+                    let canvasDeltaX = value.translation.width / zoomScale
+                    let canvasDeltaY = value.translation.height / zoomScale
                     
-                    node.position = CGPoint(x: dx, y: dy)
+                    let newX = dragStartPosition.x + canvasDeltaX
+                    let newY = dragStartPosition.y + canvasDeltaY
                     
-                    let distanceInPoints = sqrt(dx * dx + dy * dy)
-                    let distanceInMeters = distanceInPoints / 100.0
+                    node.position = CGPoint(x: newX, y: newY)
                     
-                    node.distance = String(format: "%.2f m", distanceInMeters)
+                    node.syncDistanceFromPosition()
                 }
                 .onEnded { _ in
                     if isDragging {
@@ -365,8 +369,7 @@ struct NodeView: View {
                         onGestureEnd()
                     }
                 }
-        )
-    }
+        )    }
 }
 
 struct LightShape: Shape {

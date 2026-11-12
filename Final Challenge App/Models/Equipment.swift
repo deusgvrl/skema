@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import CoreGraphics
 
 /// One item in a setup: light, modifier, reflector or camera. Fields are added with A10-7 and A10-11.
 @Model
@@ -72,6 +73,52 @@ final class Equipment {
         self.rotationAngle = rotationAngle
         self.accessories = accessories
         self.notes = notes
+    }
+}
+
+extension Equipment {
+    /// 1. Call during position dragging: updates `distance` from (positionX, positionY) using Pythagoras
+    func syncDistanceFromPosition() {
+        let dx = positionX
+        let dy = positionY
+        let distanceInPoints = sqrt(dx * dx + dy * dy)
+        let distanceInMeters = distanceInPoints / 100.0
+        self.distance = String(format: "%.2f m", distanceInMeters)
+    }
+
+    /// 2. Call during rotation handle gesture: updates `horizontalAim` string from `rotationAngle`
+    func syncHorizontalAimFromRotation() {
+        let displayAngle = (360 - Int(rotationAngle)) % 360
+        self.horizontalAim = "\(displayAngle)°"
+    }
+
+    /// 3. Call when saving form edits: converts typed `horizontalAim` string back to `rotationAngle`
+    func syncRotationFromHorizontalAim() {
+        let cleaned = horizontalAim.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        if let displayAngle = Double(cleaned) {
+            let rawAngle = (360.0 - displayAngle).truncatingRemainder(dividingBy: 360.0)
+            self.rotationAngle = rawAngle < 0 ? rawAngle + 360.0 : rawAngle
+        }
+    }
+    
+    func syncPositionFromDistance() {
+        // Parse numeric distance value (e.g., "3.50 m" -> 3.5)
+        let cleaned = distance.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+        guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
+        
+        let targetPoints = targetMeters * 100.0 // 100 points = 1.0 meter
+        let currentPoints = sqrt(positionX * positionX + positionY * positionY)
+        
+        if currentPoints > 0 {
+            // Scale existing vector to match new magnitude
+            let scaleFactor = targetPoints / currentPoints
+            positionX *= scaleFactor
+            positionY *= scaleFactor
+        } else {
+            // Fallback direction if node is at (0,0) (placed directly above subject)
+            positionX = 0
+            positionY = -targetPoints
+        }
     }
 }
 

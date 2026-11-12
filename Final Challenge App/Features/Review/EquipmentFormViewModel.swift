@@ -95,6 +95,9 @@ final class EquipmentFormViewModel {
             node.accessories = accessories
             node.notes = notes
             
+            node.syncRotationFromHorizontalAim()
+            node.syncPositionFromDistance()
+            
             reviewViewModel.updateEquipment(undoManager: undoManager)
         } else {
             let newNode = Equipment(
@@ -118,6 +121,8 @@ final class EquipmentFormViewModel {
                 notes: notes
             )
             
+            newNode.syncRotationFromHorizontalAim()
+            newNode.syncPositionFromDistance()
             reviewViewModel.addEquipment(newNode, undoManager: undoManager)
         }
         
