@@ -28,7 +28,7 @@ struct SetupsView: View {
                 } else {
                     List(viewModel.setups) { setup in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(setup.setupName)
+                            Text("\(setup.setupName) - \(setup.nodes.count) equipment")
                                 .font(.headline)
                             if !setup.client.isEmpty || !setup.project.isEmpty {
                                 Text("\(setup.client) • \(setup.project)")

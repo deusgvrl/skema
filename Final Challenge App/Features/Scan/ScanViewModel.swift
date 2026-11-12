@@ -25,21 +25,25 @@ final class ScanViewModel {
     @ObservationIgnored private var stateTask: Task<Void, Never>?
     @ObservationIgnored private var pointsTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
+    @ObservationIgnored var storageController: StorageController
     @ObservationIgnored private var detector: (any EquipmentDetecting)?
     @ObservationIgnored private var detectTask: Task<Void, Never>?
     @ObservationIgnored private var isDetecting = false
     private var tracker = EquipmentTracker()
-
-    init(
+    
+    init (
         makeScan: @escaping () -> ScanSession = { ScanSession() },
         camera: any CameraPermission = SystemCameraPermission(),
-        detector: (any EquipmentDetecting)? = nil
+        detector: (any EquipmentDetecting)? = nil,
+        storageController: StorageController? = nil
     ) {
         self.makeScan = makeScan
         self.camera = camera
+        self.storageController = storageController ?? StorageController.shared
+        self.draftSetup = Setup(setupName: "Untitled Setup")
         self.detector = detector
-        self.draftSetup = Setup(setupName: "")
     }
+
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
     var arSession: ARSession? {
@@ -126,11 +130,13 @@ final class ScanViewModel {
     }
 
     func finishTapped() {
+        insertDraftSetup()
         stopListening()
         scan?.stop()
     }
 
     func closeTapped() {
+        deleteDraftSetup()
         stopListening()
         scan?.discard()
     }
@@ -219,5 +225,13 @@ final class ScanViewModel {
         case .alreadyStarted: "The scan was already started."
         case .cameraDenied, .lidarUnsupported: ""
         }
+    }
+    
+    func deleteDraftSetup() {
+        storageController.deleteSetup(draftSetup)
+    }
+    
+    func insertDraftSetup() {
+        storageController.addSetup(draftSetup)
     }
 }

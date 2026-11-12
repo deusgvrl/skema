@@ -125,7 +125,6 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
-        // ✅ Scale Meter Overlay positioned at the bottom left corner
         .overlay(alignment: .bottomLeading) {
             ScaleMeterView(zoomScale: zoomScale * magnifyBy)
                 .padding(16)
@@ -191,11 +190,7 @@ struct NodeView: View {
     var body: some View {
         VStack(spacing: 4) {
             ZStack {
-                // =====================================
-                // ROTATING LAYER (Shape + Handle)
-                // =====================================
                 ZStack {
-                    // ✅ Dynamic Shape based on Category
                     switch node.category {
                     case .camera:
                         RoundedRectangle(cornerRadius: 6)
