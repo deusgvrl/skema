@@ -75,6 +75,28 @@ final class Equipment {
     }
 }
 
+extension Equipment {
+    /// Recalculates and updates the `distance` property based on current (positionX, positionY)
+    func updateDistanceFromPosition() {
+        let dx = CGFloat(positionX)
+        let dy = CGFloat(positionY)
+        let distanceInPoints = sqrt(dx * dx + dy * dy)
+        let meters = DiagramScale.pointsToMeters(distanceInPoints)
+        
+        self.distance = String(format: "%.2f m", meters)
+    }
+    
+    /// Sets positionX and positionY given a real-world distance in meters and angle in degrees
+    func setPosition(distanceInMeters: Double, angleInDegrees: Double) {
+        let points = DiagramScale.metersToPoints(distanceInMeters)
+        let radians = angleInDegrees * .pi / 180.0
+        
+        self.positionX = Double(points * cos(radians))
+        self.positionY = Double(points * sin(radians))
+        self.distance = String(format: "%.2f m", distanceInMeters)
+    }
+}
+
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case camera = "Camera"
     case light = "Light"

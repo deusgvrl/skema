@@ -35,6 +35,15 @@ final class ScanViewModel {
         self.camera = camera
         self.storageController = storageController ?? StorageController.shared
         self.draftSetup = Setup(setupName: "Untitled Setup")
+        let keyLight = Equipment(
+            category: .light,
+            label: "E1",
+            name: "Aputure 600d",
+            role: "Key Light",
+            position: CGPoint(x: 150.0, y: -200.0), // Hardcoded X = 150pt, Y = -200pt relative to subject
+            distance: "2.50 m"
+        )
+        draftSetup.nodes.append(keyLight)
     }
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.

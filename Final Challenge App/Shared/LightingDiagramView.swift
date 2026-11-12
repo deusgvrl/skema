@@ -20,14 +20,14 @@ struct LightingDiagramView: View {
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-           
+            
             ZStack {
                 // Background Grid
                 GridPattern()
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                     .frame(width: 6000, height: 6000)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                 
+                
                 // Connecting Lines
                 Path { path in
                     for node in viewModel.nodes {
@@ -36,7 +36,7 @@ struct LightingDiagramView: View {
                     }
                 }
                 .stroke(Color.secondary, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                 
+                
                 // Distance Labels
                 ForEach($viewModel.nodes) { $node in
                     let nodeScreenPos = CGPoint(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
@@ -44,7 +44,7 @@ struct LightingDiagramView: View {
                         x: (subjectCenter.x + nodeScreenPos.x) / 2,
                         y: (subjectCenter.y + nodeScreenPos.y) / 2
                     )
-                     
+                    
                     Text(node.distance)
                         .font(.caption)
                         .padding(4)
@@ -52,16 +52,17 @@ struct LightingDiagramView: View {
                         .cornerRadius(4)
                         .position(midPoint)
                 }
-                 
+                
                 // Subject
                 DiagramEntity(title: "Subject", icon: "person.fill", position: subjectCenter)
-                 
+                
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
                     NodeView(
                         node: $node,
                         subjectCenter: subjectCenter,
                         isSelected: !isReadOnly && selectedNodeId == node.id,
+                        zoomScale: zoomScale * magnifyBy,
                         onTap: {
                             onNodeTap?(node)
                         },
@@ -167,12 +168,11 @@ struct DiagramEntity: View {
     }
 }
 
-
-
 struct NodeView: View {
     @Binding var node: Equipment
     let subjectCenter: CGPoint
     let isSelected: Bool
+    var zoomScale: CGFloat = 1.0
     
     var onTap: () -> Void
     var onLongPress: () -> Void
@@ -181,6 +181,7 @@ struct NodeView: View {
     
     @State private var isRotating = false
     @State private var isDragging = false
+    @State private var dragStartPosition: CGPoint = .zero
     @State private var globalCenter: CGPoint = .zero
     
     // Haptic State
@@ -346,18 +347,17 @@ struct NodeView: View {
                     
                     if !isDragging {
                         isDragging = true
+                        dragStartPosition = node.position
                         onGestureStart()
                     }
                     
-                    let dx = value.location.x - subjectCenter.x
-                    let dy = value.location.y - subjectCenter.y
+                    // ✅ 1. Compute smooth new relative position from starting point
+                    let newX = dragStartPosition.x + (value.translation.width / zoomScale)
+                    let newY = dragStartPosition.y + (value.translation.height / zoomScale)
                     
-                    node.position = CGPoint(x: dx, y: dy)
+                    node.position = CGPoint(x: newX, y: newY)
                     
-                    let distanceInPoints = sqrt(dx * dx + dy * dy)
-                    let distanceInMeters = distanceInPoints / 100.0
-                    
-                    node.distance = String(format: "%.2f m", distanceInMeters)
+                    node.updateDistanceFromPosition()                    
                 }
                 .onEnded { _ in
                     if isDragging {
@@ -423,6 +423,31 @@ struct ScaleMeterView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+import CoreGraphics
+import Foundation
+
+enum DiagramScale {
+    /// 100 points on the canvas represents 1.0 meter in the real world
+    static let pointsPerMeter: CGFloat = 100.0
+    
+    /// Converts canvas points (dx, dy) to real-world meters
+    static func pointsToMeters(_ points: CGFloat) -> Double {
+        Double(points / pointsPerMeter)
+    }
+    
+    /// Converts real-world meters to canvas points
+    static func metersToPoints(_ meters: Double) -> CGFloat {
+        CGFloat(meters) * pointsPerMeter
+    }
+    
+    /// Formats a 2D canvas offset from subject origin into a formatted string (e.g. "2.50 m")
+    static func formattedDistance(for position: CGPoint) -> String {
+        let distanceInPoints = sqrt(position.x * position.x + position.y * position.y)
+        let meters = pointsToMeters(distanceInPoints)
+        return String(format: "%.2f m", meters)
     }
 }
 
