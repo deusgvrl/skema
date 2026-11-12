@@ -18,7 +18,7 @@ import Testing
 private let screen = CGSize(width: 1440, height: 1920)
 private let fullMask = InstanceMask(width: 640, height: 640, pixels: [UInt8](repeating: 1, count: 640 * 640))
 
-private let detectionCamera: CameraModel = {
+let detectionCamera: CameraModel = {
     var intrinsics = matrix_identity_float3x3
     intrinsics[0][0] = 1000
     intrinsics[1][1] = 1000
@@ -36,6 +36,25 @@ private func frame(at time: Double, metres: Float? = 2) throws -> ScanFrame {
                      tracking: .normal, ambientIntensity: nil, planes: [])
 }
 
+/// A frame with a depth map fine enough for a tap box (128 x 96), `metres` everywhere, and the given planes.
+func measuringFrame(at time: Double, metres: Float?, planes: [ScanPlane] = [], cameraX: Float = 0) throws -> ScanFrame {
+    let base = try makeScanFrame(timestamp: time)
+    var pose = matrix_identity_float4x4
+    pose.columns.3 = SIMD4(cameraX, 0, 0, 1)
+    let camera = CameraModel(intrinsics: detectionCamera.intrinsics, imageResolution: detectionCamera.imageResolution,
+                             cameraToWorld: pose)
+    return ScanFrame(timestamp: time, image: base.image, orientation: .right, camera: camera,
+                     depth: metres.map { makeDepth(width: 128, height: 96, depth: $0) },
+                     tracking: .normal, ambientIntensity: nil, planes: planes)
+}
+
+/// A mask covering the middle fifth of the picture, so the item is a small patch and not the whole wall.
+let patchMask: InstanceMask = {
+    var pixels = [UInt8](repeating: 0, count: 640 * 640)
+    for row in 256..<384 { for column in 256..<384 { pixels[row * 640 + column] = 1 } }
+    return InstanceMask(width: 640, height: 640, pixels: pixels)
+}()
+
 private struct DetectorFailed: Error {}
 
 /// Stands in for the YOLOE detector: returns what the test sets, and records each call.
@@ -48,8 +67,8 @@ final class FakeEquipmentDetector: EquipmentDetecting, @unchecked Sendable {
     private var mostAtOnce = 0
     private let delay: Duration?
 
-    init(finds kinds: [EquipmentKind] = [], delay: Duration? = nil) {
-        self.found = kinds.map { EquipmentDetection(kind: $0, confidence: 0.6, mask: fullMask) }
+    init(finds kinds: [EquipmentKind] = [], mask: InstanceMask = fullMask, delay: Duration? = nil) {
+        self.found = kinds.map { EquipmentDetection(kind: $0, confidence: 0.6, mask: mask) }
         self.delay = delay
     }
 

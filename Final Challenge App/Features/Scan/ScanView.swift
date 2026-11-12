@@ -27,8 +27,17 @@ struct ScanView: View {
             Color.black
                 .ignoresSafeArea()
             if viewModel.screen == .scanning, let session = viewModel.arSession {
-                RoomScanView(session: session, scene: viewModel.pointCloud.scene)
-                    .ignoresSafeArea()
+                GeometryReader { geometry in
+                    RoomScanView(session: session, scene: viewModel.pointCloud.scene)
+                        .ignoresSafeArea()
+                        .onTapGesture { tap in
+                            viewModel.setSubject(atScreen: tap, screenSize: geometry.size)
+                        }
+                        .accessibilityLabel("Camera view")
+                        .accessibilityHint("Tap the product to set it as the subject")
+                        .accessibilityAddTraits(.isButton)
+                }
+                .ignoresSafeArea()
                 ScanOverlayView(viewModel: viewModel)
                     .ignoresSafeArea()
                 }

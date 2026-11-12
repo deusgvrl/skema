@@ -1,5 +1,13 @@
 import CoreGraphics
 import MeasureKit
+import MeasureKitVision
+
+/// An accepted item as the latest look saw it (A10-21): its tracker id, and the box and mask to measure.
+nonisolated struct AcceptedSighting: Sendable {
+    let id: Int
+    let box: NormalizedBox
+    let mask: InstanceMask
+}
 
 /// One scan's tracking (A10-62): each look's detections → 3D sightings → `ObjectMap` → what the overlay shows.
 nonisolated struct EquipmentTracker: Sendable {
@@ -12,7 +20,8 @@ nonisolated struct EquipmentTracker: Sendable {
     private var masks: [Int: InstanceMask] = [:]
     /// The camera at the latest look; nil before the first one.
     private(set) var camera: CameraModel?
-    private var lastLook: Double?
+    /// The time of the latest look; nil before the first one.
+    private(set) var lastLook: Double?
     /// Ids of accepted items already handed out by `look`, so each is added to the setup once.
     private var handedOut: Set<Int> = []
 
@@ -35,10 +44,21 @@ nonisolated struct EquipmentTracker: Sendable {
         return newlyAccepted(map.items)
     }
 
+    /// The accepted items seen at the latest look, with the mask and box that look gave them (A10-21).
+    /// Pending items are left out: only accepted items are measured.
+    var acceptedSightings: [AcceptedSighting] {
+        map.items.compactMap { item in
+            guard item.status == .accepted, let mask = masks[item.id],
+                  let box = MaskMapping.bounds(of: mask) else { return nil }
+            return AcceptedSighting(id: item.id, box: box, mask: mask)
+        }
+    }
+
     /// What the scan screen shows now. Nil before the first look (no camera yet).
-    func overlay(subject: SIMD3<Float>?, screenSize: CGSize) -> ScanOverlay? {
+    func overlay(subject: SIMD3<Float>?, subjectMask: InstanceMask? = nil, screenSize: CGSize) -> ScanOverlay? {
         guard let camera else { return nil }
-        return ScanOverlay(items: map.items, masks: masks, subject: subject, camera: camera, screenSize: screenSize)
+        return ScanOverlay(items: map.items, masks: masks, subject: subject, subjectMask: subjectMask,
+                           camera: camera, screenSize: screenSize)
     }
 
     /// The accepted items in `items` that were not returned before, in `items`' order; remembers them in `handedOut`.
