@@ -291,7 +291,9 @@ struct ScanSubjectTests {
         let viewModel = makeViewModel(detector: FakeEquipmentDetector(finds: [.studioLighting], mask: patchMask),
                                       segmenter: FakeSubjectSegmenter([sideMask]))
         try await tapped(viewModel)
-        for tenth in 0...10 {
+        // `tapped` already made a look at 0 s (with the wall 3 m ahead). The light is first seen 2 m ahead at 0.1 s,
+        // so it is accepted at 1.1 s.
+        for tenth in 1...12 {
             await viewModel.detect(in: try measuringFrame(at: Double(tenth) / 10, metres: 2))
         }
 
