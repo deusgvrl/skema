@@ -61,39 +61,49 @@ final class EquipmentFormViewModel {
         name = node.name
         role = node.role
         power = node.power
-        colorTemp = node.colorTemp
+        
+        // Strip unit suffixes so input fields hold clean numeric strings
+        colorTemp = cleanNumericString(node.colorTemp)
         lens = node.lens
         iso = node.iso
         aperture = node.aperture
         shutterSpeed = node.shutterSpeed
-        whiteBalance = node.whiteBalance
-        height = node.height
-        tilt = node.tilt
-        horizontalAim = node.horizontalAim
-        distance = node.distance
+        whiteBalance = cleanNumericString(node.whiteBalance)
+        height = cleanNumericString(node.height)
+        tilt = cleanNumericString(node.tilt)
+        horizontalAim = cleanNumericString(node.horizontalAim)
+        distance = cleanNumericString(node.distance)
+        
         accessories = node.accessories
         notes = node.notes
     }
     
     func saveNode(undoManager: UndoManager?, completion: () -> Void) {
+        let sanitizedDistance = cleanNumericString(distance)
+        let sanitizedAim = cleanNumericString(horizontalAim)
+        
         if let id = editingNodeId, let index = reviewViewModel.nodes.firstIndex(where: { $0.id == id }) {
             let node = reviewViewModel.nodes[index]
             node.category = category
             node.name = name
             node.role = role
             node.power = power
-            node.colorTemp = colorTemp
+            node.colorTemp = cleanNumericString(colorTemp)
             node.lens = lens
             node.iso = iso
             node.aperture = aperture
             node.shutterSpeed = shutterSpeed
-            node.whiteBalance = whiteBalance
-            node.height = height
-            node.tilt = tilt
-            node.horizontalAim = horizontalAim
-            node.distance = distance
+            node.whiteBalance = cleanNumericString(whiteBalance)
+            node.height = cleanNumericString(height)
+            node.tilt = cleanNumericString(tilt)
+            node.horizontalAim = sanitizedAim
+            node.distance = sanitizedDistance
             node.accessories = accessories
             node.notes = notes
+            
+            // Synchronize diagram coordinates & heading rotation angle
+            node.syncRotationFromHorizontalAim()
+            node.syncPositionFromDistance()
             
             reviewViewModel.updateEquipment(undoManager: undoManager)
         } else {
@@ -104,19 +114,22 @@ final class EquipmentFormViewModel {
                 role: role,
                 position: CGPoint(x: 0, y: -100),
                 power: power,
-                colorTemp: colorTemp,
+                colorTemp: cleanNumericString(colorTemp),
                 lens: lens,
                 iso: iso,
                 aperture: aperture,
                 shutterSpeed: shutterSpeed,
-                whiteBalance: whiteBalance,
-                height: height,
-                tilt: tilt,
-                horizontalAim: horizontalAim,
-                distance: distance,
+                whiteBalance: cleanNumericString(whiteBalance),
+                height: cleanNumericString(height),
+                tilt: cleanNumericString(tilt),
+                horizontalAim: sanitizedAim,
+                distance: sanitizedDistance.isEmpty ? "1.00" : sanitizedDistance,
                 accessories: accessories,
                 notes: notes
             )
+            
+            newNode.syncRotationFromHorizontalAim()
+            newNode.syncPositionFromDistance()
             
             reviewViewModel.addEquipment(newNode, undoManager: undoManager)
         }
@@ -131,5 +144,13 @@ final class EquipmentFormViewModel {
         reviewViewModel.applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
         StorageController.shared.save()
         completion()
+    }
+    
+    // MARK: - Sanitization Helper
+    
+    /// Sanitizes strings by stripping non-numeric unit characters, keeping pure numeric inputs (e.g. "2.50").
+    private func cleanNumericString(_ input: String) -> String {
+        let cleaned = input.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

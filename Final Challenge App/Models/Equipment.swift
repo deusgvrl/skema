@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import CoreGraphics
 
 /// One item in a setup: light, modifier, reflector or camera. Fields are added with A10-7 and A10-11.
 @Model
@@ -72,6 +73,52 @@ final class Equipment {
         self.rotationAngle = rotationAngle
         self.accessories = accessories
         self.notes = notes
+    }
+}
+
+extension Equipment {
+    static let pointsPerMeter: Double = 100.0
+
+    /// Updates `distance` string as a clean number (e.g. "2.50") from (positionX, positionY)
+    func syncDistanceFromPosition() {
+        let dx = positionX
+        let dy = positionY
+        let distanceInPoints = sqrt(dx * dx + dy * dy)
+        let distanceInMeters = distanceInPoints / Self.pointsPerMeter
+        self.distance = String(format: "%.2f", distanceInMeters)
+    }
+
+    /// Updates `horizontalAim` string as a clean number (e.g. "45") from `rotationAngle`
+    func syncHorizontalAimFromRotation() {
+        let displayAngle = (360 - Int(rotationAngle)) % 360
+        self.horizontalAim = "\(displayAngle)"
+    }
+
+    /// Updates `rotationAngle` from a typed numeric `horizontalAim` string
+    func syncRotationFromHorizontalAim() {
+        let cleaned = horizontalAim.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        if let displayAngle = Double(cleaned) {
+            let rawAngle = (360.0 - displayAngle).truncatingRemainder(dividingBy: 360.0)
+            self.rotationAngle = rawAngle < 0 ? rawAngle + 360.0 : rawAngle
+        }
+    }
+
+    /// Scales (positionX, positionY) along vector from a typed numeric `distance` string
+    func syncPositionFromDistance() {
+        let cleaned = distance.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+        guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
+        
+        let targetPoints = targetMeters * Self.pointsPerMeter
+        let currentPoints = sqrt(positionX * positionX + positionY * positionY)
+        
+        if currentPoints > 0 {
+            let scaleFactor = targetPoints / currentPoints
+            positionX *= scaleFactor
+            positionY *= scaleFactor
+        } else {
+            positionX = 0
+            positionY = -targetPoints
+        }
     }
 }
 
