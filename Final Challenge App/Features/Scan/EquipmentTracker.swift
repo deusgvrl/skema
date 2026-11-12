@@ -10,7 +10,8 @@ nonisolated struct EquipmentTracker: Sendable {
 
     private var map = ObjectMap()
     private var masks: [Int: InstanceMask] = [:]
-    private var camera: CameraModel?
+    /// The camera at the latest look; nil before the first one.
+    private(set) var camera: CameraModel?
     private var lastLook: Double?
     /// Ids of accepted items already handed out by `look`, so each is added to the setup once.
     private var handedOut: Set<Int> = []

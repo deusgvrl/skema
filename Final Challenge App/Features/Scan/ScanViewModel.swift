@@ -59,6 +59,11 @@ final class ScanViewModel {
         overlay(in: .zero)?.canFinish ?? false
     }
 
+    /// The camera at the latest look, to lay the masks over the picture (A10-62). Nil before the first look.
+    var overlayCamera: CameraModel? {
+        tracker.camera
+    }
+
     /// What the scan screen draws over the camera (A10-62). Nil before the first look.
     func overlay(in screenSize: CGSize) -> ScanOverlay? {
         tracker.overlay(subject: subject, screenSize: screenSize)
