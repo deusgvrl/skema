@@ -1,15 +1,20 @@
 import SwiftUI
+/// Polar coordinate snapshot to prevent math drift during orbital rotation
+private struct OrbitSnapshot {
+    let radius: Double
+    let initialOrbitAngle: Double
+    let initialFacingAngle: Double
+}
 
-/// Top-down lighting diagram, reused by Review, SetupDetail and the PDF (A10-10).
-
+/// Top-down lighting diagram, reused by Review, SetupDetail and the PDF.
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
     var undoManager: UndoManager? = nil
     var onNodeTap: ((Equipment) -> Void)? = nil
     
-    @State private var nodesSnapshot: [Equipment] = []
     @State private var selectedNodeId: UUID? = nil
+    @State private var nodesSnapshot: [Equipment] = []
     
     // Smooth Zoom & Pan States
     @State private var zoomScale: CGFloat = 1.0
@@ -17,18 +22,26 @@ struct LightingDiagramView: View {
     @State private var offset: CGSize = .zero
     @GestureState private var dragOffset: CGSize = .zero
     
+    // Top Slider States (Strict 0 to 360 bounds)
+    // ✅ Starts exactly at 0 degrees
+    @State private var sliderAngle: Double = 0.0
+    @State private var baseSliderAngle: Double = 0.0
+    @State private var isSliderDragging: Bool = false
+    @State private var orbitSnapshots: [UUID: OrbitSnapshot] = [:]
+    
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-           
+            let currentZoom = zoomScale * magnifyBy
+            
             ZStack {
-                // Background Grid
+                // 1. Background Grid (Stationary)
                 GridPattern()
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                     .frame(width: 6000, height: 6000)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                 
-                // Connecting Lines
+                
+                // 2. Connecting Lines
                 Path { path in
                     for node in viewModel.nodes {
                         path.move(to: subjectCenter)
@@ -36,15 +49,15 @@ struct LightingDiagramView: View {
                     }
                 }
                 .stroke(Color.secondary, style: StrokeStyle(lineWidth: 1.5, dash: [5]))
-                 
-                // Distance Labels
+                
+                // 3. Distance Labels
                 ForEach($viewModel.nodes) { $node in
                     let nodeScreenPos = CGPoint(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
                     let midPoint = CGPoint(
                         x: (subjectCenter.x + nodeScreenPos.x) / 2,
                         y: (subjectCenter.y + nodeScreenPos.y) / 2
                     )
-                     
+                    
                     Text("\(node.distance) m")
                         .font(.caption)
                         .padding(4)
@@ -52,20 +65,18 @@ struct LightingDiagramView: View {
                         .cornerRadius(4)
                         .position(midPoint)
                 }
-                 
-                // Subject
+                
+                // 4. Central Subject
                 DiagramEntity(title: "Subject", icon: "person.fill", position: subjectCenter)
-                 
-                // Draggable Nodes
+                
+                // 5. Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
                     NodeView(
                         node: $node,
                         subjectCenter: subjectCenter,
                         isSelected: !isReadOnly && selectedNodeId == node.id,
-                        zoomScale: zoomScale * magnifyBy,
-                        onTap: {
-                            onNodeTap?(node)
-                        },
+                        zoomScale: currentZoom,
+                        onTap: { onNodeTap?(node) },
                         onLongPress: {
                             if !isReadOnly {
                                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -75,9 +86,7 @@ struct LightingDiagramView: View {
                             }
                         },
                         onGestureStart: {
-                            if !isReadOnly {
-                                nodesSnapshot = viewModel.nodes
-                            }
+                            if !isReadOnly { nodesSnapshot = viewModel.nodes }
                         },
                         onGestureEnd: {
                             if !isReadOnly {
@@ -87,12 +96,11 @@ struct LightingDiagramView: View {
                     )
                 }
             }
-            // Apply Pan Offset
             .offset(
                 x: offset.width + dragOffset.width,
                 y: offset.height + dragOffset.height
             )
-            .scaleEffect(zoomScale * magnifyBy)
+            .scaleEffect(currentZoom)
             .background(Color(uiColor: .systemBackground))
             .onTapGesture {
                 if !isReadOnly {
@@ -101,19 +109,21 @@ struct LightingDiagramView: View {
                     }
                 }
             }
+            // Canvas Pan Gesture
             .gesture(
                 DragGesture()
                     .updating($dragOffset) { value, state, _ in
                         state = CGSize(
-                            width: value.translation.width / zoomScale,
-                            height: value.translation.height / zoomScale
+                            width: value.translation.width / currentZoom,
+                            height: value.translation.height / currentZoom
                         )
                     }
                     .onEnded { value in
-                        offset.width += value.translation.width / zoomScale
-                        offset.height += value.translation.height / zoomScale
+                        offset.width += value.translation.width / currentZoom
+                        offset.height += value.translation.height / currentZoom
                     }
             )
+            // Canvas Zoom Gesture
             .simultaneousGesture(
                 MagnifyGesture()
                     .updating($magnifyBy) { value, state, _ in
@@ -126,9 +136,88 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
+        
+        // MARK: - Overlays
+        
+        // Bottom Scale Meter
         .overlay(alignment: .bottomLeading) {
             ScaleMeterView(zoomScale: zoomScale * magnifyBy)
                 .padding(16)
+        }
+        
+        // Top 0-360 Slider Overlay
+        .overlay(alignment: .top) {
+            if !isReadOnly {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .foregroundColor(.secondary)
+                    
+                    Slider(
+                        value: $sliderAngle,
+                        in: 0...360,
+                        onEditingChanged: { isEditing in
+                            if isEditing {
+                                isSliderDragging = true
+                                baseSliderAngle = sliderAngle // Anchor the current slider value
+                                
+                                // Snapshot original node positions for UndoManager
+                                nodesSnapshot = viewModel.nodes.map { Equipment(
+                                      id: $0.id, category: $0.category, label: $0.label, name: $0.name, role: $0.role, position: $0.position, power: $0.power, colorTemp: $0.colorTemp, lens: $0.lens, iso: $0.iso, aperture: $0.aperture, shutterSpeed: $0.shutterSpeed, whiteBalance: $0.whiteBalance, height: $0.height, tilt: $0.tilt, horizontalAim: $0.horizontalAim, distance: $0.distance, rotationAngle: $0.rotationAngle, accessories: $0.accessories, notes: $0.notes)
+                                  }
+                                
+                                // Take mathematical Polar Snapshots
+                                orbitSnapshots.removeAll()
+                                for node in viewModel.nodes {
+                                    let radius = sqrt(node.position.x * node.position.x + node.position.y * node.position.y)
+                                    let orbitAngle = atan2(node.position.x, -node.position.y)
+                                    orbitSnapshots[node.id] = OrbitSnapshot(radius: radius, initialOrbitAngle: orbitAngle, initialFacingAngle: node.rotationAngle)
+                                }
+                                
+                            } else {
+                                isSliderDragging = false
+                                viewModel.applyStateChange(oldNodes: nodesSnapshot, undoManager: undoManager)
+                            }
+                        }
+                    )
+                    
+                    Image(systemName: "arrow.uturn.forward")
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.regularMaterial)
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+                .padding(.horizontal, 40)
+                .padding(.top, 16)
+                
+                // Mathematical update on slide
+                .onChange(of: sliderAngle) { _, newSliderAngle in
+                    guard isSliderDragging else { return }
+                    
+                    let deltaDegrees = newSliderAngle - baseSliderAngle
+                    let deltaRadians = deltaDegrees * .pi / 180.0
+                    
+                    for node in viewModel.nodes {
+                        guard let snap = orbitSnapshots[node.id] else { continue }
+                        
+                        // 1. Calculate new (X, Y) along the orbital circle
+                        let newOrbitAngle = snap.initialOrbitAngle + deltaRadians
+                        node.position = CGPoint(
+                            x: snap.radius * sin(newOrbitAngle),
+                            y: -snap.radius * cos(newOrbitAngle)
+                        )
+                        
+                        // 2. Rotate the facing angle of the equipment
+                        var newFacingAngle = (snap.initialFacingAngle + deltaDegrees).truncatingRemainder(dividingBy: 360)
+                        if newFacingAngle < 0 { newFacingAngle += 360 }
+                        node.rotationAngle = newFacingAngle
+                        
+                        // 3. Keep string models in sync
+                        node.syncHorizontalAimFromRotation()
+                    }
+                }
+            }
         }
     }
 }
