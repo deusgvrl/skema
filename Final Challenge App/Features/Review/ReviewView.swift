@@ -42,9 +42,23 @@ struct ReviewView: View {
     var body: some View {
         Group {
             if isShowingDiagram {
-                diagramContent
+                ReviewDiagramContentView(
+                    viewModel: viewModel,
+                    undoManager: undoManager,
+                    onNodeTap: { node in editingNode = node },
+                    onSubjectTap: { isShowingSubjectSheet = true },
+                    onAddNodeTap: { isAddingNode = true }
+                )
             } else {
-                loadingContent
+                ReviewLoadingView(
+                    progress: progress,
+                    isScanComplete: isScanComplete,
+                    onContinue: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isShowingDiagram = true
+                        }
+                    }
+                )
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -106,144 +120,15 @@ struct ReviewView: View {
         }
         .sheet(item: $editingNode) { node in
             EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isShowingSubjectSheet) {
-            subjectHeightSheet()
+            SubjectFormView(viewModel: viewModel, undoManager: undoManager)
         }
     }
     
-    // MARK: - Subviews
-    
-    private var loadingContent: some View {
-        VStack(spacing: 40) {
-            Image("loading_illustration")
-                .resizable()
-                .scaledToFit()
-                .frame(maxHeight: 260)
-                .clipShape(RoundedRectangle(cornerRadius: 28))
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
-                .accessibilityLabel("Scan preview illustration")
-            
-            VStack(spacing: 16) {
-                Text("Building Your Diagram...")
-                    .font(.title2.weight(.semibold))
-                
-                Text("We're mapping your lights, cameras and backdrop, and measuring how far each one is from the subject.\n\nKeep the app open while this finishes.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-            
-            Spacer()
-            
-            if isScanComplete {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isShowingDiagram = true
-                    }
-                } label: {
-                    Text("Continue to Layout")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.accentColor)
-                        .clipShape(Capsule())
-                }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 40)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else {
-                let secondsLeft = max(1, Int((1.0 - progress) * 20))
-                
-                VStack(spacing: 12) {
-                    ProgressView(value: progress, total: 1.0)
-                        .progressViewStyle(.linear)
-                        .tint(.blue)
-                        .padding(.horizontal, 32)
-                    
-                    Text("Measuring distances... About \(secondsLeft) seconds left")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("4 lights · 1 bounce · 2 cameras · backdrop found")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 40)
-            }
-        }
-        .background(Color(uiColor: .systemBackground))
-    }
-    
-    private var diagramContent: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .top) {
-                LightingDiagramView(
-                    viewModel: viewModel,
-                    isReadOnly: false,
-                    undoManager: undoManager,
-                    onNodeTap: { node in editingNode = node },
-                    onSubjectTap: { isShowingSubjectSheet = true }
-                )
-                .overlay(alignment: .bottomTrailing) {
-                    Button {
-                        isAddingNode = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color.gray, in: .circle)
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    }
-                    .padding(16)
-                }
-                
-                if showHint && !viewModel.nodes.isEmpty {
-                    HStack {
-                        Text("Long press to move/rotate, or tap to edit details")
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                        
-                        Spacer()
-                        
-                        Button {
-                            withAnimation { showHint = false }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color(uiColor: .systemBackground))
-                            .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                }
-            }
-            
-            EquipmentCarousel(
-                viewModel: viewModel,
-                isReadOnly: false,
-                onNodeTap: { node in editingNode = node }
-            )
-        }
-    }
     
     // MARK: - Toolbar Content
     @ToolbarContentBuilder
@@ -324,50 +209,6 @@ struct ReviewView: View {
                 }
             }
         }
-    }
-    
-    // MARK: - Subject Details Sheet
-    private func subjectHeightSheet() -> some View {
-        NavigationStack {
-            Form {
-                Section(
-                    header: Text("Position"),
-                    footer: Text("Set the distance from the floor to the bottom of your subject (e.g., tabletop height, posing stool, or floor).")
-                ) {
-                    HStack {
-                        Text("Height from floor")
-                        Spacer()
-                        TextField("0.0", text: $viewModel.draftSetup.subjectHeight)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 80)
-                        Text("m")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .navigationTitle("Subject Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", systemImage: "checkmark") {
-                        // Save to SwiftData & register with UndoManager
-                        viewModel.updateSubjectHeight(
-                            oldValue: initialSubjectHeight,
-                            newValue: viewModel.draftSetup.subjectHeight,
-                            undoManager: undoManager
-                        )
-                        isShowingSubjectSheet = false
-                    }
-                }
-            }
-            .onAppear {
-                // Record starting value when sheet opens
-                initialSubjectHeight = viewModel.draftSetup.subjectHeight
-            }
-        }
-        .presentationDetents([.height(200), .medium])
-        .presentationDragIndicator(.visible)
     }
     
     private func handleClose() {

@@ -56,9 +56,7 @@ struct LightingDiagramView: View {
                  
                 // Subject
                 DiagramEntity(title: "Subject", icon: "person.fill", position: subjectCenter) {
-                    if !isReadOnly {
-                        onSubjectTap?()
-                    }
+                    onSubjectTap?()
                 }
                  
                 // Draggable Nodes

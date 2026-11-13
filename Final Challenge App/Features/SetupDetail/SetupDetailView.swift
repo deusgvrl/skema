@@ -40,6 +40,9 @@ struct SetupDetailView: View {
                         isReadOnly: true,
                         onNodeTap: { node in
                             viewModel.selectedEquipment = node
+                        },
+                        onSubjectTap: {
+                            viewModel.isShowSubjectSheet = true
                         }
                     )
 
@@ -208,6 +211,10 @@ struct SetupDetailView: View {
             NavigationStack {
                 ProjectDetailsView(setup: viewModel.setup)
             }
+        }
+        // Subject Height Sheet (Read-Only)
+        .sheet(isPresented: $viewModel.isShowSubjectSheet) {
+            SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
         }
         // Delete Confirmation Alert
         .alert("Delete Setup", isPresented: $viewModel.isDeleteAlertPresented) {

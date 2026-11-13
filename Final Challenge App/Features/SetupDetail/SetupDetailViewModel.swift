@@ -19,6 +19,7 @@ final class SetupDetailViewModel {
     var isEditingProjectDetails: Bool = false
     var selectedEquipment: Equipment? = nil
     var isDeleteAlertPresented: Bool = false
+    var isShowSubjectSheet: Bool = false
 
     // References Tab State
     var isSelectionMode: Bool = false
