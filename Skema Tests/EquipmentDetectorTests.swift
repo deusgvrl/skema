@@ -2,8 +2,9 @@
 //  EquipmentDetectorTests.swift
 //  Skema Tests
 //
-//  A10-60 test cases 1, 2, 8, 9, 11 and 12 (docs/test-cases/A10-60_equipment-detector.md in the Challenge 5 folder).
-//  Cases 3–7 and 10 are in MeasureKit (EquipmentFilterTests, MaskUpsampleTests). Case 13 waits for mini-setup photos.
+//  A10-60 test cases 1, 2, 8, 11 and 12 (docs/test-cases/A10-60_equipment-detector.md in the Challenge 5 folder).
+//  Cases 4–7 and 10 are in MeasureKit (EquipmentFilterTests, MaskUpsampleTests). Case 13 waits for mini-setup photos.
+//  A10-90 changed case 9 into D1 (YOLOE drops cameras) and case 3 into D2 (the 60% cutoff), both here.
 //
 
 import CoreML
@@ -65,23 +66,31 @@ struct EquipmentDetectorTests {
         #expect(detections.isEmpty)
     }
 
-    // Case 9, through the decoding seam with hand-made model output: one prompt row per kind,
+    // Case D1 (was case 9), through the decoding seam with hand-made model output: one prompt row per kind,
     // one prototype that is +1 everywhere, so each mask is exactly its box at 640 x 640.
     // Class 0 is a light prompt, class 1 a camera prompt.
-    @Test("Case 9: every detection has a kind, a confidence and a 640 x 640 mask inside its box")
-    func detectionsCarryKindConfidenceAndMask() {
+    @Test("Case D1: YOLOE returns only the light, with its 640 x 640 mask; its camera is dropped")
+    func yoloeKeepsOnlyTheLight() {
         let names: [Int: String] = [0: "studio lighting", 1: "camera"]
         let light = YOLORow(x1: 0, y1: 0, x2: 100, y2: 100, confidence: 0.9, classIndex: 0, coefficients: [1])
-        let camera = YOLORow(x1: 300, y1: 300, x2: 340, y2: 320, confidence: 0.6, classIndex: 1, coefficients: [1])
+        let camera = YOLORow(x1: 300, y1: 300, x2: 340, y2: 320, confidence: 0.95, classIndex: 1, coefficients: [1])
         let protos = [Float](repeating: 1, count: 160 * 160)
 
         let detections = EquipmentDetector.detections(from: [camera, light], protos: protos, protoSize: 160,
                                                       classNames: names, orientation: .up)
 
-        #expect(detections.map(\.kind) == [.studioLighting, .camera])
-        #expect(detections.map(\.confidence) == [0.9, 0.6])
+        #expect(detections.map(\.kind) == [.studioLighting])
+        #expect(detections.map(\.confidence) == [0.9])
         #expect(detections.allSatisfy { $0.mask.width == 640 && $0.mask.height == 640 })
-        #expect(detections.map { $0.mask.pixels.reduce(0) { $0 + Int($1) } } == [100 * 100, 40 * 20])
+        #expect(detections.map { $0.mask.pixels.reduce(0) { $0 + Int($1) } } == [100 * 100])
+    }
+
+    @Test("Case D2: YOLOE results at 59% are dropped, at 60% and 61% kept")
+    func cutoffIsSixtyPercent() {
+        func raw(_ conf: Float) -> [Float] { [0, 0, 10, 10, conf, 0] + [Float](repeating: 0, count: 32) }
+        let rows = YOLOSegmentDecoder.rows(output: raw(0.59) + raw(0.60) + raw(0.61), count: 3,
+                                           minConfidence: EquipmentDetector.minConfidence)
+        #expect(rows.map(\.confidence) == [0.60, 0.61])
     }
 
     @Test("Case 11 (smoke): detect runs from a background task and returns")

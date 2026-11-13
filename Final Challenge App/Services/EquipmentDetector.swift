@@ -46,8 +46,12 @@ nonisolated final class EquipmentDetector: EquipmentDetecting, @unchecked Sendab
         case unexpectedOutputs
     }
 
-    /// A10-60 decisions (10 Nov 2026): 30% cutoff, drop boxes over 80% of the frame, one box per object within a label.
-    static let minConfidence: Float = 0.30
+    /// A10-60 decisions (10 Nov 2026): drop boxes over 80% of the frame, one box per object within a label.
+    /// A10-90 (Amadeus, 13 Nov): 60% cutoff, to stop flickering (was 30%).
+    static let minConfidence: Float = 0.60
+    /// A10-90 (option A, Amadeus, 13 Nov): YOLOE keeps only studio lighting. Its camera prompts stay in the model,
+    /// so a camera is labelled "camera" (and dropped here) instead of passing as studio lighting. Vision finds cameras.
+    static let keptLabels: Set<String> = ["studio lighting"]
     static let maxAreaFraction: Float = 0.8
     static let overlapThreshold: Float = 0.5
     static let inputSize = 640
@@ -106,7 +110,7 @@ nonisolated final class EquipmentDetector: EquipmentDetecting, @unchecked Sendab
     /// Decoded rows → filter (`EquipmentFilter.keep`) → 640 x 640 masks → native orientation. Best first.
     static func detections(from rows: [YOLORow], protos: [Float], protoSize: Int, classNames: [Int: String],
                            orientation: ImageOrientation) -> [EquipmentDetection] {
-        let kept = EquipmentFilter.keep(rows, classNames: classNames, labels: Set(EquipmentKind.modelLabels.values),
+        let kept = EquipmentFilter.keep(rows, classNames: classNames, labels: keptLabels,
                                         maxAreaFraction: maxAreaFraction, iouThreshold: overlapThreshold,
                                         inputSize: Float(inputSize))
         return kept.compactMap { row in
