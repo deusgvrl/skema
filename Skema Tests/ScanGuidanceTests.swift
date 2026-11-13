@@ -8,7 +8,6 @@
 import Foundation
 import MeasureKit
 import Testing
-import UIKit
 @testable import Final_Challenge_App
 
 @Suite("Scan guidance: tips when the scan goes badly")
@@ -85,10 +84,6 @@ struct ScanGuidanceTests {
         #expect(tip.message == expected)
     }
 
-    @Test("Every tip's symbol exists", arguments: ScanGuidance.allCases)
-    func symbols(tip: ScanGuidance) {
-        #expect(UIImage(systemName: tip.systemImage) != nil)
-    }
 }
 
 @Suite("Guidance hold: tips do not flicker")

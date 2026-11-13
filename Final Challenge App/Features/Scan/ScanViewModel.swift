@@ -32,6 +32,8 @@ final class ScanViewModel {
     @ObservationIgnored var storageController: StorageController
     @ObservationIgnored private var detector: (any EquipmentDetecting)?
     @ObservationIgnored private var detectTask: Task<Void, Never>?
+    @ObservationIgnored private var guidanceTask: Task<Void, Never>?
+    @ObservationIgnored private var guidanceHold = GuidanceHold()
     @ObservationIgnored private var isDetecting = false
     private var tracker = EquipmentTracker()
     /// The points of the subject and of every accepted item, for distance and height (A10-41, A10-21).
@@ -59,6 +61,8 @@ final class ScanViewModel {
         self.draftSetup = Setup(setupName: "Untitled Setup")
         self.detector = detector
     }
+
+    private(set) var guidance: ScanGuidance?
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
     var arSession: ARSession? {
@@ -225,6 +229,7 @@ final class ScanViewModel {
         listen(to: newScan)
         collectPoints(from: newScan)
         detectEquipment(from: newScan)
+        watchGuidance(from: newScan)
         do {
             try newScan.start()
             scan = newScan
@@ -333,11 +338,34 @@ final class ScanViewModel {
         return Equipment(category: category, name: ScanOverlay.name(for: item))
     }
 
-    private func stopListening() {
-        stateTask?.cancel()
-        pointsTask?.cancel()
-        detectTask?.cancel()
-    }
+    func updateGuidance(for frame: ScanFrame) {
+            let tip = ScanGuidance.guidance(
+                tracking: frame.tracking,
+                ambientIntensity: frame.ambientIntensity,
+                depth: frame.depth
+            )
+            guidance = guidanceHold.update(tip, at: frame.timestamp)
+        }
+
+        /// Listens to the same frames as the points, for the tracking tips (A10-69).
+        private func watchGuidance(from scan: ScanSession) {
+            guidanceTask?.cancel()
+            let frames = scan.frames()
+            guidanceTask = Task { [weak self] in
+                for await frame in frames {
+                    guard let self, !Task.isCancelled else { return }
+                    self.updateGuidance(for: frame)
+                }
+            }
+        }
+
+        private func stopListening() {
+            stateTask?.cancel()
+            pointsTask?.cancel()
+            detectTask?.cancel()
+            guidanceTask?.cancel()
+            guidance = nil
+        }
 
     private static func message(for error: ScanSessionError) -> String {
         switch error {

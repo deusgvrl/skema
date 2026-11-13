@@ -261,6 +261,33 @@ struct ScanViewModelTests {
             #expect(viewModel.pointCloud.pointCount == 0)
         }
 
+    @Test("A tracking problem that lasts shows its tip, and recovering hides it")
+        func guidanceFromFrames() throws {
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
+
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+            let shown = viewModel.guidance
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2, tracking: .normal))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2.5, tracking: .normal))
+
+            #expect(shown == .moveSlower)
+            #expect(viewModel.guidance == nil)
+        }
+
+        @Test("Finish Scan clears the tip")
+        func finishClearsGuidance() async throws {
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
+            await viewModel.start()
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+
+            viewModel.finishTapped()
+
+            #expect(viewModel.guidance == nil)
+        }
+
+
     @Test("Close before the scan started does nothing")
     func closeBeforeStart() {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .denied))
@@ -287,5 +314,19 @@ func makeDepthScanFrame(timestamp: TimeInterval) throws -> ScanFrame {
         tracking: frame.tracking,
         ambientIntensity: frame.ambientIntensity,
         planes: frame.planes
+    )
+}
+
+func makeTrackingFrame(timestamp: TimeInterval, tracking: ScanTracking) throws -> ScanFrame {
+    let frame = try makeScanFrame(timestamp: timestamp)
+    return ScanFrame(
+        timestamp: timestamp,
+        image: frame.image,
+        orientation: frame.orientation,
+        camera: frame.camera,
+        depth: makeDepth(width: 8, height: 8, depth: 1),
+        tracking: tracking,
+        ambientIntensity: 1000,
+        planes: []
     )
 }
