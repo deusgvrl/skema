@@ -61,6 +61,10 @@ final class ScanViewModel {
 
     private(set) var guidance: ScanGuidance?
 
+    var asksBeforeLeaving: Bool {
+            screen == .scanning
+        }
+
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
     var arSession: ARSession? {
         scan?.session as? ARSession
@@ -292,7 +296,6 @@ final class ScanViewModel {
         }
     }
 
-
     /// Listens to the same frames as the points, at its own pace (A10-62).
     private func detectEquipment(from scan: ScanSession) {
         detectTask?.cancel()
@@ -357,11 +360,11 @@ final class ScanViewModel {
         case .cameraDenied, .lidarUnsupported: ""
         }
     }
-    
+
     func deleteDraftSetup() {
         storageController.deleteSetup(draftSetup)
     }
-    
+
     func insertDraftSetup() {
         storageController.addSetup(draftSetup)
     }

@@ -7,6 +7,7 @@ struct ScanView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ScanViewModel
     @State private var reviewViewModel: ReviewViewModel? = nil
+    @State private var showsLeaveAlert = false
     var onDismissToSetups: (() -> Void)?
 
     /// "Add Equipment Manually", when the camera is off or there is no LiDAR.
@@ -77,13 +78,25 @@ struct ScanView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel", systemImage: "chevron.left") {
-                    viewModel.closeTapped()
-                    dismiss()
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Close", systemImage: "xmark") {
+                            if viewModel.asksBeforeLeaving {
+                                showsLeaveAlert = true
+                            } else {
+                                leave()
+                            }
+                        }
+                    }
                 }
-            }
-        }
+
+                .alert("Cancel This Scan?", isPresented: $showsLeaveAlert) {
+                    Button("Continue", role: .cancel) {}
+                    Button("Cancel Scan", role: .destructive) {
+                        leave()
+                    }
+                } message: {
+                    Text("Everything detected so far will be lost.")
+                }
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await viewModel.start()
@@ -93,6 +106,12 @@ struct ScanView: View {
             Task { await viewModel.appBecameActive() }
         }
     }
+
+    private func leave() {
+        viewModel.closeTapped()
+        dismiss()
+    }
+
     private var showsFinishScan: Bool {
             #if targetEnvironment(simulator)
             true
