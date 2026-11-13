@@ -24,6 +24,12 @@ nonisolated struct EquipmentTracker: Sendable {
     private(set) var lastLook: Double?
     /// Ids of accepted items already handed out by `look`, so each is added to the setup once.
     private var handedOut: Set<Int> = []
+    /// The latest look's sightings and the item id each joined, for the raw-data export.
+    private(set) var latestSightings: [SightedDetection] = []
+    private(set) var latestJoinedIDs: [Int] = []
+
+    /// Every tracked item now, for the raw-data export.
+    var items: [TrackedItem] { map.items }
 
     /// True when at least `lookInterval` has passed since the last look (or there was none).
     func wantsLook(at time: Double) -> Bool {
@@ -42,6 +48,9 @@ nonisolated struct EquipmentTracker: Sendable {
         // for those it returns nil, so they have no mask to keep.
         let sighted = EquipmentSightings.make(from: detections, depth: depth, camera: camera)
         let ids = map.update(sighted.map(\.sighting), at: time)
+        // For the raw-data export: a nil id (a weak light that joined no accepted item) is logged as -1.
+        latestSightings = sighted
+        latestJoinedIDs = ids.map { $0 ?? -1 }
         masks = Dictionary(zip(ids, sighted.map(\.mask)).compactMap { id, mask in id.map { ($0, mask) } },
                            uniquingKeysWith: { first, _ in first })
         return newlyAccepted(map.items)
