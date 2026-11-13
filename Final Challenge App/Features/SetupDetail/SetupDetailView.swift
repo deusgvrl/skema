@@ -174,16 +174,10 @@ struct SetupDetailView: View {
         }
         // Photos Picker
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerSelection, matching: .images)
-        .onChange(of: photoPickerSelection) { _, newItems in
-            Task {
-                for item in newItems {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        viewModel.referenceImages.append(image)
-                    }
-                }
-                photoPickerSelection.removeAll()
-            }
+        .task(id: photoPickerSelection) {
+            guard !photoPickerSelection.isEmpty else { return }
+            await viewModel.addReferenceImages(from: photoPickerSelection)
+            photoPickerSelection.removeAll()
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker(images: $viewModel.referenceImages) { capturedImage in
