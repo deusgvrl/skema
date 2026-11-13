@@ -235,4 +235,31 @@ struct ScanOverlayTests {
         let items = [acceptedCamera(1, id: 0), item("studio lighting", .pending, progress: 0.9, id: 1)]
         #expect(!overlay(items, subject: SIMD3(0, 0, -1)).canFinish)
     }
+
+    // MARK: Tap on the screen (subject by hand)
+
+    @Test("A tap in the middle of the screen is the middle of the picture")
+    func tapInTheMiddle() throws {
+        let point = try #require(ScanOverlay.picturePoint(fromScreen: CGPoint(x: 720, y: 960), camera: camera(),
+                                                         screenSize: screen))
+        #expect(abs(point.x - 0.5) < 1e-6 && abs(point.y - 0.5) < 1e-6)
+    }
+
+    @Test("A tap on an item's tag spot gives the picture point that spot projects to")
+    func tapIsTheInverseOfScreenPoint() throws {
+        let spot = SIMD3<Float>(0.3, -0.2, -1)
+        let cam = camera()
+        let tapped = try #require(ScanOverlay.screenPoint(of: spot, camera: cam, screenSize: screen))
+        let pixel = try #require(DepthSampler.project(spot, camera: cam))
+
+        let point = try #require(ScanOverlay.picturePoint(fromScreen: tapped, camera: cam, screenSize: screen))
+
+        #expect(abs(Float(point.x) - pixel.x / cam.imageResolution.x) < 1e-4)
+        #expect(abs(Float(point.y) - pixel.y / cam.imageResolution.y) < 1e-4)
+    }
+
+    @Test("A tap outside the screen is nothing")
+    func tapOutsideTheScreen() {
+        #expect(ScanOverlay.picturePoint(fromScreen: CGPoint(x: -1, y: 5), camera: camera(), screenSize: screen) == nil)
+    }
 }

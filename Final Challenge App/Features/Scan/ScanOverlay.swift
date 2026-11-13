@@ -5,6 +5,8 @@ import MeasureKit
 nonisolated enum MaskColor: Equatable, Sendable {
     case white
     case green
+    /// The subject the photographer tapped.
+    case blue
 }
 
 /// One thing drawn on the scan screen: a tracked item or the subject.
@@ -31,9 +33,10 @@ nonisolated struct ScanOverlay: Equatable, Sendable {
     /// - Parameters:
     ///   - masks: this look's mask for each item id (from `ObjectMap.update`'s returned ids).
     ///   - subject: the chosen subject's 3D spot, or nil.
+    ///   - subjectMask: the subject's mask while it is shown (a short confirmation after the tap), or nil.
     ///   - camera: the camera at this look; its picture is sideways (`.right`) and shown upright, filling the screen.
-    init(items: [TrackedItem], masks: [Int: InstanceMask], subject: SIMD3<Float>?, camera: CameraModel,
-         screenSize: CGSize) {
+    init(items: [TrackedItem], masks: [Int: InstanceMask], subject: SIMD3<Float>?, subjectMask: InstanceMask? = nil,
+         camera: CameraModel, screenSize: CGSize) {
         func onScreen(_ spot: SIMD3<Float>) -> CGPoint? {
             Self.screenPoint(of: spot, camera: camera, screenSize: screenSize)
         }
@@ -48,7 +51,8 @@ nonisolated struct ScanOverlay: Equatable, Sendable {
                 tagPosition: onScreen(item.position))
         }
         self.subject = subject.map {
-            OverlayItem(tag: "Subject ✓", ring: nil, mask: nil, maskColor: nil, tagPosition: onScreen($0))
+            OverlayItem(tag: "Subject ✓", ring: nil, mask: subjectMask, maskColor: subjectMask == nil ? nil : .blue,
+                        tagPosition: onScreen($0))
         }
         let accepted = items.filter { $0.status == .accepted }
         let cameras = accepted.filter { EquipmentKind(modelLabel: $0.label) == .camera }.count
@@ -99,5 +103,19 @@ nonisolated struct ScanOverlay: Equatable, Sendable {
                             y: upright.y * scale + (screenSize.height - uprightSize.height * scale) / 2)
         guard point.x >= 0, point.x < screenSize.width, point.y >= 0, point.y < screenSize.height else { return nil }
         return point
+    }
+
+    /// A tap on the screen → the point it touches in the camera picture, as fractions of the picture (0...1, top-left).
+    /// The exact reverse of `screenPoint`. Nil when the tap is outside the screen.
+    static func picturePoint(fromScreen tap: CGPoint, camera: CameraModel, screenSize: CGSize) -> CGPoint? {
+        guard tap.x >= 0, tap.x < screenSize.width, tap.y >= 0, tap.y < screenSize.height else { return nil }
+        let pictureHeight = CGFloat(camera.imageResolution.y)
+        let pictureWidth = CGFloat(camera.imageResolution.x)
+        let uprightSize = CGSize(width: pictureHeight, height: pictureWidth)
+        let scale = max(screenSize.width / uprightSize.width, screenSize.height / uprightSize.height)
+        let upright = CGPoint(x: (tap.x - (screenSize.width - uprightSize.width * scale) / 2) / scale,
+                              y: (tap.y - (screenSize.height - uprightSize.height * scale) / 2) / scale)
+        // Upright (x, y) is the sideways picture's (H - v, u).
+        return CGPoint(x: upright.y / pictureWidth, y: (pictureHeight - upright.x) / pictureHeight)
     }
 }

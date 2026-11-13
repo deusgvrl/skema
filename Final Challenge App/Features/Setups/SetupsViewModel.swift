@@ -55,4 +55,9 @@ final class SetupsViewModel {
             print(" '\(s.setupName)' | Client: '\(s.client)' | Project: '\(s.project)' | Equipment total: '\(s.nodes.count)'")
         }
     }
+    
+    func deleteSetup(_ setup: Setup) {
+        storageController.deleteSetup(setup)
+        fetchSetups()
+    }
 }

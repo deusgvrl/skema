@@ -5,6 +5,7 @@ struct SetupsView: View {
     @State private var viewModel = SetupsViewModel()
     @State private var searchText = ""
     @State private var grouping = SetupsGrouping.recent
+    @State private var isShowingLiDARScan = false
     @ScaledMetric(relativeTo: .title2) private var newSetupButtonSize: CGFloat = 48
 
     var body: some View {
@@ -27,23 +28,44 @@ struct SetupsView: View {
                         .padding(.top, 120)
                 } else {
                     List(viewModel.setups) { setup in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(setup.setupName) - \(setup.nodes.count) equipment")
-                                .font(.headline)
-                            if !setup.client.isEmpty || !setup.project.isEmpty {
-                                Text("\(setup.client) • \(setup.project)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                        NavigationLink(value: setup) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(setup.setupName) • \(setup.nodes.count) equipment")
+                                    .font(.headline)
+                                
+                                let subtitle = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " › ")
+                                if !subtitle.isEmpty {
+                                    Text(subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                viewModel.deleteSetup(setup)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }
                     .listStyle(.insetGrouped)
+                    .navigationDestination(for: Setup.self) { selectedSetup in
+                        
+                        SetupDetailView(setup: selectedSetup)
+                    }
                 }
                 Spacer(minLength: 0)
             }
             .navigationDestination(isPresented: $viewModel.isShowingScan) {
                 ScanView(onDismissToSetups: {
                     viewModel.isShowingScan = false
+                })
+            }
+            .navigationDestination(isPresented: $isShowingLiDARScan) {
+                LiDARScanView(onDismissToSetups: {
+                    isShowingLiDARScan = false
                 })
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -109,6 +131,11 @@ struct SetupsView: View {
 
             }
             .accessibilityLabel("New Setup")
+            #if DEBUG
+            .contextMenu {
+                Button("LiDAR tap scan (test)") { isShowingLiDARScan = true }
+            }
+            #endif
             .padding(16)
     }
 }

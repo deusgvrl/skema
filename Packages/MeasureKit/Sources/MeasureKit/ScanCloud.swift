@@ -67,7 +67,22 @@ public struct EquipmentPoints: Sendable {
             if !worldPoints(maxRange: .infinity).isEmpty { sawPointsBeyondRange = true }
             return
         }
-        for point in inRange {
+        insert(inRange)
+    }
+
+    /// Adds world points that were collected by another rule (a painted column, `DepthSampler.columnPoints`).
+    /// The same range and cell rules as `add(box:mask:depth:camera:)`: a point farther than `DepthSampler.maxRange`
+    /// from `camera` is dropped, and only far points (and none near) make the item `outOfRange`.
+    public mutating func add(points newPoints: [SIMD3<Float>], camera: CameraModel) {
+        let toCamera = camera.cameraToWorld.inverse
+        let near = newPoints.filter { -(toCamera * SIMD4<Float>($0, 1)).z <= DepthSampler.maxRange }
+        if near.isEmpty, !newPoints.isEmpty { sawPointsBeyondRange = true }
+        insert(near)
+    }
+
+    /// Keeps each point whose 1 cm cell has no point yet.
+    private mutating func insert(_ newPoints: [SIMD3<Float>]) {
+        for point in newPoints {
             // Same cell rule as `ScanCloud`: the cell is the point's position divided by the cell size, rounded down.
             let cell = SIMD3<Int32>((point / ScanCloud.voxelSize).rounded(.down), rounding: .towardZero)
             if voxels.insert(cell).inserted { points.append(point) }
@@ -100,6 +115,16 @@ public struct ScanMeasurements: Sendable {
         to id: UUID, box: NormalizedBox, mask: InstanceMask?, depth: DepthFrame, camera: CameraModel
     ) {
         equipment[id, default: EquipmentPoints()].add(box: box, mask: mask, depth: depth, camera: camera)
+    }
+
+    /// Adds world points for the equipment `id` (see `EquipmentPoints.add(points:camera:)`).
+    public mutating func add(points: [SIMD3<Float>], to id: UUID, camera: CameraModel) {
+        equipment[id, default: EquipmentPoints()].add(points: points, camera: camera)
+    }
+
+    /// Forgets everything collected for the equipment `id`. An id that was never added does nothing.
+    public mutating func remove(_ id: UUID) {
+        equipment[id] = nil
     }
 
     /// The centres of every piece of equipment, or the reason there are none (see `EquipmentPoints.scanResult`).

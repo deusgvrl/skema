@@ -60,21 +60,62 @@ struct EquipmentFormView: View {
                 // MARK: 2. Category-Specific Settings
                 if formViewModel.category == .light {
                     Section(header: Text("Light Settings")) {
-                        HStack { Text("Power"); Spacer(); TextField("-", text: $formViewModel.power).multilineTextAlignment(.trailing) }
-                        HStack { Text("Color temperature"); Spacer(); TextField("- K", text: $formViewModel.colorTemp).multilineTextAlignment(.trailing) }
+                        HStack {
+                            Text("Power")
+                            Spacer()
+                            TextField("-", text: $formViewModel.power)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text("Color temperature")
+                            Spacer()
+                            TextField("-", text: $formViewModel.colorTemp)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numberPad)
+                            Text("K")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 
                 if formViewModel.category == .camera {
                     Section(header: Text("Lens")) {
-                        HStack { Text("Lens"); Spacer(); TextField("-", text: $formViewModel.lens).multilineTextAlignment(.trailing) }
+                        HStack {
+                            Text("Lens")
+                            Spacer()
+                            TextField("-", text: $formViewModel.lens)
+                                .multilineTextAlignment(.trailing)
+                        }
                     }
                     
                     Section(header: Text("Camera Settings")) {
-                        HStack { Text("ISO"); Spacer(); TextField("-", text: $formViewModel.iso).multilineTextAlignment(.trailing) }
-                        HStack { Text("Aperture"); Spacer(); TextField("-", text: $formViewModel.aperture).multilineTextAlignment(.trailing) }
-                        HStack { Text("Shutter speed"); Spacer(); TextField("-", text: $formViewModel.shutterSpeed).multilineTextAlignment(.trailing) }
-                        HStack { Text("White balance"); Spacer(); TextField("- K", text: $formViewModel.whiteBalance).multilineTextAlignment(.trailing) }
+                        HStack {
+                            Text("ISO")
+                            Spacer()
+                            TextField("-", text: $formViewModel.iso)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text("Aperture")
+                            Spacer()
+                            TextField("-", text: $formViewModel.aperture)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text("Shutter speed")
+                            Spacer()
+                            TextField("-", text: $formViewModel.shutterSpeed)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text("White balance")
+                            Spacer()
+                            TextField("-", text: $formViewModel.whiteBalance)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numberPad)
+                            Text("K")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 
@@ -84,14 +125,46 @@ struct EquipmentFormView: View {
                         header: Text("Position & Direction"),
                         footer: Text(isReadOnly ? "Viewing equipment details from read-only mode." : "It's placed next to the subject for now. You can drag it to the right spot on the diagram, or change these values anytime later.")
                     ) {
-                        HStack { Text("Height"); Spacer(); TextField("- cm", text: $formViewModel.height).multilineTextAlignment(.trailing) }
-                        HStack { Text("Tilt"); Spacer(); TextField("- °", text: $formViewModel.tilt).multilineTextAlignment(.trailing) }
-                        
-                        if formViewModel.category == .light {
-                            HStack { Text("Horizontal aim"); Spacer(); TextField("- °", text: $formViewModel.horizontalAim).multilineTextAlignment(.trailing) }
+                        HStack {
+                            Text("Height")
+                            Spacer()
+                            TextField("-", text: $formViewModel.height)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.decimalPad)
+                            Text("m")
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Text("Tilt")
+                            Spacer()
+                            TextField("-", text: $formViewModel.tilt)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numbersAndPunctuation)
+                            Text("°")
+                                .foregroundStyle(.secondary)
                         }
                         
-                        HStack { Text("Distance to subject"); Spacer(); TextField("- m", text: $formViewModel.distance).multilineTextAlignment(.trailing) }
+                        if formViewModel.category == .light {
+                            HStack {
+                                Text("Horizontal aim")
+                                Spacer()
+                                TextField("-", text: $formViewModel.horizontalAim)
+                                    .multilineTextAlignment(.trailing)
+                                    .keyboardType(.numbersAndPunctuation)
+                                Text("°")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("Distance to subject")
+                            Spacer()
+                            TextField("-", text: $formViewModel.distance)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.decimalPad)
+                            Text("m")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 
@@ -152,7 +225,6 @@ struct EquipmentFormView: View {
         }
     }
 }
-
 
 #Preview {
     EquipmentFormView(viewModel: ReviewViewModel(), editingNodeId: nil, undoManager: nil)

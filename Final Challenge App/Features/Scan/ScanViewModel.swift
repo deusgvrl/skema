@@ -1,5 +1,7 @@
 import ARKit
+import CoreGraphics
 import MeasureKit
+import MeasureKitVision
 import Observation
 
 enum ScanScreen: Equatable {
@@ -25,25 +27,38 @@ final class ScanViewModel {
     @ObservationIgnored private var stateTask: Task<Void, Never>?
     @ObservationIgnored private var pointsTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
+    @ObservationIgnored private let subjectSegmenter: any SubjectSegmenting
+    @ObservationIgnored private var subjectTask: Task<Void, Never>?
     @ObservationIgnored var storageController: StorageController
     @ObservationIgnored private var detector: (any EquipmentDetecting)?
     @ObservationIgnored private var detectTask: Task<Void, Never>?
     @ObservationIgnored private var isDetecting = false
     private var tracker = EquipmentTracker()
-    
-    init (
+    /// The points of the subject and of every accepted item, for distance and height (A10-41, A10-21).
+    @ObservationIgnored private var measurements = ScanMeasurements()
+    /// Stands for the subject in `measurements`.
+    @ObservationIgnored private let subjectID = UUID()
+    /// The draft equipment each accepted tracker item became.
+    @ObservationIgnored private var equipmentIDs: [Int: UUID] = [:]
+    /// The newest frame, for a tap on the subject.
+    @ObservationIgnored private var latestFrame: ScanFrame?
+    /// The lowest floor plane ARKit has found so far; nil until it finds one.
+    @ObservationIgnored private var floorY: Float?
+
+    init(
         makeScan: @escaping () -> ScanSession = { ScanSession() },
         camera: any CameraPermission = SystemCameraPermission(),
         detector: (any EquipmentDetecting)? = nil,
+        subjectSegmenter: any SubjectSegmenting = SubjectSegmenter(),
         storageController: StorageController? = nil
     ) {
+        self.subjectSegmenter = subjectSegmenter
         self.makeScan = makeScan
         self.camera = camera
         self.storageController = storageController ?? StorageController.shared
         self.draftSetup = Setup(setupName: "Untitled Setup")
         self.detector = detector
     }
-
 
     /// The running scan's ARKit session, for the camera view. Nil until scanning, and in tests.
     var arSession: ARSession? {
@@ -58,6 +73,13 @@ final class ScanViewModel {
     /// The chosen subject's 3D spot. Nil until the subject tap exists (owner open).
     var subject: SIMD3<Float>?
 
+    /// The subject's mask in the newest camera's picture. It is the subject's depth points from the tap, projected
+    /// into each new camera, so it stays on the product as the phone moves. Nil when none is in view.
+    private(set) var subjectMask: InstanceMask?
+    /// The subject's depth points from the tap's mask (world space, at most `maxSubjectPoints`).
+    @ObservationIgnored private var subjectPoints: [SIMD3<Float>] = []
+    private static let maxSubjectPoints = 4000
+
     /// Finish Scan is enabled (A10-62 rule, from the overlay). False before the first look.
     var canFinish: Bool {
         overlay(in: .zero)?.canFinish ?? false
@@ -70,13 +92,14 @@ final class ScanViewModel {
 
     /// What the scan screen draws over the camera (A10-62). Nil before the first look.
     func overlay(in screenSize: CGSize) -> ScanOverlay? {
-        tracker.overlay(subject: subject, screenSize: screenSize)
+        tracker.overlay(subject: subject, subjectMask: subjectMask, screenSize: screenSize)
     }
 
     /// One frame through detection → tracking → overlay (A10-62). Internal so tests can call it.
     /// Skips the frame when the last look was under 0.1 s ago or a look is still running.
     /// A frame without depth or a failed detection counts as a look that saw nothing.
     func detect(in frame: ScanFrame) async {
+        floorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? floorY
         guard !isDetecting, tracker.wantsLook(at: frame.timestamp), let detector else { return }
         isDetecting = true
         defer { isDetecting = false }
@@ -86,8 +109,103 @@ final class ScanViewModel {
         }
         guard !Task.isCancelled else { return }
         for item in tracker.look(found, depth: frame.depth, camera: frame.camera, at: frame.timestamp) {
-            addDraftEquipment(Self.equipment(for: item))
+            let equipment = Self.equipment(for: item)
+            equipmentIDs[item.id] = equipment.id
+            addDraftEquipment(equipment)
         }
+        measureAcceptedItems(in: frame)
+        subjectMask = DepthSampler.projectedMask(of: subjectPoints, camera: frame.camera)
+    }
+
+    /// Adds this look's points of every accepted item. Pending items add nothing (A10-21).
+    private func measureAcceptedItems(in frame: ScanFrame) {
+        guard let depth = frame.depth else { return }
+        for seen in tracker.acceptedSightings {
+            guard let id = equipmentIDs[seen.id] else { continue }
+            measurements.add(to: id, box: seen.box, mask: seen.mask, depth: depth, camera: frame.camera)
+        }
+    }
+
+    /// Half the side of the square of depth around a tap, as a fraction of the picture (about 12% wide in all).
+    static let tapHalfSize = 0.06
+
+    /// The photographer taps the subject on the camera view. Uses the newest frame the scan delivered.
+    /// - Returns: false when there is no frame yet, the tap is off the picture, or there is no good depth under it;
+    ///   the subject is then unchanged.
+    @discardableResult
+    func setSubject(atScreen tap: CGPoint, screenSize: CGSize) -> Bool {
+        guard let latestFrame else { return false }
+        return setSubject(atScreen: tap, screenSize: screenSize, in: latestFrame)
+    }
+
+    /// Same as `setSubject(atScreen:screenSize:)`, on a given frame. Internal so tests can call it.
+    @discardableResult
+    func setSubject(atScreen tap: CGPoint, screenSize: CGSize, in frame: ScanFrame) -> Bool {
+        guard let depth = frame.depth,
+              let point = ScanOverlay.picturePoint(fromScreen: tap, camera: frame.camera, screenSize: screenSize)
+        else { return false }
+        let box = NormalizedBox.around(x: point.x, y: point.y, halfSize: Self.tapHalfSize)
+        let spot = DepthSampler.worldPoints(in: box, depth: depth, camera: frame.camera,
+                                            maxRange: DepthSampler.maxRange)
+        guard let centre = Geometry.medianPoint(spot) else { return false }
+        measurements.remove(subjectID)
+        measurements.add(to: subjectID, box: box, mask: nil, depth: depth, camera: frame.camera)
+        subject = centre
+        subjectMask = nil
+        subjectPoints = []
+        subjectTask?.cancel()
+        subjectTask = Task { [weak self, subjectSegmenter] in
+            let mask = await subjectSegmenter.mask(atNative: point, in: frame)
+            guard let mask, !Task.isCancelled else { return }
+            self?.useSubjectMask(mask, in: frame)
+        }
+        return true
+    }
+
+    /// Waits for the mask of the latest tap (or its failure). Internal so tests can wait for it.
+    func subjectMaskSettled() async {
+        await subjectTask?.value
+    }
+
+    /// The mask's depth points replace the patch's: the subject's base is then the product's own bottom band.
+    /// A mask with no good depth is ignored and the patch stays.
+    private func useSubjectMask(_ mask: InstanceMask, in frame: ScanFrame) {
+        let points = frame.depth.map {
+            DepthSampler.worldPoints(in: mask, depth: $0, camera: frame.camera, maxRange: DepthSampler.maxRange)
+        } ?? []
+        guard let depth = frame.depth, let box = MaskMapping.bounds(of: mask),
+              let centre = Geometry.medianPoint(points) else { return }
+        measurements.remove(subjectID)
+        measurements.add(to: subjectID, box: box, mask: mask, depth: depth, camera: frame.camera)
+        subject = centre
+        let step = max(1, points.count / Self.maxSubjectPoints)
+        subjectPoints = stride(from: 0, to: points.count, by: step).map { points[$0] }
+        subjectMask = DepthSampler.projectedMask(of: subjectPoints, camera: frame.camera)
+    }
+
+    /// Writes each measured item's distance, height and plan position onto its draft equipment.
+    /// The plan has the phone's side at the bottom, 100 points to the metre (as the diagram draws it).
+    /// An item that could not be measured keeps empty values and stays at the centre.
+    private func writeMeasurements() {
+        guard let subject, let camera = tracker.camera else { return }
+        let phone = camera.cameraToWorld.columns.3
+        let towardPhone = SIMD2(phone.x - subject.x, phone.z - subject.z)
+        let results = measurements.results(subject: subjectID, floorY: floorY ?? 0)
+        for equipment in draftSetup.nodes {
+            guard let result = results[equipment.id], result.status == .measured,
+                  let distance = result.distanceToSubject, let offset = result.floorOffset else { continue }
+            let plan = PlanLayout.planOffset(offset, towardViewer: towardPhone)
+            equipment.distance = Self.metres(distance)
+            equipment.position = CGPoint(x: Double(plan.x) * 100, y: Double(plan.y) * 100)
+            if floorY != nil, let height = result.height {
+                equipment.height = Self.metres(height)
+            }
+        }
+    }
+
+    /// "1.28": a plain number of metres, as `Equipment.syncDistanceFromPosition` writes it. The views add the unit.
+    private static func metres(_ value: Float) -> String {
+        String(format: "%.2f", value)
     }
 
     func start() async {
@@ -132,6 +250,7 @@ final class ScanViewModel {
     func finishTapped() {
         insertDraftSetup()
         stopListening()
+        writeMeasurements()
         scan?.stop()
     }
 
@@ -196,6 +315,7 @@ final class ScanViewModel {
             }
             for await frame in frames {
                 guard let self, !Task.isCancelled else { return }
+                self.latestFrame = frame
                 await self.detect(in: frame)
             }
         }

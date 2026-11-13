@@ -8,6 +8,7 @@ extension MaskColor {
         switch self {
         case .white: SIMD3(255, 255, 255)
         case .green: SIMD3(52, 199, 89)
+        case .blue: SIMD3(10, 132, 255)
         }
     }
 }
