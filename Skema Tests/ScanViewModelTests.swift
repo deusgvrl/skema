@@ -256,6 +256,40 @@ struct ScanViewModelTests {
             #expect(viewModel.guidance == nil)
         }
 
+    @Test("While scanning, ✕ asks first, and asking keeps the same scan running")
+        func asksWhileScanning() async throws {
+            let made = MadeScans()
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized), made: made)
+            await viewModel.start()
+
+            let asks = viewModel.asksBeforeLeaving
+
+            let scan = try #require(made.all.first)
+            #expect(asks)
+            #expect(scan.state == .running)
+            #expect(arSession.pauseCount == 0)
+            #expect(made.all.count == 1)
+        }
+
+        @Test("On the camera-off and no-LiDAR screens, ✕ leaves without asking", arguments: [
+            (true, CameraPermissionStatus.denied),
+            (false, .authorized)
+        ])
+        func leavesWithoutAsking(supportsLiDAR: Bool, cameraStatus: CameraPermissionStatus) async {
+            let camera = FakeCameraPermission(status: cameraStatus)
+            let viewModel = makeViewModel(supportsLiDAR: supportsLiDAR, camera: camera)
+            await viewModel.start()
+
+            #expect(!viewModel.asksBeforeLeaving)
+        }
+
+        @Test("Before the scan starts, ✕ leaves without asking")
+        func startingDoesNotAsk() {
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
+
+            #expect(!viewModel.asksBeforeLeaving)
+        }
+
     @Test("Close before the scan started does nothing")
     func closeBeforeStart() {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .denied))
