@@ -23,6 +23,8 @@ struct ReviewView: View {
     @State private var selectedNewCategory: EquipmentCategory = .light
     @State private var showDiscardAlert = false
     @State private var showUnsavedEditsAlert = false
+    @State private var isShowingSubjectSheet = false
+    @State private var initialSubjectHeight: String = ""
 
     
     init(
@@ -40,9 +42,23 @@ struct ReviewView: View {
     var body: some View {
         Group {
             if isShowingDiagram {
-                diagramContent
+                ReviewDiagramContentView(
+                    viewModel: viewModel,
+                    undoManager: undoManager,
+                    onNodeTap: { node in editingNode = node },
+                    onSubjectTap: { isShowingSubjectSheet = true },
+                    onAddNodeTap: { isAddingNode = true }
+                )
             } else {
-                loadingContent
+                ReviewLoadingView(
+                    progress: progress,
+                    isScanComplete: isScanComplete,
+                    onContinue: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            isShowingDiagram = true
+                        }
+                    }
+                )
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -104,140 +120,15 @@ struct ReviewView: View {
         }
         .sheet(item: $editingNode) { node in
             EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingSubjectSheet) {
+            SubjectFormView(viewModel: viewModel, undoManager: undoManager)
         }
     }
     
-    // MARK: - Subviews
-    
-    private var loadingContent: some View {
-        VStack(spacing: 40) {
-            Image("loading_illustration")
-                .resizable()
-                .scaledToFit()
-                .frame(maxHeight: 260)
-                .clipShape(RoundedRectangle(cornerRadius: 28))
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
-                .accessibilityLabel("Scan preview illustration")
-            
-            VStack(spacing: 16) {
-                Text("Building Your Diagram...")
-                    .font(.title2.weight(.semibold))
-                
-                Text("We're mapping your lights, cameras and backdrop, and measuring how far each one is from the subject.\n\nKeep the app open while this finishes.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-            
-            Spacer()
-            
-            if isScanComplete {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isShowingDiagram = true
-                    }
-                } label: {
-                    Text("Continue to Layout")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.accentColor)
-                        .clipShape(Capsule())
-                }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 40)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else {
-                let secondsLeft = max(1, Int((1.0 - progress) * 20))
-                
-                VStack(spacing: 12) {
-                    ProgressView(value: progress, total: 1.0)
-                        .progressViewStyle(.linear)
-                        .tint(.blue)
-                        .padding(.horizontal, 32)
-                    
-                    Text("Measuring distances... About \(secondsLeft) seconds left")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("4 lights · 1 bounce · 2 cameras · backdrop found")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 40)
-            }
-        }
-        .background(Color(uiColor: .systemBackground))
-    }
-    
-    private var diagramContent: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .top) {
-                LightingDiagramView(
-                    viewModel: viewModel,
-                    isReadOnly: false,
-                    undoManager: undoManager,
-                    onNodeTap: { node in editingNode = node }
-                )
-                .overlay(alignment: .bottomTrailing) {
-                    Button {
-                        isAddingNode = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color.gray, in: .circle)
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    }
-                    .padding(16)
-                }
-                
-                if showHint && !viewModel.nodes.isEmpty {
-                    HStack {
-                        Text("Long press to move/rotate, or tap to edit details")
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                        
-                        Spacer()
-                        
-                        Button {
-                            withAnimation { showHint = false }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color(uiColor: .systemBackground))
-                            .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                }
-            }
-            
-            EquipmentCarousel(
-                viewModel: viewModel,
-                isReadOnly: false,
-                onNodeTap: { node in editingNode = node }
-            )
-        }
-    }
     
     // MARK: - Toolbar Content
     @ToolbarContentBuilder
@@ -319,7 +210,6 @@ struct ReviewView: View {
             }
         }
     }
-    // MARK: - Actions
     
     private func handleClose() {
         let hasUnsavedChanges = viewModel.canUndo
@@ -329,7 +219,7 @@ struct ReviewView: View {
                 // They are in a new scan and haven't saved yet
                 showDiscardAlert = true
             } else {
-                // They already tapped "Done" to save the scan, safe to close
+                viewModel.discardSetup()
                 dismissAll()
             }
         } else {
@@ -366,34 +256,6 @@ struct ReviewView: View {
                 }
             }
         }
-    }
-}
-
-struct EquipmentCarousel: View {
-    let viewModel: ReviewViewModel
-    var isReadOnly: Bool = false
-    var onNodeTap: ((Equipment) -> Void)? = nil
-    
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(viewModel.nodes) { node in
-                    VStack(alignment: .leading) {
-                        Text("\(node.name)")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                    .onTapGesture {
-                        onNodeTap?(node)
-                    }
-                }
-            }
-            .padding()
-        }
-        .background(Color(uiColor: .systemBackground))
     }
 }
 

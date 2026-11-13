@@ -249,6 +249,8 @@ struct EquipmentFormView: View {
                 Text("Are you sure you want to remove this equipment?")
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

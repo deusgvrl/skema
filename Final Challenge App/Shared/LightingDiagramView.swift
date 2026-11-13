@@ -7,6 +7,7 @@ struct LightingDiagramView: View {
     var isReadOnly: Bool = false
     var undoManager: UndoManager? = nil
     var onNodeTap: ((Equipment) -> Void)? = nil
+    var onSubjectTap: (() -> Void)? = nil
     
     @State private var nodesSnapshot: [Equipment] = []
     @State private var selectedNodeId: UUID? = nil
@@ -54,7 +55,9 @@ struct LightingDiagramView: View {
                 }
                  
                 // Subject
-                DiagramEntity(title: "Subject", icon: "person.fill", position: subjectCenter)
+                DiagramEntity(title: "Subject", icon: "person.fill", position: subjectCenter) {
+                    onSubjectTap?()
+                }
                  
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
@@ -153,6 +156,7 @@ struct DiagramEntity: View {
     let title: String
     let icon: String
     let position: CGPoint
+    var onTap: () -> Void
     
     var body: some View {
         VStack(spacing: 4) {
@@ -165,6 +169,9 @@ struct DiagramEntity: View {
                 .foregroundStyle(.secondary)
         }
         .position(position)
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
