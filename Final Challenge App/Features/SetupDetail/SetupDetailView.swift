@@ -183,8 +183,10 @@ struct SetupDetailView: View {
             }
         }
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker(images: $viewModel.referenceImages)
-                .ignoresSafeArea()
+            CameraPicker(images: $viewModel.referenceImages) { capturedImage in
+                viewModel.addReferenceImage(capturedImage)
+            }
+            .ignoresSafeArea()
         }
         // Equipment Detail Sheet (Read-Only)
         .sheet(item: $viewModel.selectedEquipment) { node in

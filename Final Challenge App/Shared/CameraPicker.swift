@@ -41,8 +41,11 @@ struct CameraPicker: UIViewControllerRepresentable {
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             if let uiImage = info[.originalImage] as? UIImage {
-                parent.images.append(uiImage)
-                parent.onImageCaptured?(uiImage)
+                if let onImageCaptured = parent.onImageCaptured {
+                    onImageCaptured(uiImage)
+                } else {
+                    parent.images.append(uiImage)
+                }
             }
             parent.dismiss()
         }
