@@ -104,9 +104,13 @@ struct ReviewView: View {
         }
         .sheet(item: $editingNode) { node in
             EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
     
@@ -261,7 +265,7 @@ struct ReviewView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
+                VStack(alignment: viewModel.canUndo || viewModel.canRedo ? .leading : .center, spacing: 2) {
                     Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
                         .font(.headline)
                         .fontWeight(.bold)
