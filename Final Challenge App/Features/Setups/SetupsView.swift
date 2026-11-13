@@ -131,11 +131,9 @@ struct SetupsView: View {
 
             }
             .accessibilityLabel("New Setup")
-            #if DEBUG
             .contextMenu {
                 Button("LiDAR tap scan (test)") { isShowingLiDARScan = true }
             }
-            #endif
             .padding(16)
     }
 }

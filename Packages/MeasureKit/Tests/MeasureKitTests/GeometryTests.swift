@@ -410,3 +410,201 @@ struct FloorPositionTests {
         #expect(Geometry.floorOffset(of: light, from: notMeasuredCentres()) == nil)
     }
 }
+
+/// Team decision (Richie and his guide, 13 Nov 2026): a light's top centre is the middle of the head in 3D, and its base
+/// centre is that point straight down. Cameras keep the highest-part rule for now.
+@Suite("Middle of a light (A10-42)")
+struct MiddleRuleTests {
+    /// A head 20 cm wide (x -10...10 cm), 30 cm high (y 100...130 cm) and 20 cm deep (z -310...-290 cm), on a 2 cm grid,
+    /// with the left half (x < 0) counted four times so it has four times the points.
+    private func head(extra: [SIMD3<Float>] = []) -> [SIMD3<Float>] {
+        var points: [SIMD3<Float>] = []
+        for x in stride(from: -10, through: 10, by: 2) {
+            for y in stride(from: 100, through: 130, by: 2) {
+                for z in stride(from: -310, through: -290, by: 2) {
+                    let point = SIMD3(cm(Float(x)), cm(Float(y)), cm(Float(z)))
+                    points.append(point)
+                    if x < 0 { points.append(contentsOf: [point, point, point]) }
+                }
+            }
+        }
+        return points + extra
+    }
+
+    @Test("The top centre is the middle of the head, even when one side has four times the points")
+    func middleOfTheHead() throws {
+        let centres = Geometry.centres(of: head(), isSubject: false, rule: .middle)
+
+        #expect(centres.status == .measured)
+        #expect(near(try #require(centres.topCentre), SIMD3(0, 1.15, -3), 0.001))
+    }
+
+    @Test("The base centre is the middle's x and z, straight down")
+    func baseIsStraightDown() throws {
+        let centres = Geometry.centres(of: head(), isSubject: false, rule: .middle)
+
+        #expect(near(try #require(centres.baseCentre), SIMD2(0, -3), 0.001))
+    }
+
+    @Test("A stray point 50 cm away does not move the middle")
+    func strayPointIgnored() throws {
+        let centres = Geometry.centres(of: head(extra: [SIMD3(0.6, 1.15, -3)]), isSubject: false, rule: .middle)
+
+        #expect(near(try #require(centres.topCentre), SIMD3(0, 1.15, -3), 0.001))
+    }
+
+    @Test("A light's height is the middle of the head above the floor")
+    func heightIsTheMiddle() throws {
+        let centres = Geometry.centres(of: head(), isSubject: false, rule: .middle)
+
+        #expect(near(try #require(Geometry.height(of: centres, floorY: -0.05)), 1.2, 0.001))
+    }
+
+    @Test("The subject ignores the rule")
+    func subjectIgnoresTheRule() {
+        let points = head()
+
+        #expect(Geometry.centres(of: points, isSubject: true, rule: .middle) == Geometry.centres(of: points, isSubject: true))
+    }
+
+    @Test("Without a rule the top is still the highest part, as before")
+    func defaultIsUnchanged() throws {
+        let points = head()
+
+        let before = Geometry.centres(of: points, isSubject: false)
+
+        #expect(before == Geometry.centres(of: points, isSubject: false, rule: .topPoint))
+        #expect(try #require(before.topCentre).y > 1.25)
+    }
+
+    @Test("Too few points still says so")
+    func tooFew() {
+        let centres = Geometry.centres(of: Array(head().prefix(Geometry.minPointCount - 1)), isSubject: false,
+                                       rule: .middle)
+
+        #expect(centres.status == .tooFewPoints && centres.topCentre == nil)
+    }
+}
+
+/// A light on a stand: the stand below the head is not part of "the middle of the head".
+@Suite("Head of a light (A10-42)")
+struct HeadOfALightTests {
+    /// A head 20 cm wide, 20 cm deep and 20 cm high (y 100...120 cm, middle 110 cm, 2 cm grid) on a stand 4 cm wide that
+    /// reaches from 60 to 98 cm. The stand's points are counted `standCount` times.
+    private func lightOnAStand(standCount: Int = 1) -> [SIMD3<Float>] {
+        var points: [SIMD3<Float>] = []
+        for x in stride(from: -10, through: 10, by: 2) {
+            for z in stride(from: -310, through: -290, by: 2) {
+                for y in stride(from: 100, through: 120, by: 2) {
+                    points.append(SIMD3(cm(Float(x)), cm(Float(y)), cm(Float(z))))
+                }
+            }
+        }
+        for x in stride(from: -2, through: 2, by: 2) {
+            for z in stride(from: -302, through: -298, by: 2) {
+                for y in stride(from: 60, through: 98, by: 2) {
+                    for _ in 0..<standCount { points.append(SIMD3(cm(Float(x)), cm(Float(y)), cm(Float(z)))) }
+                }
+            }
+        }
+        return points
+    }
+
+    @Test("The stand below the head does not pull the middle down")
+    func standIsLeftOut() throws {
+        let centres = Geometry.centres(of: lightOnAStand(), isSubject: false, rule: .middle)
+
+        // Counting the stand, the middle would be at 90 cm; the head alone is at 110 cm.
+        #expect(near(try #require(centres.topCentre), SIMD3(0, 1.10, -3), 0.015))
+        #expect(near(try #require(centres.baseCentre), SIMD2(0, -3), 0.015))
+    }
+
+    @Test("It does not matter how many more points the stand has")
+    func standDensityDoesNotMatter() throws {
+        let centres = Geometry.centres(of: lightOnAStand(standCount: 4), isSubject: false, rule: .middle)
+
+        #expect(near(try #require(centres.topCentre), SIMD3(0, 1.10, -3), 0.015))
+    }
+
+    @Test("A head that is narrower at the top is kept whole")
+    func coneHeadKeptWhole() throws {
+        // 20 cm wide at 100 cm, 12 cm wide at 120 cm: 5 x 5 points per layer, 11 layers.
+        var points: [SIMD3<Float>] = []
+        for y in stride(from: 100, through: 120, by: 2) {
+            let half = 10 - 4 * Float(y - 100) / 20
+            for column in 0..<5 {
+                for row in 0..<5 {
+                    points.append(SIMD3(cm(-half + half * Float(column) / 2), cm(Float(y)),
+                                        cm(-300 - half + half * Float(row) / 2)))
+                }
+            }
+        }
+
+        let centres = Geometry.centres(of: points, isSubject: false, rule: .middle)
+
+        #expect(near(try #require(centres.topCentre), SIMD3(0, 1.10, -3), 0.015))
+    }
+
+    @Test("A round head, widest in the middle, is kept above and below the widest layer")
+    func roundHeadKeptWhole() throws {
+        // y 100...120 cm, half-width 10 cm at 110 cm and 6 cm at both ends: 5 x 5 points per layer, on a stand below.
+        var points: [SIMD3<Float>] = []
+        for y in stride(from: 100, through: 120, by: 2) {
+            let half = 10 - 4 * abs(Float(y) - 110) / 10
+            for column in 0..<5 {
+                for row in 0..<5 {
+                    points.append(SIMD3(cm(-half + half * Float(column) / 2), cm(Float(y)),
+                                        cm(-300 - half + half * Float(row) / 2)))
+                }
+            }
+        }
+        for y in stride(from: 60, through: 98, by: 2) {
+            for column in 0..<3 { points.append(SIMD3(cm(Float(column) - 1), cm(Float(y)), cm(-300))) }
+        }
+
+        let centres = Geometry.centres(of: points, isSubject: false, rule: .middle)
+
+        #expect(near(try #require(centres.topCentre), SIMD3(0, 1.10, -3), 0.015))
+    }
+
+    @Test("Points that are all the same width are all kept")
+    func sameWidthAllKept() throws {
+        // Only the stand: nothing is wider than anything else, so nothing is cut.
+        var points: [SIMD3<Float>] = []
+        for x in stride(from: -2, through: 2, by: 2) {
+            for z in stride(from: -302, through: -298, by: 2) {
+                for y in stride(from: 60, through: 120, by: 1) {
+                    points.append(SIMD3(cm(Float(x)), cm(Float(y)), cm(Float(z))))
+                }
+            }
+        }
+
+        let centres = Geometry.centres(of: points, isSubject: false, rule: .middle)
+
+        #expect(near(try #require(centres.topCentre).y, 0.90, 0.015))
+    }
+
+    @Test("Layers with too few points to tell a width fall back to all the points")
+    func sparseLayersFallBack() throws {
+        // One point per 2 cm layer, 110 layers: no layer has a width.
+        let points = (0..<110).map { SIMD3(cm(Float($0 % 7)), cm(Float($0) * 2), cm(-300)) }
+
+        let centres = Geometry.centres(of: points, isSubject: false, rule: .middle)
+
+        #expect(centres.status == .measured)
+        // 110 points, 2 dropped at each end: from the 3rd lowest (4 cm) to the 3rd highest (214 cm).
+        #expect(near(try #require(centres.topCentre).y, 1.09, 0.001))
+    }
+
+    @Test("A wide layer with fewer than 20 points is not enough to call it the head")
+    func tinyHeadFallsBack() throws {
+        // A stand (100 points, 4 cm wide) and one wide layer of 6 points on top.
+        var points = (0..<100).map { SIMD3(cm(Float($0 % 3)), cm(Float($0 / 3) * 2), cm(-300 + Float($0 % 2))) }
+        points += (0..<6).map { SIMD3(cm(Float($0) * 4 - 10), cm(100), cm(-300 + Float($0 % 2) * 20)) }
+
+        let centres = Geometry.centres(of: points, isSubject: false, rule: .middle)
+
+        // All the points count: from about 0 to 100 cm, so the middle is far below the wide layer.
+        #expect(try #require(centres.topCentre).y < 0.6)
+    }
+}

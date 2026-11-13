@@ -94,19 +94,20 @@ public struct EquipmentPoints: Sendable {
     /// An item that was only ever seen too far away (beyond `DepthSampler.maxRange`) is `outOfRange`.
     /// Everything else is decided by `Geometry.centres`: `tooFewPoints` or `measured`.
     /// An item seen far once but near later has points, so it is not `outOfRange`.
-    public func scanResult(isSubject: Bool) -> EquipmentCentres {
+    public func scanResult(isSubject: Bool, rule: CentreRule = .topPoint) -> EquipmentCentres {
         // Out of range: no points were kept, but a frame did see the item farther than the range.
         // No points and nothing seen far away is not out of range: that is `tooFewPoints`.
         if points.isEmpty, sawPointsBeyondRange {
             return EquipmentCentres(status: .outOfRange, baseCentre: nil, topCentre: nil)
         }
-        return Geometry.centres(of: points, isSubject: isSubject)
+        return Geometry.centres(of: points, isSubject: isSubject, rule: rule)
     }
 }
 
 /// The points of every piece of equipment in one scan, and what they say once the floor and the subject are known.
 public struct ScanMeasurements: Sendable {
     private var equipment: [UUID: EquipmentPoints] = [:]
+    private var rules: [UUID: CentreRule] = [:]
 
     public init() {}
 
@@ -125,13 +126,19 @@ public struct ScanMeasurements: Sendable {
     /// Forgets everything collected for the equipment `id`. An id that was never added does nothing.
     public mutating func remove(_ id: UUID) {
         equipment[id] = nil
+        rules[id] = nil
+    }
+
+    /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light uses `.middle`.
+    public mutating func setRule(_ rule: CentreRule, for id: UUID) {
+        rules[id] = rule
     }
 
     /// The centres of every piece of equipment, or the reason there are none (see `EquipmentPoints.scanResult`).
     private func centres(subject: UUID) -> [UUID: EquipmentCentres] {
         var centres: [UUID: EquipmentCentres] = [:]
         for (id, points) in equipment {
-            centres[id] = points.scanResult(isSubject: id == subject)
+            centres[id] = points.scanResult(isSubject: id == subject, rule: rules[id] ?? .topPoint)
         }
         return centres
     }

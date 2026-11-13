@@ -127,6 +127,8 @@ final class LiDARScanViewModel {
         let equipment = Equipment(category: kind == .camera ? .camera : .light, name: name)
         items.append(LiDARScanItem(id: equipment.id, kind: kind, name: name, anchor: anchor))
         draftSetup.nodes.append(equipment)
+        // A light is measured at the middle of its head; a camera keeps the top-point rule for now.
+        if kind == .light { measurements.setRule(.middle, for: equipment.id) }
     }
 
     private func remove(_ id: UUID) {
