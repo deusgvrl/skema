@@ -6,22 +6,17 @@ struct ScanView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: ScanViewModel
-    @State private var reviewViewModel: ReviewViewModel? = nil
+    @State private var reviewViewModel: ReviewViewModel?
     @State private var showsLeaveAlert = false
     var onDismissToSetups: (() -> Void)?
 
-    /// "Add Equipment Manually", when the camera is off or there is no LiDAR.
-    var onAddManually: (() -> Void)?
-
     init(
-        viewModel: ScanViewModel = ScanViewModel(),
-        onDismissToSetups: (() -> Void)? = nil,
-        onAddManually: (() -> Void)? = nil
-    ) {
-        _viewModel = State(initialValue: viewModel)
-        self.onDismissToSetups = onDismissToSetups
-        self.onAddManually = onAddManually
-    }
+            viewModel: ScanViewModel = ScanViewModel(),
+            onDismissToSetups: (() -> Void)? = nil
+        ) {
+            _viewModel = State(initialValue: viewModel)
+            self.onDismissToSetups = onDismissToSetups
+        }
 
     var body: some View {
         ZStack {
@@ -68,7 +63,7 @@ struct ScanView: View {
             NavigationStack {
                 ReviewView(
                     isFromLoadingScreen: true,
-                    viewModel: vm, 
+                    viewModel: vm,
                     onDismissToSetups: {
                         reviewViewModel = nil // Dismisses cover
                         onDismissToSetups?()
@@ -112,6 +107,13 @@ struct ScanView: View {
         dismiss()
     }
 
+    private func addEquipmentManually() {
+           viewModel.insertDraftSetup()
+           reviewViewModel = ReviewViewModel(
+               setup: viewModel.draftSetup, storageController: viewModel.storageController
+           )
+       }
+
     private var showsFinishScan: Bool {
             #if targetEnvironment(simulator)
             true
@@ -123,7 +125,7 @@ struct ScanView: View {
     private var finishScanButton: some View {
             Button {
                 viewModel.finishTapped()
-                reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup)
+                reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup, storageController: viewModel.storageController)
             } label: {
                 HStack(spacing: 10) {
                     Text("Finish Scan")
@@ -180,7 +182,7 @@ struct ScanView: View {
                 .controlSize(.extraLarge)
 
                 Button("Add Equipment Manually") {
-                    onAddManually?()
+                    addEquipmentManually()
                 }
                 .fontWeight(.semibold)
             }
@@ -199,7 +201,7 @@ struct ScanView: View {
             )
 
             Button {
-                onAddManually?()
+                addEquipmentManually()
             } label: {
                 Text("Add Equipment Manually")
                     .frame(maxWidth: .infinity)
