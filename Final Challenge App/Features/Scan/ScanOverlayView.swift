@@ -22,6 +22,13 @@ struct ScanOverlayView: View {
                                 .position(x: rect.midX, y: rect.midY)
                         }
                     }
+                    if let mask = overlay.subject?.mask, let color = overlay.subject?.maskColor,
+                       let image = MaskImage.image(of: mask, color: color) {
+                        Image(decorative: image, scale: 1)
+                            .resizable()
+                            .frame(width: rect.width, height: rect.height)
+                            .position(x: rect.midX, y: rect.midY)
+                    }
                     ForEach(Array(overlay.items.enumerated()), id: \.offset) { _, item in
                         if let point = item.tagPosition {
                             ScanTag(item: item)
