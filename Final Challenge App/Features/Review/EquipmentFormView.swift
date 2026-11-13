@@ -13,7 +13,10 @@ struct EquipmentFormView: View {
     
     let undoManager: UndoManager?
     var isReadOnly: Bool = false
+    
     @State private var isDeleteAlert: Bool = false
+    @State private var isDiscardAlertPresented: Bool = false
+    @State private var isDirty: Bool = false
     
     init(viewModel: ReviewViewModel, editingNodeId: UUID?, undoManager: UndoManager?, isReadOnly: Bool = false) {
         self.undoManager = undoManager
@@ -139,7 +142,7 @@ struct EquipmentFormView: View {
                             Spacer()
                             TextField("-", text: $formViewModel.tilt)
                                 .multilineTextAlignment(.trailing)
-                                .keyboardType(.numbersAndPunctuation)
+                                .keyboardType(.numberPad)
                             Text("°")
                                 .foregroundStyle(.secondary)
                         }
@@ -150,7 +153,7 @@ struct EquipmentFormView: View {
                                 Spacer()
                                 TextField("-", text: $formViewModel.horizontalAim)
                                     .multilineTextAlignment(.trailing)
-                                    .keyboardType(.numbersAndPunctuation)
+                                    .keyboardType(.numberPad)
                                 Text("°")
                                     .foregroundStyle(.secondary)
                             }
@@ -197,7 +200,11 @@ struct EquipmentFormView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(isReadOnly ? "Close" : "Cancel", systemImage: "xmark") {
-                        dismiss()
+                        if !isReadOnly && isDirty {
+                            isDiscardAlertPresented = true
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
                 
@@ -211,6 +218,25 @@ struct EquipmentFormView: View {
                         .disabled(!formViewModel.isFormValid)
                     }
                 }
+            }
+            .interactiveDismissDisabled(!isReadOnly && isDirty)
+            .onChange(of: formViewModel.name) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.role) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.distance) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.horizontalAim) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.height) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.tilt) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.colorTemp) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.whiteBalance) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.power) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.accessories) { _, _ in isDirty = true }
+            .onChange(of: formViewModel.notes) { _, _ in isDirty = true }
+            
+            .alert("Discard Unsaved Changes?", isPresented: $isDiscardAlertPresented) {
+                Button("Keep Editing", role: .cancel) { }
+                Button("Discard", role: .destructive) { dismiss() }
+            } message: {
+                Text("You have unsaved changes. Are you sure you want to discard them?")
             }
             .alert("Delete Equipment", isPresented: $isDeleteAlert) {
                 Button("Cancel", role: .cancel) { }

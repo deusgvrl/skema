@@ -94,18 +94,20 @@ extension Equipment {
         self.horizontalAim = "\(displayAngle)"
     }
 
-    /// Updates `rotationAngle` from a typed numeric `horizontalAim` string
+    /// Updates `rotationAngle` from a typed numeric `horizontalAim` string (handles both '.' and ',')
     func syncRotationFromHorizontalAim() {
-        let cleaned = horizontalAim.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        let normalized = horizontalAim.replacingOccurrences(of: ",", with: ".")
+        let cleaned = normalized.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
         if let displayAngle = Double(cleaned) {
             let rawAngle = (360.0 - displayAngle).truncatingRemainder(dividingBy: 360.0)
             self.rotationAngle = rawAngle < 0 ? rawAngle + 360.0 : rawAngle
         }
     }
 
-    /// Scales (positionX, positionY) along vector from a typed numeric `distance` string
+    /// Scales (positionX, positionY) along vector from a typed numeric `distance` string (handles both '.' and ',')
     func syncPositionFromDistance() {
-        let cleaned = distance.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
+        let normalized = distance.replacingOccurrences(of: ",", with: ".")
+        let cleaned = normalized.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
         guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
         
         let targetPoints = targetMeters * Self.pointsPerMeter
@@ -119,6 +121,53 @@ extension Equipment {
             positionX = 0
             positionY = -targetPoints
         }
+    }
+    
+    func clone() -> Equipment {
+        Equipment(
+            id: self.id,
+            category: self.category,
+            label: self.label,
+            name: self.name,
+            role: self.role,
+            position: self.position,
+            power: self.power,
+            colorTemp: self.colorTemp,
+            lens: self.lens,
+            iso: self.iso,
+            aperture: self.aperture,
+            shutterSpeed: self.shutterSpeed,
+            whiteBalance: self.whiteBalance,
+            height: self.height,
+            tilt: self.tilt,
+            horizontalAim: self.horizontalAim,
+            distance: self.distance,
+            rotationAngle: self.rotationAngle,
+            accessories: self.accessories,
+            notes: self.notes
+        )
+    }
+    
+    func restoreValues(from snapshot: Equipment) {
+        self.category = snapshot.category
+        self.label = snapshot.label
+        self.name = snapshot.name
+        self.role = snapshot.role
+        self.position = snapshot.position
+        self.rotationAngle = snapshot.rotationAngle
+        self.power = snapshot.power
+        self.colorTemp = snapshot.colorTemp
+        self.lens = snapshot.lens
+        self.iso = snapshot.iso
+        self.aperture = snapshot.aperture
+        self.shutterSpeed = snapshot.shutterSpeed
+        self.whiteBalance = snapshot.whiteBalance
+        self.height = snapshot.height
+        self.tilt = snapshot.tilt
+        self.horizontalAim = snapshot.horizontalAim
+        self.distance = snapshot.distance
+        self.accessories = snapshot.accessories
+        self.notes = snapshot.notes
     }
 }
 

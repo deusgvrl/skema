@@ -79,6 +79,7 @@ final class EquipmentFormViewModel {
     }
     
     func saveNode(undoManager: UndoManager?, completion: () -> Void) {
+        let oldNodesSnapshot = reviewViewModel.nodes.map { $0.clone() }
         let sanitizedDistance = cleanNumericString(distance)
         let sanitizedAim = cleanNumericString(horizontalAim)
         
@@ -105,7 +106,7 @@ final class EquipmentFormViewModel {
             node.syncRotationFromHorizontalAim()
             node.syncPositionFromDistance()
             
-            reviewViewModel.updateEquipment(undoManager: undoManager)
+            reviewViewModel.updateEquipment(oldNodesSnapshot: oldNodesSnapshot, undoManager: undoManager)
         } else {
             let newNode = Equipment(
                 category: category,
@@ -150,7 +151,8 @@ final class EquipmentFormViewModel {
     
     /// Sanitizes strings by stripping non-numeric unit characters, keeping pure numeric inputs (e.g. "2.50").
     private func cleanNumericString(_ input: String) -> String {
-        let cleaned = input.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        let normalized = input.replacingOccurrences(of: ",", with: ".")
+        let cleaned = normalized.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
