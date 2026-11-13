@@ -256,7 +256,6 @@ struct ScanViewModelTests {
             #expect(viewModel.guidance == nil)
         }
 
-
     @Test("Close before the scan started does nothing")
     func closeBeforeStart() {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .denied))

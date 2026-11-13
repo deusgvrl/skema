@@ -101,4 +101,3 @@ func makeCamera(size: Float, focal: Float, position: SIMD3<Float> = .zero) -> Ca
         cameraToWorld: cameraToWorld
     )
 }
-

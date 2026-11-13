@@ -31,4 +31,3 @@ struct ScanGuidanceView: View {
     }
     .environment(\.colorScheme, .dark)
 }
-
