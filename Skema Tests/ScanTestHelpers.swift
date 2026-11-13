@@ -77,3 +77,27 @@ final class FakeARSession: ARSessionControlling, @unchecked Sendable {
         pauseCount += 1
     }
 }
+
+func makeDepth(width: Int, height: Int, depth: Float, confidence: UInt8 = 2) -> DepthFrame {
+    DepthFrame(
+        width: width,
+        height: height,
+        depth: [Float](repeating: depth, count: width * height),
+        confidence: [UInt8](repeating: confidence, count: width * height)
+    )
+}
+
+/// A pinhole camera looking down -Z, with the image centre in the middle.
+func makeCamera(size: Float, focal: Float, position: SIMD3<Float> = .zero) -> CameraModel {
+    var cameraToWorld = matrix_identity_float4x4
+    cameraToWorld.columns.3 = SIMD4(position, 1)
+    return CameraModel(
+        intrinsics: simd_float3x3(columns: (
+            SIMD3(focal, 0, 0),
+            SIMD3(0, focal, 0),
+            SIMD3(size / 2, size / 2, 1)
+        )),
+        imageResolution: SIMD2(size, size),
+        cameraToWorld: cameraToWorld
+    )
+}

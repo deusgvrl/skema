@@ -7,17 +7,14 @@
 
 import Foundation
 import ARKit
-import SceneKit
 import SwiftUI
 
 struct RoomScanView: UIViewRepresentable {
     let session: ARSession
-    let scene: SCNScene
 
     func makeUIView(context: Context) -> ARSCNView {
         let view = ARSCNView(frame: .zero)
         view.session = session
-        view.scene = scene
         view.automaticallyUpdatesLighting = false
         return view
     }

@@ -28,7 +28,7 @@ struct ScanView: View {
                 .ignoresSafeArea()
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, scene: viewModel.pointCloud.scene)
+                    RoomScanView(session: session)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.setSubject(atScreen: tap, screenSize: geometry.size)
@@ -51,10 +51,17 @@ struct ScanView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if showsFinishScan {
-                finishScanButton
-            }
-        }
+                    VStack(spacing: 16) {
+                        if viewModel.screen == .scanning, let guidance = viewModel.guidance {
+                            ScanGuidanceView(guidance: guidance)
+                                .transition(.opacity)
+                        }
+                        if showsFinishScan {
+                            finishScanButton
+                        }
+                    }
+                    .animation(.default, value: viewModel.guidance)
+                }
         .environment(\.colorScheme, .dark)
         .fullScreenCover(item: $reviewViewModel) { vm in
             NavigationStack {

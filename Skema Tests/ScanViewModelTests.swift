@@ -230,35 +230,30 @@ struct ScanViewModelTests {
         #expect(arSession.pauseCount == 1)
     }
 
-    @Test("While scanning, LiDAR frames build up the room points")
-        func scanningCollectsPoints() async throws {
-            let made = MadeScans()
-            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized), made: made)
-            await viewModel.start()
+    @Test("A tracking problem that lasts shows its tip, and recovering hides it")
+        func guidanceFromFrames() throws {
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
 
-            let scan = try #require(made.all.first)
-            scan.deliver(try makeDepthScanFrame(timestamp: 1))
-            for _ in 0..<100 where viewModel.pointCloud.pointCount == 0 {
-                await Task.yield()
-            }
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+            let shown = viewModel.guidance
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2, tracking: .normal))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2.5, tracking: .normal))
 
-            #expect(viewModel.pointCloud.pointCount == 4)
+            #expect(shown == .moveSlower)
+            #expect(viewModel.guidance == nil)
         }
 
-        @Test("After Finish Scan, no more points are added")
-        func finishStopsPoints() async throws {
-            let made = MadeScans()
-            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized), made: made)
+        @Test("Finish Scan clears the tip")
+        func finishClearsGuidance() async throws {
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
             await viewModel.start()
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
 
             viewModel.finishTapped()
-            let scan = try #require(made.all.first)
-            scan.deliver(try makeDepthScanFrame(timestamp: 1))
-            for _ in 0..<20 {
-                await Task.yield()
-            }
 
-            #expect(viewModel.pointCloud.pointCount == 0)
+            #expect(viewModel.guidance == nil)
         }
 
     @Test("Close before the scan started does nothing")
@@ -276,16 +271,16 @@ struct ScanViewModelTests {
     }
 }
 
-func makeDepthScanFrame(timestamp: TimeInterval) throws -> ScanFrame {
+func makeTrackingFrame(timestamp: TimeInterval, tracking: ScanTracking) throws -> ScanFrame {
     let frame = try makeScanFrame(timestamp: timestamp)
     return ScanFrame(
-        timestamp: frame.timestamp,
+        timestamp: timestamp,
         image: frame.image,
         orientation: frame.orientation,
-        camera: makeCamera(size: 8, focal: 8),
+        camera: frame.camera,
         depth: makeDepth(width: 8, height: 8, depth: 1),
-        tracking: frame.tracking,
-        ambientIntensity: frame.ambientIntensity,
-        planes: frame.planes
+        tracking: tracking,
+        ambientIntensity: 1000,
+        planes: []
     )
 }
