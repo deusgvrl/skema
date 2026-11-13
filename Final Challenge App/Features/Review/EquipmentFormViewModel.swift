@@ -79,6 +79,7 @@ final class EquipmentFormViewModel {
     }
     
     func saveNode(undoManager: UndoManager?, completion: () -> Void) {
+        let oldNodesSnapshot = reviewViewModel.nodes.map { $0.clone() }
         let sanitizedDistance = cleanNumericString(distance)
         let sanitizedAim = cleanNumericString(horizontalAim)
         
@@ -105,7 +106,7 @@ final class EquipmentFormViewModel {
             node.syncRotationFromHorizontalAim()
             node.syncPositionFromDistance()
             
-            reviewViewModel.updateEquipment(undoManager: undoManager)
+            reviewViewModel.updateEquipment(oldNodesSnapshot: oldNodesSnapshot, undoManager: undoManager)
         } else {
             let newNode = Equipment(
                 category: category,

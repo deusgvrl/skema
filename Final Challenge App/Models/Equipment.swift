@@ -122,6 +122,53 @@ extension Equipment {
             positionY = -targetPoints
         }
     }
+    
+    func clone() -> Equipment {
+        Equipment(
+            id: self.id,
+            category: self.category,
+            label: self.label,
+            name: self.name,
+            role: self.role,
+            position: self.position,
+            power: self.power,
+            colorTemp: self.colorTemp,
+            lens: self.lens,
+            iso: self.iso,
+            aperture: self.aperture,
+            shutterSpeed: self.shutterSpeed,
+            whiteBalance: self.whiteBalance,
+            height: self.height,
+            tilt: self.tilt,
+            horizontalAim: self.horizontalAim,
+            distance: self.distance,
+            rotationAngle: self.rotationAngle,
+            accessories: self.accessories,
+            notes: self.notes
+        )
+    }
+    
+    func restoreValues(from snapshot: Equipment) {
+        self.category = snapshot.category
+        self.label = snapshot.label
+        self.name = snapshot.name
+        self.role = snapshot.role
+        self.position = snapshot.position
+        self.rotationAngle = snapshot.rotationAngle
+        self.power = snapshot.power
+        self.colorTemp = snapshot.colorTemp
+        self.lens = snapshot.lens
+        self.iso = snapshot.iso
+        self.aperture = snapshot.aperture
+        self.shutterSpeed = snapshot.shutterSpeed
+        self.whiteBalance = snapshot.whiteBalance
+        self.height = snapshot.height
+        self.tilt = snapshot.tilt
+        self.horizontalAim = snapshot.horizontalAim
+        self.distance = snapshot.distance
+        self.accessories = snapshot.accessories
+        self.notes = snapshot.notes
+    }
 }
 
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
