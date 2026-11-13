@@ -175,13 +175,9 @@ struct SetupDetailView: View {
         // Photos Picker
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerSelection, matching: .images)
         .onChange(of: photoPickerSelection) { _, newItems in
+            guard !newItems.isEmpty else { return }
             Task {
-                for item in newItems {
-                    if let data = try? await item.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        viewModel.referenceImages.append(image)
-                    }
-                }
+                await viewModel.addReferenceImages(from: newItems)
                 photoPickerSelection.removeAll()
             }
         }
