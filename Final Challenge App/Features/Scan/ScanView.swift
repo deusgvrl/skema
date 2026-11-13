@@ -74,6 +74,11 @@ struct ScanView: View {
                         onDismissToSetups?()
                     }
                 )
+                .toolbar {
+                    ToolbarItem(placement: .bottomBar) {
+                        RawExportButton(viewModel: viewModel)
+                    }
+                }
             }
         }
         .navigationBarBackButtonHidden(true)

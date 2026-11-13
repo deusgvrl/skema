@@ -43,6 +43,8 @@ final class ScanViewModel {
     @ObservationIgnored private var latestFrame: ScanFrame?
     /// The lowest floor plane ARKit has found so far; nil until it finds one.
     @ObservationIgnored private var floorY: Float?
+    /// Every look, tap and the finish, for the raw-data export (data-tool branch, not for dev).
+    @ObservationIgnored private(set) var rawLog = RawScanLog()
 
     init(
         makeScan: @escaping () -> ScanSession = { ScanSession() },
@@ -120,6 +122,13 @@ final class ScanViewModel {
         }
         measureAcceptedItems(in: frame)
         subjectMask = DepthSampler.projectedMask(of: subjectPoints, camera: frame.camera)
+        await recordLook(found, in: frame)
+    }
+
+    /// Adds this look to the raw-data log. The point work runs off the main actor.
+    private func recordLook(_ found: [EquipmentDetection], in frame: ScanFrame) async {
+        guard let request = rawLog.request(for: found, tracker: tracker, frame: frame) else { return }
+        rawLog.append(await RawLookSampler.sample(request), for: request)
     }
 
     /// Adds this look's points of every accepted item. Pending items add nothing (A10-21).
@@ -148,11 +157,14 @@ final class ScanViewModel {
     func setSubject(atScreen tap: CGPoint, screenSize: CGSize, in frame: ScanFrame) -> Bool {
         guard let depth = frame.depth,
               let point = ScanOverlay.picturePoint(fromScreen: tap, camera: frame.camera, screenSize: screenSize)
-        else { return false }
+        else { return recordSubjectTap(tap, screenSize: screenSize, in: frame, centre: nil) }
         let box = NormalizedBox.around(x: point.x, y: point.y, halfSize: Self.tapHalfSize)
         let spot = DepthSampler.worldPoints(in: box, depth: depth, camera: frame.camera,
                                             maxRange: DepthSampler.maxRange)
-        guard let centre = Geometry.medianPoint(spot) else { return false }
+        guard let centre = Geometry.medianPoint(spot) else {
+            return recordSubjectTap(tap, screenSize: screenSize, in: frame, centre: nil)
+        }
+        recordSubjectTap(tap, screenSize: screenSize, in: frame, centre: centre)
         measurements.remove(subjectID)
         measurements.add(to: subjectID, box: box, mask: nil, depth: depth, camera: frame.camera)
         subject = centre
@@ -167,6 +179,15 @@ final class ScanViewModel {
         return true
     }
 
+    /// Logs a subject tap for the raw-data export. Returns whether it set the subject (a centre was found).
+    @discardableResult
+    private func recordSubjectTap(_ tap: CGPoint, screenSize: CGSize, in frame: ScanFrame,
+                                  centre: SIMD3<Float>?) -> Bool {
+        rawLog.addSubjectTap(RawSubjectTap(tap: tap, screenSize: screenSize, camera: frame.camera,
+                                           at: frame.timestamp, centre: centre))
+        return centre != nil
+    }
+
     /// Waits for the mask of the latest tap (or its failure). Internal so tests can wait for it.
     func subjectMaskSettled() async {
         await subjectTask?.value
@@ -178,6 +199,8 @@ final class ScanViewModel {
         let points = frame.depth.map {
             DepthSampler.worldPoints(in: mask, depth: $0, camera: frame.camera, maxRange: DepthSampler.maxRange)
         } ?? []
+        rawLog.addSubjectMask(RawSubjectMask(timestamp: frame.timestamp, pointCount: points.count,
+                                             position: Geometry.medianPoint(points)))
         guard let depth = frame.depth, let box = MaskMapping.bounds(of: mask),
               let centre = Geometry.medianPoint(points) else { return }
         measurements.remove(subjectID)
@@ -256,6 +279,10 @@ final class ScanViewModel {
         insertDraftSetup()
         stopListening()
         writeMeasurements()
+        rawLog.setFinish(RawFinish(
+            results: measurements.results(subject: subjectID, floorY: floorY ?? 0), subjectID: subjectID,
+            equipmentIDs: equipmentIDs, nodes: draftSetup.nodes, lastLook: tracker.lastLook, floorY: floorY,
+            subject: subject))
         scan?.stop()
     }
 
