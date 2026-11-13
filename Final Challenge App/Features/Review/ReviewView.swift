@@ -23,6 +23,8 @@ struct ReviewView: View {
     @State private var selectedNewCategory: EquipmentCategory = .light
     @State private var showDiscardAlert = false
     @State private var showUnsavedEditsAlert = false
+    @State private var isShowingSubjectSheet = false
+    @State private var initialSubjectHeight: String = ""
 
     
     init(
@@ -112,6 +114,9 @@ struct ReviewView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingSubjectSheet) {
+            subjectHeightSheet()
+        }
     }
     
     // MARK: - Subviews
@@ -187,7 +192,8 @@ struct ReviewView: View {
                     viewModel: viewModel,
                     isReadOnly: false,
                     undoManager: undoManager,
-                    onNodeTap: { node in editingNode = node }
+                    onNodeTap: { node in editingNode = node },
+                    onSubjectTap: { isShowingSubjectSheet = true }
                 )
                 .overlay(alignment: .bottomTrailing) {
                     Button {
@@ -319,7 +325,50 @@ struct ReviewView: View {
             }
         }
     }
-    // MARK: - Actions
+    
+    // MARK: - Subject Details Sheet
+    private func subjectHeightSheet() -> some View {
+        NavigationStack {
+            Form {
+                Section(
+                    header: Text("Position"),
+                    footer: Text("Set the distance from the floor to the bottom of your subject (e.g., tabletop height, posing stool, or floor).")
+                ) {
+                    HStack {
+                        Text("Height from floor")
+                        Spacer()
+                        TextField("0.0", text: $viewModel.draftSetup.subjectHeight)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("m")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Subject Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", systemImage: "checkmark") {
+                        // Save to SwiftData & register with UndoManager
+                        viewModel.updateSubjectHeight(
+                            oldValue: initialSubjectHeight,
+                            newValue: viewModel.draftSetup.subjectHeight,
+                            undoManager: undoManager
+                        )
+                        isShowingSubjectSheet = false
+                    }
+                }
+            }
+            .onAppear {
+                // Record starting value when sheet opens
+                initialSubjectHeight = viewModel.draftSetup.subjectHeight
+            }
+        }
+        .presentationDetents([.height(200), .medium])
+        .presentationDragIndicator(.visible)
+    }
     
     private func handleClose() {
         let hasUnsavedChanges = viewModel.canUndo
@@ -329,7 +378,7 @@ struct ReviewView: View {
                 // They are in a new scan and haven't saved yet
                 showDiscardAlert = true
             } else {
-                // They already tapped "Done" to save the scan, safe to close
+                viewModel.discardSetup()
                 dismissAll()
             }
         } else {
@@ -366,34 +415,6 @@ struct ReviewView: View {
                 }
             }
         }
-    }
-}
-
-struct EquipmentCarousel: View {
-    let viewModel: ReviewViewModel
-    var isReadOnly: Bool = false
-    var onNodeTap: ((Equipment) -> Void)? = nil
-    
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(viewModel.nodes) { node in
-                    VStack(alignment: .leading) {
-                        Text("\(node.name)")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                    .onTapGesture {
-                        onNodeTap?(node)
-                    }
-                }
-            }
-            .padding()
-        }
-        .background(Color(uiColor: .systemBackground))
     }
 }
 

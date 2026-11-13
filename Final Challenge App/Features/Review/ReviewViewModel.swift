@@ -118,4 +118,17 @@ final class ReviewViewModel: Identifiable {
         storageController.save()
         applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
     }
+    
+    func updateSubjectHeight(oldValue: String, newValue: String, undoManager: UndoManager?) {
+        guard oldValue != newValue else { return }
+        
+        draftSetup.subjectHeight = newValue
+        storageController.save()
+        
+        undoManager?.registerUndo(withTarget: self) { target in
+            target.updateSubjectHeight(oldValue: newValue, newValue: oldValue, undoManager: undoManager)
+        }
+        undoManager?.setActionName("Change Subject Height")
+        updateUndoState(undoManager: undoManager)
+    }
 }

@@ -196,6 +196,9 @@ final class ScanViewModel {
         let phone = camera.cameraToWorld.columns.3
         let towardPhone = SIMD2(phone.x - subject.x, phone.z - subject.z)
         let results = measurements.results(subject: subjectID, floorY: floorY ?? 0)
+        if floorY != nil, let subjectResult = results[subjectID], let height = subjectResult.height {
+               draftSetup.subjectHeight = Self.metres(height)
+        }
         for equipment in draftSetup.nodes {
             guard let result = results[equipment.id], result.status == .measured,
                   let distance = result.distanceToSubject, let offset = result.floorOffset else { continue }
