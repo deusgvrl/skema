@@ -152,13 +152,13 @@ struct SetupDetailView: View {
                     if !viewModel.isSelectionMode {
                         Menu {
                             Button {
-                                // showCamera = true
+                                showCamera = true
                             } label: {
                                 Label("Take Photo", systemImage: "camera")
                             }
 
                             Button {
-                                // showPhotoPicker = true
+                                showPhotoPicker = true
                             } label: {
                                 Label("Choose from Library", systemImage: "photo.on.rectangle")
                             }
@@ -181,6 +181,10 @@ struct SetupDetailView: View {
                 }
                 photoPickerSelection.removeAll()
             }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker(images: $viewModel.referenceImages)
+                .ignoresSafeArea()
         }
         // Equipment Detail Sheet (Read-Only)
         .sheet(item: $viewModel.selectedEquipment) { node in
