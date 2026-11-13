@@ -76,7 +76,7 @@ struct LightingDiagramView: View {
                         },
                         onGestureStart: {
                             if !isReadOnly {
-                                nodesSnapshot = viewModel.nodes
+                                nodesSnapshot = viewModel.nodes.map { $0.clone() }
                             }
                         },
                         onGestureEnd: {
