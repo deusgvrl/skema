@@ -30,6 +30,7 @@ final class SetupDetailViewModel {
         self.setup = setup
         self.storageController = storage
         self.reviewViewModel = ReviewViewModel(setup: setup, storageController: storage)
+        self.loadReferenceImages()
     }
 
 
@@ -46,5 +47,24 @@ final class SetupDetailViewModel {
     func deleteSetup(completion: () -> Void) {
         storageController.deleteSetup(setup)
         completion()
+    }
+    
+    /// Loads existing ReferenceImage data into UIImages
+    func loadReferenceImages() {
+        self.referenceImages = setup.referenceImages.compactMap { ref in
+            UIImage(data: ref.imageData)
+        }
+    }
+    
+    /// Saves a new image to SwiftData using StorageController
+    func addReferenceImage(_ image: UIImage) {
+        // Update in-memory array for instant UI update
+        referenceImages.append(image)
+        
+        // Convert to Data and persist via StorageController
+        if let data = image.jpegData(compressionQuality: 0.8) {
+            let newRefImage = ReferenceImage(imageData: data)
+            storageController.addReferenceImage(newRefImage, to: setup)
+        }
     }
 }
