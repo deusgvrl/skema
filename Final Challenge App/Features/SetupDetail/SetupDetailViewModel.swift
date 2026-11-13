@@ -57,7 +57,7 @@ final class SetupDetailViewModel {
         }
     }
     
-    /// Saves a new image to SwiftData using StorageController
+    /// Saves a single UIImage to SwiftData using StorageController
     func addReferenceImage(_ image: UIImage) {
         // Update in-memory array for instant UI update
         referenceImages.append(image)
@@ -67,18 +67,20 @@ final class SetupDetailViewModel {
             let newRefImage = ReferenceImage(imageData: data)
             storageController.addReferenceImage(newRefImage, to: setup)
         }
-        
-        /// Loads PhotosPickerItem data asynchronously and saves to SwiftData
-        func addReferenceImages(from items: [PhotosPickerItem]) async {
-            for item in items {
-                guard let data = try? await item.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data) else { continue }
-                
-                referenceImages.append(image)
-                
-                let newRefImage = ReferenceImage(imageData: data)
-                storageController.addReferenceImage(newRefImage, to: setup)
-            }
+    }
+    
+    /// Loads PhotosPickerItem data asynchronously and saves each image to SwiftData
+    func addReferenceImages(from items: [PhotosPickerItem]) async {
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else { continue }
+            
+            // Update in-memory array for instant UI update
+            referenceImages.append(image)
+            
+            // Save original Data directly — no re-encoding needed
+            let newRefImage = ReferenceImage(imageData: data)
+            storageController.addReferenceImage(newRefImage, to: setup)
         }
     }
 }
