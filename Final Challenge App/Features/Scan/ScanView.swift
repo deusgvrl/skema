@@ -28,7 +28,7 @@ struct ScanView: View {
                 .ignoresSafeArea()
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, scene: viewModel.pointCloud.scene)
+                    RoomScanView(session: session)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.setSubject(atScreen: tap, screenSize: geometry.size)

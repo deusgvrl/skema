@@ -1,4 +1,3 @@
-import SceneKit
 import SwiftUI
 
 /// The LiDAR-only tap scan screen, to compare with the automatic `ScanView`: no object detection. Tap the subject,
@@ -22,7 +21,7 @@ struct LiDARScanView: View {
             Color.black.ignoresSafeArea()
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, scene: SCNScene())
+                    RoomScanView(session: session)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.tap(atScreen: tap, screenSize: geometry.size)

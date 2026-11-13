@@ -19,13 +19,10 @@ final class ScanViewModel {
 
     var draftSetup: Setup
 
-    @ObservationIgnored let pointCloud = PointCloudScene()
-
     @ObservationIgnored private let makeScan: () -> ScanSession
     @ObservationIgnored private let camera: any CameraPermission
     @ObservationIgnored private var scan: ScanSession?
     @ObservationIgnored private var stateTask: Task<Void, Never>?
-    @ObservationIgnored private var pointsTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
     @ObservationIgnored private let subjectSegmenter: any SubjectSegmenting
     @ObservationIgnored private var subjectTask: Task<Void, Never>?
@@ -227,7 +224,6 @@ final class ScanViewModel {
             return
         }
         listen(to: newScan)
-        collectPoints(from: newScan)
         detectEquipment(from: newScan)
         watchGuidance(from: newScan)
         do {
@@ -296,18 +292,6 @@ final class ScanViewModel {
         }
     }
 
-    private func collectPoints(from scan: ScanSession) {
-        pointsTask?.cancel()
-        let frames = scan.frames()
-        let collector = RoomPointsCollector()
-        pointsTask = Task { [weak self] in
-            for await frame in frames {
-                let added = await collector.add(frame)
-                guard !Task.isCancelled else { return }
-                self?.pointCloud.add(added)
-            }
-        }
-    }
 
     /// Listens to the same frames as the points, at its own pace (A10-62).
     private func detectEquipment(from scan: ScanSession) {
@@ -361,7 +345,6 @@ final class ScanViewModel {
 
         private func stopListening() {
             stateTask?.cancel()
-            pointsTask?.cancel()
             detectTask?.cancel()
             guidanceTask?.cancel()
             guidance = nil
