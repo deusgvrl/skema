@@ -22,6 +22,8 @@ struct ReviewView: View {
     @State private var showHint = true
     @State private var selectedNewCategory: EquipmentCategory = .light
     @State private var showDiscardAlert = false
+    @State private var showUnsavedEditsAlert = false
+
     
     init(
         isFromLoadingScreen: Bool,
@@ -77,6 +79,21 @@ struct ReviewView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("If you leave now, this scan and it's diagram will be lost.")
+        }
+        .alert("Discard Unsaved Changes?", isPresented: $showUnsavedEditsAlert) {
+            Button("Discard Changes", role: .destructive) {
+                while undoManager?.canUndo == true {
+                    undoManager?.undo()
+                }
+                
+                // 2. Clear memory and close
+                undoManager?.removeAllActions()
+                viewModel.updateUndoState(undoManager: undoManager)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Any edits you made to this diagram will be reverted.")
         }
         .navigationDestination(isPresented: $navigateToR07) {
             ProjectDetailsView(
@@ -253,49 +270,72 @@ struct ReviewView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            if viewModel.canUndo || viewModel.canRedo {
-                ToolbarItem {
-                    HStack(spacing: 16) {
-                        Button {
-                            undoManager?.undo()
-                            viewModel.updateUndoState(undoManager: undoManager)
-                        } label: {
-                            Image(systemName: "arrow.uturn.backward")
-                        }
-                        .disabled(!viewModel.canUndo)
-                        
-                        Button {
-                            undoManager?.redo()
-                            viewModel.updateUndoState(undoManager: undoManager)
-                        } label: {
-                            Image(systemName: "arrow.uturn.forward")
-                        }
-                        .disabled(!viewModel.canRedo)
-                    }
-                }
-            }
             
-            ToolbarItem(placement: .confirmationAction) {
+            ToolbarItemGroup(placement: .confirmationAction) {
+                            
+                // Undo / Redo Buttons
+                if viewModel.canUndo || viewModel.canRedo {
+                    Button {
+                        undoManager?.undo()
+                        viewModel.updateUndoState(undoManager: undoManager)
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                    }
+                    .disabled(!viewModel.canUndo)
+                    
+                    Button {
+                        undoManager?.redo()
+                        viewModel.updateUndoState(undoManager: undoManager)
+                    } label: {
+                        Image(systemName: "arrow.uturn.forward")
+                    }
+                    .disabled(!viewModel.canRedo)
+                }
+                
+                // Done / Save Button (Two-Tap Logic)
                 Button("Done", systemImage: isFromLoadingScreen ? "chevron.right" : "checkmark") {
-                    undoManager?.removeAllActions()
-                    viewModel.updateUndoState(undoManager: undoManager)
-                    if isFromLoadingScreen {
-                        navigateToR07 = true
+                    
+                    if viewModel.canUndo || viewModel.canRedo {
+                        // 1ST TAP: User has unsaved edits. Save and clear the stack.
+                        viewModel.finalizeAndSaveSetup()
+                        undoManager?.removeAllActions()
+                        
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.updateUndoState(undoManager: undoManager)
+                        }
                     } else {
-                        dismiss()
+                        // 2ND TAP (or no edits made): Undo stack is clean. Navigate away.
+                        if isFromLoadingScreen {
+                            navigateToR07 = true
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
             }
         }
     }
-    
     // MARK: - Actions
     
     private func handleClose() {
+        let hasUnsavedChanges = viewModel.canUndo
+        
         if isFromLoadingScreen {
-            showDiscardAlert = true
+            if hasUnsavedChanges {
+                // They are in a new scan and haven't saved yet
+                showDiscardAlert = true
+            } else {
+                // They already tapped "Done" to save the scan, safe to close
+                dismissAll()
+            }
         } else {
-            dismiss()
+            if hasUnsavedChanges {
+                // They are editing an existing setup and made changes
+                showUnsavedEditsAlert = true
+            } else {
+                // No changes made, safe to close instantly
+                dismiss()
+            }
         }
     }
     
