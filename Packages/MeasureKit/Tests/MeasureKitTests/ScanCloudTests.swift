@@ -375,3 +375,45 @@ struct AddPointsTests {
         #expect(near(try #require(result.height), 1.2, 0.03))
     }
 }
+
+/// The centre rule per item: lights are measured at the middle of the head, everything else as before.
+@Suite("Centre rule per item")
+struct CentreRulePerItemTests {
+    private let subject = UUID()
+    private let light = UUID()
+    private let camera = UUID()
+
+    private func scan() -> ScanMeasurements {
+        var scan = ScanMeasurements()
+        let cam = makeCamera()
+        let wall = SyntheticEquipment.column(x: 0, z: -300, bottom: 0, top: 120, total: 120)
+        scan.add(points: SyntheticEquipment.column(x: 100, z: -300, bottom: 0, top: 100, total: 120),
+                 to: subject, camera: cam)
+        scan.add(points: wall, to: light, camera: cam)
+        scan.add(points: wall, to: camera, camera: cam)
+        return scan
+    }
+
+    @Test("An item with the middle rule is measured at the middle, one without it at its top")
+    func middleAndTop() throws {
+        var scan = scan()
+        scan.setRule(.middle, for: light)
+
+        let results = scan.results(subject: subject, floorY: 0)
+
+        #expect(near(try #require(results[light]?.height), 0.6, 0.02))
+        #expect(near(try #require(results[camera]?.height), 1.2, 0.03))
+    }
+
+    @Test("Removing an item forgets its rule")
+    func removeForgetsTheRule() throws {
+        var scan = scan()
+        scan.setRule(.middle, for: light)
+        scan.remove(light)
+
+        scan.add(points: SyntheticEquipment.column(x: 0, z: -300, bottom: 0, top: 120, total: 120),
+                 to: light, camera: makeCamera())
+
+        #expect(near(try #require(scan.results(subject: subject, floorY: 0)[light]?.height), 1.2, 0.03))
+    }
+}

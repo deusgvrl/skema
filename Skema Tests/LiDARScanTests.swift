@@ -163,8 +163,9 @@ struct LiDARScanTests {
         let light = try #require(viewModel.draftSetup.nodes.first)
         let height = try #require(Double(light.height.replacingOccurrences(of: " m", with: "")))
         #expect(light.distance == "1.00")
-        // The column runs from 3 cm above the floor up to the top of the wall at 2 m, 2.39 m above the floor.
-        #expect(abs(height - 2.39) < 0.05)
+        // A light is measured at the middle of its head: here the column from 3 cm above the floor up to the top of
+        // the wall at 2 m, so its middle is 1.24 m above the floor.
+        #expect(abs(height - 1.24) < 0.05)
         #expect(abs(light.position.x) < 2 && abs(light.position.y - 100) < 2)
     }
 

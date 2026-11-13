@@ -116,6 +116,8 @@ final class ScanViewModel {
         for item in tracker.look(found, depth: frame.depth, camera: frame.camera, at: frame.timestamp) {
             let equipment = Self.equipment(for: item)
             equipmentIDs[item.id] = equipment.id
+            // A light is measured at the middle of its head; a camera keeps the top-point rule for now.
+            if equipment.category == .light { measurements.setRule(.middle, for: equipment.id) }
             addDraftEquipment(equipment)
         }
         measureAcceptedItems(in: frame)

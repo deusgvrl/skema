@@ -159,7 +159,9 @@ struct ScanSubjectTests {
 
         let light = try #require(viewModel.draftSetup.nodes.first)
         #expect(light.distance == "1.00")
-        #expect(light.height == "1.20")
+        // A light is measured at its middle: the patch is level with the phone, 0.945 m above the floor.
+        let height = try #require(Double(light.height))
+        #expect(abs(height - 0.945) < 0.04)
         // On the phone's side of the subject, so below it on the plan: 1 m is 100 points.
         #expect(abs(light.position.x) < 2)
         #expect(abs(light.position.y - 100) < 2)

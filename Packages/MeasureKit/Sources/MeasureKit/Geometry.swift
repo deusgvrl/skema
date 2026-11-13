@@ -20,6 +20,23 @@ public enum Geometry {
     /// The top is the height that this many percent of the points lie under (98 = the 98th percentile), not the single highest point.
     public static let topPercentile = 98
 
+    /// For `CentreRule.middle`: the share of points dropped at each end of each axis (0.02 = the lowest 2% and the highest 2%)
+    /// before the extremes are taken, so a stray pixel or a hand cannot stretch the middle.
+    public static let middleTrim: Float = 0.02
+
+    /// For `CentreRule.middle`: the head of a light is the wide part of its points. The points are cut into layers this
+    /// thick (metres) and each layer's horizontal width is measured.
+    public static let middleLayer: Float = 0.02
+
+    /// For `CentreRule.middle`: a layer is part of the head while it is at least this share as wide as the widest layer.
+    /// A stand (a few cm) next to a head (20 cm or more) is cut off.
+    public static let middleMinWidthShare: Float = 0.5
+
+    /// For `CentreRule.middle`: a layer needs this many points to have a width, and the head this many in all,
+    /// otherwise every point counts.
+    public static let middleMinLayerPoints = 5
+    public static let middleMinHeadPoints = 20
+
     /// Thickness of the "top slice": the points from the top height down to this much lower give the top centre's x and z.
     public static let topEpsilon: Float = 0.05
 
@@ -91,11 +108,24 @@ public enum Geometry {
     /// The subject (`isSubject`) is a product: its base centre is the bottom of its points, which can be on a table.
     /// When the equipment cannot be measured, the result says why (`status`) and has no centres.
     /// `outOfRange` is not decided here: it needs the whole scan, see `EquipmentPoints.scanResult(isSubject:)`.
-    public static func centres(of points: [SIMD3<Float>], isSubject: Bool) -> EquipmentCentres {
+    ///
+    /// `rule` says how the top centre of equipment (not the subject) is found: `.topPoint` as above, or `.middle`: the
+    /// centre of the points' 3D extents (the middle of a light's head), with its base centre straight under it.
+    public static func centres(
+        of points: [SIMD3<Float>], isSubject: Bool, rule: CentreRule = .topPoint
+    ) -> EquipmentCentres {
         // Too few points means too little information to trust a base or a top.
         // `lowest` is the height of the lowest point.
         guard points.count >= minPointCount, let lowest = points.map(\.y).min() else {
             return EquipmentCentres(status: .tooFewPoints, baseCentre: nil, topCentre: nil)
+        }
+
+        // The middle of the head: the centre of the extents on each axis, after trimming the strays at both ends.
+        if rule == .middle, !isSubject {
+            let head = headPoints(of: points, lowest: lowest)
+            let middle = SIMD3(trimmedMidpoint(head.map(\.x)), trimmedMidpoint(head.map(\.y)),
+                               trimmedMidpoint(head.map(\.z)))
+            return EquipmentCentres(status: .measured, baseCentre: SIMD2(middle.x, middle.z), topCentre: middle)
         }
 
         // Top height. Use a high percentile, not the highest point,
@@ -138,6 +168,45 @@ public enum Geometry {
     public static func floorOffset(of equipment: EquipmentCentres, from subject: EquipmentCentres) -> SIMD2<Float>? {
         guard let subjectBase = subject.baseCentre, let equipmentBase = equipment.baseCentre else { return nil }
         return equipmentBase - subjectBase
+    }
+
+    /// The wide part of a light's points, without its stand: cut the points into layers of `middleLayer`, measure each
+    /// layer's horizontal width, and keep the layers around the widest one that are at least `middleMinWidthShare` as
+    /// wide. Every point when no layer has a width or the head would have fewer than `middleMinHeadPoints` points.
+    private static func headPoints(of points: [SIMD3<Float>], lowest: Float) -> [SIMD3<Float>] {
+        var layers: [Int: [SIMD3<Float>]] = [:]
+        for point in points {
+            layers[Int(((point.y - lowest) / middleLayer).rounded(.down)), default: []].append(point)
+        }
+        var widths: [Int: Float] = [:]
+        for (layer, members) in layers where members.count >= middleMinLayerPoints {
+            widths[layer] = hypot(trimmedSpan(members.map(\.x)), trimmedSpan(members.map(\.z)))
+        }
+        guard let widest = widths.keys.sorted().max(by: { widths[$0, default: 0] < widths[$1, default: 0] }),
+              let widestWidth = widths[widest], widestWidth > 0 else { return points }
+        let minimum = widestWidth * middleMinWidthShare
+        // Grow from the widest layer, bridging one empty or sparse layer (LiDAR leaves holes), so a gap does not cut it.
+        // A missing layer is never wide, even when the share is set to 0, so the growth always ends.
+        func wide(_ layer: Int) -> Bool { widths[layer].map { $0 > 0 && $0 >= minimum } ?? false }
+        var low = widest, high = widest
+        while wide(low - 1) || wide(low - 2) { low -= wide(low - 1) ? 1 : 2 }
+        while wide(high + 1) || wide(high + 2) { high += wide(high + 1) ? 1 : 2 }
+        let head = layers.filter { (low...high).contains($0.key) }.flatMap(\.value)
+        return head.count >= middleMinHeadPoints ? head : points
+    }
+
+    /// The distance between the smallest and the largest value, after dropping the lowest and highest `middleTrim` share.
+    private static func trimmedSpan(_ values: [Float]) -> Float {
+        let sorted = values.sorted()
+        let dropped = Int(Float(sorted.count) * middleTrim)
+        return sorted[sorted.count - 1 - dropped] - sorted[dropped]
+    }
+
+    /// The midpoint between the smallest and the largest value, after dropping the lowest and highest `middleTrim` share.
+    private static func trimmedMidpoint(_ values: [Float]) -> Float {
+        let sorted = values.sorted()
+        let dropped = Int(Float(sorted.count) * middleTrim)
+        return (sorted[dropped] + sorted[sorted.count - 1 - dropped]) / 2
     }
 
     /// The average position on the floor of some points: add up all the x values and all the z values, then divide by how many there are.

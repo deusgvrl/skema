@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import MeasureKit
 
-extension MaskColor {
+nonisolated extension MaskColor {
     /// White for pending items, iOS system green (light mode) for accepted ones, until Sketch R03 is checked.
     var rgb: SIMD3<UInt8> {
         switch self {
