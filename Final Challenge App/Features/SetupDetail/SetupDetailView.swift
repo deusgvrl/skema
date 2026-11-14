@@ -15,6 +15,7 @@ struct SetupDetailView: View {
     @State private var selectedImageIndices: Set<Int> = []
     @State private var selectedPreviewIndex: Int = 0
     @State private var showReferenceDetail: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
 
     init(setup: Setup, storageController: StorageController? = nil) {
         self._viewModel = State(initialValue: SetupDetailViewModel(
@@ -204,7 +205,7 @@ struct SetupDetailView: View {
                 ToolbarItem(placement: .bottomBar) {
                     if viewModel.isSelectionMode {
                         Button(role: .destructive) {
-                            deleteSelectedImages()
+                            showDeleteConfirmation = true
                         } label: {
                             Label(
                                 selectedImageIndices.isEmpty ? "Delete" : "Delete (\(selectedImageIndices.count))",
@@ -212,6 +213,28 @@ struct SetupDetailView: View {
                             )
                         }
                         .disabled(selectedImageIndices.isEmpty)
+                        .confirmationDialog(
+                            selectedImageIndices.count == 1
+                                ? "This photo will be deleted from this setup."
+                                : "These \(selectedImageIndices.count) photos will be deleted from this setup.",
+                            isPresented: $showDeleteConfirmation,
+                            titleVisibility: .hidden
+                        ) {
+                            Button(
+                                selectedImageIndices.count == 1 ? "Delete Photo" : "Delete \(selectedImageIndices.count) Photos",
+                                role: .destructive
+                            ) {
+                                deleteSelectedImages()
+                            }
+                            
+                            Button("Cancel", role: .cancel) { }
+                        } message: {
+                            Text(
+                                selectedImageIndices.count == 1
+                                    ? "This photo will be deleted from your setup reference."
+                                    : "These photos will be deleted from your setup references."
+                            )
+                        }
                     } else {
                         Menu {
                             Button {

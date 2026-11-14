@@ -111,7 +111,7 @@ struct FullScreenImageView: View {
             }
         }
         .background(Color(uiColor: .systemBackground))
-        .navigationBarBackButtonHidden(true)
+        //.navigationBarBackButtonHidden(true)
         .onChange(of: viewModel.referenceImages.count) { _, newCount in
             if newCount == 0 {
                 dismiss()
@@ -128,12 +128,6 @@ struct FullScreenImageView: View {
             Text("It will be removed from this setups's references.")
         }
         .toolbar {
-            // Circular Back Button
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Back", systemImage: "chevron.left") {
-                    dismiss()
-                }
-            }
 
             // Title & Subtitle Metadata
             ToolbarItem(placement: .principal) {
