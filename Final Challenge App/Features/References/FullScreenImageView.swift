@@ -15,6 +15,7 @@ struct FullScreenImageView: View {
     // Zoom state
     @State private var currentScale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
+    @State private var isDeleteAlert: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -118,6 +119,14 @@ struct FullScreenImageView: View {
                 selectedIndex = max(0, newCount - 1)
             }
         }
+        .alert("Delete This Photo", isPresented: $isDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteCurrentImage()
+            }
+        } message: {
+            Text("It will be removed from this setups's references.")
+        }
         .toolbar {
             // Circular Back Button
             ToolbarItem(placement: .topBarLeading) {
@@ -131,8 +140,8 @@ struct FullScreenImageView: View {
                 VStack(spacing: 2) {
                     let displayIndex = viewModel.referenceImages.isEmpty ? 0 : min(selectedIndex + 1, viewModel.referenceImages.count)
                     
-                    let currentRefImage = viewModel.setup.referenceImages.indices.contains(selectedIndex)
-                        ? viewModel.setup.referenceImages[selectedIndex]
+                    let currentRefImage = viewModel.sortedReferenceImages.indices.contains(selectedIndex)
+                        ? viewModel.sortedReferenceImages[selectedIndex]
                         : nil
 
                     Text("Reference \(displayIndex)")
@@ -150,11 +159,12 @@ struct FullScreenImageView: View {
                     }
                 }
             }
-
+            
+            ToolbarSpacer(placement: .bottomBar)
             // Circular Delete Button
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .bottomBar) {
                 Button("Delete", systemImage: "trash") {
-                    deleteCurrentImage()
+                    isDeleteAlert = true
                 }
                 .disabled(viewModel.referenceImages.isEmpty)
             }
