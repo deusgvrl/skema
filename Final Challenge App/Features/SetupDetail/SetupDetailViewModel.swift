@@ -26,6 +26,11 @@ final class SetupDetailViewModel {
     var isSelectionMode: Bool = false
     var referenceImages: [UIImage] = []
     
+    /// Deterministically sorted SwiftData models by creation date
+    var sortedReferenceImages: [ReferenceImage] {
+        setup.referenceImages.sorted(by: { $0.createdAt < $1.createdAt })
+    }
+    
     init(setup: Setup, storageController: StorageController? = nil) {
         let storage = storageController ?? StorageController.shared
         self.setup = setup
@@ -33,7 +38,6 @@ final class SetupDetailViewModel {
         self.reviewViewModel = ReviewViewModel(setup: setup, storageController: storage)
         self.loadReferenceImages()
     }
-    
     
     var setupName: String {
         setup.setupName.isEmpty ? "Untitled Setup" : setup.setupName
@@ -44,25 +48,22 @@ final class SetupDetailViewModel {
         return components.isEmpty ? "No Details" : components.joined(separator: " › ")
     }
     
-    
     func deleteSetup(completion: () -> Void) {
         storageController.deleteSetup(setup)
         completion()
     }
     
-    /// Loads existing ReferenceImage data into UIImages
+    /// Loads existing ReferenceImage data into UIImages sorted by createdAt
     func loadReferenceImages() {
-        self.referenceImages = setup.referenceImages.compactMap { ref in
+        self.referenceImages = sortedReferenceImages.compactMap { ref in
             UIImage(data: ref.imageData)
         }
     }
     
     /// Saves a single UIImage to SwiftData using StorageController
     func addReferenceImage(_ image: UIImage) {
-        // Update in-memory array for instant UI update
         referenceImages.append(image)
         
-        // Convert to Data and persist via StorageController
         if let data = image.jpegData(compressionQuality: 0.8) {
             let newRefImage = ReferenceImage(imageData: data)
             storageController.addReferenceImage(newRefImage, to: setup)
@@ -75,12 +76,54 @@ final class SetupDetailViewModel {
             guard let data = try? await item.loadTransferable(type: Data.self),
                   let image = UIImage(data: data) else { continue }
             
-            // Update in-memory array for instant UI update
             referenceImages.append(image)
             
-            // Save original Data directly — no re-encoding needed
             let newRefImage = ReferenceImage(imageData: data)
             storageController.addReferenceImage(newRefImage, to: setup)
+        }
+    }
+    
+    // MARK: - Delete Reference Image Operations
+    
+    /// Deletes a specific ReferenceImage model from SwiftData and local array
+    func deleteReferenceImage(_ image: ReferenceImage) {
+        let sorted = sortedReferenceImages
+        if let index = sorted.firstIndex(where: { $0.id == image.id }) {
+            if referenceImages.indices.contains(index) {
+                referenceImages.remove(at: index)
+            }
+        }
+        storageController.deleteReferenceImage(image)
+    }
+    
+    /// Deletes a single reference image by matching index in sortedReferenceImages
+    func deleteReferenceImage(at index: Int) {
+        let sorted = sortedReferenceImages
+        guard sorted.indices.contains(index) else { return }
+        
+        let refImageToDelete = sorted[index]
+        
+        if referenceImages.indices.contains(index) {
+            referenceImages.remove(at: index)
+        }
+        
+        storageController.deleteReferenceImage(refImageToDelete)
+    }
+    
+    /// Batch deletes reference images by a set of indices
+    func deleteReferenceImages(at indices: Set<Int>) {
+        let sorted = sortedReferenceImages
+        let sortedIndices = indices.sorted(by: >)
+        
+        for index in sortedIndices {
+            guard sorted.indices.contains(index) else { continue }
+            let refImageToDelete = sorted[index]
+            
+            if referenceImages.indices.contains(index) {
+                referenceImages.remove(at: index)
+            }
+            
+            storageController.deleteReferenceImage(refImageToDelete)
         }
     }
 }

@@ -20,8 +20,18 @@ final class ReferenceImage {
     // Relationship back to parent
     var setup: Setup?
     
-    init(id: UUID = UUID(), imageData: Data) {
+    // Date and time when the reference image was captured or imported
+    var createdAt: Date
+    
+    init(id: UUID = UUID(), imageData: Data, createdAt: Date = Date()) {
         self.id = id
         self.imageData = imageData
+        self.createdAt = createdAt
+    }
+}
+
+extension ReferenceImage {
+    var formattedDateString: String {
+        createdAt.formatted(.dateTime.day().month(.abbreviated).year())
     }
 }
