@@ -19,6 +19,8 @@ struct FullScreenImageView: View {
 
     @State private var scrollPositionID: Int?
 
+    private let feedbackGenerator = UISelectionFeedbackGenerator()
+
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
@@ -96,6 +98,7 @@ struct FullScreenImageView: View {
                                         .contentShape(Rectangle())
                                         .id(index)
                                         .onTapGesture {
+                                            feedbackGenerator.selectionChanged()
                                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                                 selectedIndex = index
                                                 scrollPositionID = index
@@ -112,6 +115,7 @@ struct FullScreenImageView: View {
                     .scrollPosition(id: $scrollPositionID, anchor: .center)
                     .onChange(of: scrollPositionID) { _, newID in
                         if let newID, viewModel.referenceImages.indices.contains(newID), newID != selectedIndex {
+                            feedbackGenerator.selectionChanged()
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
                                 selectedIndex = newID
                             }
@@ -134,6 +138,7 @@ struct FullScreenImageView: View {
         .background(Color(uiColor: .systemBackground))
         .onAppear {
             scrollPositionID = selectedIndex
+            feedbackGenerator.prepare()
         }
         .onChange(of: viewModel.referenceImages.count) { _, newCount in
             if newCount == 0 {
