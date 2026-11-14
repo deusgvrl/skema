@@ -83,4 +83,34 @@ final class SetupDetailViewModel {
             storageController.addReferenceImage(newRefImage, to: setup)
         }
     }
+    
+    /// Deletes a single reference image by its array index
+    func deleteReferenceImage(at index: Int) {
+        guard setup.referenceImages.indices.contains(index) else { return }
+        
+        let refImageToDelete = setup.referenceImages[index]
+        
+        if referenceImages.indices.contains(index) {
+            referenceImages.remove(at: index)
+        }
+        
+        storageController.deleteReferenceImage(refImageToDelete)
+    }
+    
+    /// Batch deletes reference images by a set of indices (used in multiselect deletion)
+    func deleteReferenceImages(at indices: Set<Int>) {
+        let sortedIndices = indices.sorted(by: >)
+        
+        for index in sortedIndices {
+            guard setup.referenceImages.indices.contains(index) else { continue }
+            
+            let refImageToDelete = setup.referenceImages[index]
+            
+            if referenceImages.indices.contains(index) {
+                referenceImages.remove(at: index)
+            }
+            
+            storageController.deleteReferenceImage(refImageToDelete)
+        }
+    }
 }

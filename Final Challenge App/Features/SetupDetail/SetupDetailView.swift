@@ -11,6 +11,11 @@ struct SetupDetailView: View {
     @State private var showPhotoPicker = false
     @State private var photoPickerSelection: [PhotosPickerItem] = []
 
+    // Selection & Preview State
+    @State private var selectedImageIndices: Set<Int> = []
+    @State private var selectedPreviewIndex: Int = 0
+    @State private var showReferenceDetail: Bool = false
+
     init(setup: Setup, storageController: StorageController? = nil) {
         self._viewModel = State(initialValue: SetupDetailViewModel(
             setup: setup,
@@ -96,12 +101,41 @@ struct SetupDetailView: View {
                             let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
                             LazyVGrid(columns: columns, spacing: 2) {
                                 ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
-                                    Image(uiImage: viewModel.referenceImages[index])
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .clipped()
+                                    if viewModel.referenceImages.indices.contains(index) {
+                                        let isSelected = selectedImageIndices.contains(index)
+                                        
+                                        ZStack(alignment: .topTrailing) {
+                                            Image(uiImage: viewModel.referenceImages[index])
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                                                .aspectRatio(1, contentMode: .fit)
+                                                .clipped()
+                                                .opacity(viewModel.isSelectionMode && isSelected ? 0.75 : 1.0)
+
+                                            // Selection Checkmark Badge
+                                            if viewModel.isSelectionMode {
+                                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                                    .font(.title3.weight(.semibold))
+                                                    .foregroundStyle(isSelected ? Color.accentColor : .white)
+                                                    .shadow(color: .black.opacity(0.3), radius: 2)
+                                                    .padding(6)
+                                            }
+                                        }
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            if viewModel.isSelectionMode {
+                                                if isSelected {
+                                                    selectedImageIndices.remove(index)
+                                                } else {
+                                                    selectedImageIndices.insert(index)
+                                                }
+                                            } else {
+                                                selectedPreviewIndex = index
+                                                showReferenceDetail = true
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -113,6 +147,12 @@ struct SetupDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: viewModel.selectedTab) { _, _ in
             viewModel.isSelectionMode = false
+            selectedImageIndices.removeAll()
+        }
+        .onChange(of: viewModel.isSelectionMode) { _, isSelecting in
+            if !isSelecting {
+                selectedImageIndices.removeAll()
+            }
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -143,7 +183,9 @@ struct SetupDetailView: View {
                     }
                 } else {
                     Button(viewModel.isSelectionMode ? "Cancel" : "Select") {
-                        withAnimation { viewModel.isSelectionMode.toggle() }
+                        withAnimation {
+                            viewModel.isSelectionMode.toggle()
+                        }
                     }
                     .disabled(viewModel.referenceImages.isEmpty)
                 }
@@ -152,7 +194,17 @@ struct SetupDetailView: View {
             if viewModel.selectedTab == 1 {
                 ToolbarSpacer(placement: .bottomBar)
                 ToolbarItem(placement: .bottomBar) {
-                    if !viewModel.isSelectionMode {
+                    if viewModel.isSelectionMode {
+                        Button(role: .destructive) {
+                            deleteSelectedImages()
+                        } label: {
+                            Label(
+                                selectedImageIndices.isEmpty ? "Delete" : "Delete (\(selectedImageIndices.count))",
+                                systemImage: "trash"
+                            )
+                        }
+                        .disabled(selectedImageIndices.isEmpty)
+                    } else {
                         Menu {
                             Button {
                                 showCamera = true
@@ -172,7 +224,6 @@ struct SetupDetailView: View {
                 }
             }
         }
-        // Photos Picker
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerSelection, matching: .images)
         .task(id: photoPickerSelection) {
             guard !photoPickerSelection.isEmpty else { return }
@@ -185,7 +236,13 @@ struct SetupDetailView: View {
             }
             .ignoresSafeArea()
         }
-        // Equipment Detail Sheet (Read-Only)
+        // Direct Navigation Destination via boolean flag
+        .navigationDestination(isPresented: $showReferenceDetail) {
+            FullScreenImageView(
+                viewModel: viewModel,
+                selectedIndex: selectedPreviewIndex
+            )
+        }
         .sheet(item: $viewModel.selectedEquipment) { node in
             EquipmentFormView(
                 viewModel: viewModel.reviewViewModel,
@@ -194,7 +251,6 @@ struct SetupDetailView: View {
                 isReadOnly: true
             )
         }
-        // Edit Diagram Canvas Modal
         .fullScreenCover(isPresented: $viewModel.isEditingDiagram) {
             NavigationStack {
                 ReviewView(
@@ -206,17 +262,14 @@ struct SetupDetailView: View {
                 )
             }
         }
-        // Edit Project Details Modal (R07)
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
                 ProjectDetailsView(setup: viewModel.setup)
             }
         }
-        // Subject Height Sheet (Read-Only)
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {
             SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
         }
-        // Delete Confirmation Alert
         .alert("Delete Setup", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -227,6 +280,12 @@ struct SetupDetailView: View {
         } message: {
             Text("Are you sure you want to delete this setup? This action cannot be undone.")
         }
+    }
+
+    private func deleteSelectedImages() {
+        viewModel.deleteReferenceImages(at: selectedImageIndices)
+        selectedImageIndices.removeAll()
+        viewModel.isSelectionMode = false
     }
 }
 
