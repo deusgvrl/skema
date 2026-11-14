@@ -17,6 +17,8 @@ struct FullScreenImageView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var isDeleteAlert: Bool = false
 
+    @State private var scrollPositionID: Int?
+
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
@@ -64,11 +66,16 @@ struct FullScreenImageView: View {
 
             Spacer(minLength: 0)
 
-            // Bottom Thumbnail Strip
+            // Bottom Centered Thumbnail Strip (Native Photos Behavior)
             if !viewModel.referenceImages.isEmpty {
-                ScrollViewReader { proxy in
+                GeometryReader { geometry in
+                    let selectedSize: CGFloat = 44
+                    let unselectedWidth: CGFloat = 30
+                    let height: CGFloat = 44
+                    let centerPadding = (geometry.size.width - selectedSize) / 2
+
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 5) {
                             ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
                                 if viewModel.referenceImages.indices.contains(index) {
                                     let isSelected = index == selectedIndex
@@ -76,47 +83,64 @@ struct FullScreenImageView: View {
                                     Image(uiImage: viewModel.referenceImages[index])
                                         .resizable()
                                         .scaledToFill()
-                                        .frame(width: isSelected ? 52 : 42, height: isSelected ? 52 : 42)
-                                        .clipShape(RoundedRectangle(cornerRadius: isSelected ? 8 : 6))
+                                        .frame(
+                                            width: isSelected ? selectedSize : unselectedWidth,
+                                            height: height
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: isSelected ? 8 : 4))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: isSelected ? 8 : 6)
+                                            RoundedRectangle(cornerRadius: isSelected ? 8 : 4)
                                                 .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
                                         )
-                                        .opacity(isSelected ? 1.0 : 0.6)
+                                        .opacity(isSelected ? 1.0 : 0.5)
+                                        .contentShape(Rectangle())
                                         .id(index)
                                         .onTapGesture {
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                                 selectedIndex = index
+                                                scrollPositionID = index
                                             }
                                         }
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.horizontal)
-                        .padding(.vertical, 6)
+                        .scrollTargetLayout()
+                        .padding(.horizontal, centerPadding)
+                        .padding(.vertical, 4)
                     }
-                    .frame(maxWidth: .infinity)
-                    .onChange(of: selectedIndex) { _, newIndex in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            if viewModel.referenceImages.indices.contains(newIndex) {
-                                proxy.scrollTo(newIndex, anchor: .center)
+                    .scrollTargetBehavior(.viewAligned)
+                    .scrollPosition(id: $scrollPositionID, anchor: .center)
+                    .onChange(of: scrollPositionID) { _, newID in
+                        if let newID, viewModel.referenceImages.indices.contains(newID), newID != selectedIndex {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                selectedIndex = newID
                             }
-                            currentScale = 1.0
-                            lastScale = 1.0
                         }
                     }
+                    .onChange(of: selectedIndex) { _, newIndex in
+                        if scrollPositionID != newIndex {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                scrollPositionID = newIndex
+                            }
+                        }
+                        currentScale = 1.0
+                        lastScale = 1.0
+                    }
                 }
-                .padding(.bottom, 24)
+                .frame(height: 56)
+                .padding(.bottom, 16)
             }
         }
         .background(Color(uiColor: .systemBackground))
-        //.navigationBarBackButtonHidden(true)
+        .onAppear {
+            scrollPositionID = selectedIndex
+        }
         .onChange(of: viewModel.referenceImages.count) { _, newCount in
             if newCount == 0 {
                 dismiss()
             } else if selectedIndex >= newCount {
                 selectedIndex = max(0, newCount - 1)
+                scrollPositionID = selectedIndex
             }
         }
         .alert("Delete This Photo", isPresented: $isDeleteAlert) {
@@ -125,10 +149,9 @@ struct FullScreenImageView: View {
                 deleteCurrentImage()
             }
         } message: {
-            Text("It will be removed from this setups's references.")
+            Text("It will be removed from this setup's references.")
         }
         .toolbar {
-
             // Title & Subtitle Metadata
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
@@ -155,7 +178,7 @@ struct FullScreenImageView: View {
             }
             
             ToolbarSpacer(placement: .bottomBar)
-            // Circular Delete Button
+
             ToolbarItem(placement: .bottomBar) {
                 Button("Delete", systemImage: "trash") {
                     isDeleteAlert = true
@@ -180,6 +203,7 @@ struct FullScreenImageView: View {
                 selectedIndex = remainingCount - 1
             }
             viewModel.deleteReferenceImage(at: targetIndex)
+            scrollPositionID = selectedIndex
         }
     }
 }
