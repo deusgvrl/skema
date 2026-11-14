@@ -131,13 +131,23 @@ struct FullScreenImageView: View {
                 VStack(spacing: 2) {
                     let displayIndex = viewModel.referenceImages.isEmpty ? 0 : min(selectedIndex + 1, viewModel.referenceImages.count)
                     
+                    let currentRefImage = viewModel.setup.referenceImages.indices.contains(selectedIndex)
+                        ? viewModel.setup.referenceImages[selectedIndex]
+                        : nil
+
                     Text("Reference \(displayIndex)")
                         .font(.headline)
                         .fontWeight(.bold)
 
-                    Text("\(displayIndex) of \(viewModel.referenceImages.count) · Added 2 Nov 2026")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if let currentRefImage {
+                        Text("\(displayIndex) of \(viewModel.referenceImages.count) · Added \(currentRefImage.formattedDateString)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("\(displayIndex) of \(viewModel.referenceImages.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 

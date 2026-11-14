@@ -182,12 +182,20 @@ struct SetupDetailView: View {
                         Image(systemName: "ellipsis")
                     }
                 } else {
-                    Button(viewModel.isSelectionMode ? "Cancel" : "Select") {
-                        withAnimation {
-                            viewModel.isSelectionMode.toggle()
+                    if viewModel.isSelectionMode {
+                        Button("Cancel", systemImage: "xmark") {
+                            withAnimation {
+                                viewModel.isSelectionMode = false
+                            }
                         }
+                    } else {
+                        Button("Select") {
+                            withAnimation {
+                                viewModel.isSelectionMode = true
+                            }
+                        }
+                        .disabled(viewModel.referenceImages.isEmpty)
                     }
-                    .disabled(viewModel.referenceImages.isEmpty)
                 }
             }
 
