@@ -8,10 +8,11 @@
 import SwiftUI
 import UIKit
 
-/// Hardware-accelerated image zoom wrapper using UIKit's UIScrollView.
+/// Hardware-accelerated zoomable image view supporting zoom scale tracking for swipe/drag gestures.
 struct ZoomableImageView: UIViewRepresentable {
     let image: UIImage
     let isSelected: Bool
+    @Binding var isZoomed: Bool
     @Binding var isControlsHidden: Bool
 
     func makeUIView(context: Context) -> UIScrollView {
@@ -46,7 +47,7 @@ struct ZoomableImageView: UIViewRepresentable {
         doubleTap.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTap)
 
-        // Single Tap to Toggle Toolbar & Controls
+        // Single Tap to Toggle Controls
         let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSingleTap(_:)))
         singleTap.numberOfTapsRequired = 1
         singleTap.require(toFail: doubleTap)
@@ -85,6 +86,7 @@ struct ZoomableImageView: UIViewRepresentable {
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            // Keep image centered during zoom
             if let imageView = scrollView.viewWithTag(99) {
                 let boundsSize = scrollView.bounds.size
                 var frameToCenter = imageView.frame
@@ -104,29 +106,19 @@ struct ZoomableImageView: UIViewRepresentable {
                 imageView.frame = frameToCenter
             }
 
-            // Auto-hide controls when pinching in to zoom; show when pinch returns to 1.0x
-            if scrollView.zoomScale > 1.05 && !parent.isControlsHidden {
+            // Update zoomed state for drag-to-dismiss gesture enabling
+            let currentlyZoomed = scrollView.zoomScale > 1.01
+            if parent.isZoomed != currentlyZoomed {
                 DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        self.parent.isControlsHidden = true
-                    }
-                }
-            } else if scrollView.zoomScale <= 1.01 && parent.isControlsHidden {
-                DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        self.parent.isControlsHidden = false
-                    }
+                    self.parent.isZoomed = currentlyZoomed
                 }
             }
         }
 
         func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
-            if scale <= 1.01 && parent.isControlsHidden {
-                DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        self.parent.isControlsHidden = false
-                    }
-                }
+            let currentlyZoomed = scale > 1.01
+            DispatchQueue.main.async {
+                self.parent.isZoomed = currentlyZoomed
             }
         }
 
@@ -141,20 +133,20 @@ struct ZoomableImageView: UIViewRepresentable {
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = gesture.view as? UIScrollView else { return }
             if scrollView.zoomScale > 1.01 {
-                // Zoom Out -> Restore toolbar and thumbnail strip
                 scrollView.setZoomScale(1.0, animated: true)
                 DispatchQueue.main.async {
                     withAnimation(.easeInOut(duration: 0.25)) {
+                        self.parent.isZoomed = false
                         self.parent.isControlsHidden = false
                     }
                 }
             } else {
-                // Zoom In -> Hide toolbar and thumbnail strip
                 let pointInView = gesture.location(in: scrollView.viewWithTag(99))
                 let zoomRect = zoomRectForScale(scale: 2.5, center: pointInView, scrollView: scrollView)
                 scrollView.zoom(to: zoomRect, animated: true)
                 DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        self.parent.isZoomed = true
                         self.parent.isControlsHidden = true
                     }
                 }

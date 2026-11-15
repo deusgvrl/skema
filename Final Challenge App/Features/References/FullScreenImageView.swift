@@ -14,26 +14,45 @@ struct FullScreenImageView: View {
 
     @State private var isDeleteAlert: Bool = false
     @State private var isControlsHidden: Bool = false
+    @State private var isZoomed: Bool = false
+    @State private var dragOffset: CGSize = .zero
     @State private var scrollPositionID: Int?
+    @State private var isDraggingDown: Bool = false
 
     private let feedbackGenerator = UISelectionFeedbackGenerator()
 
+    // Dynamic background opacity based on drag distance
+    private var backgroundOpacity: Double {
+        if isControlsHidden { return 1.0 }
+        let progress = max(0, dragOffset.height) / 300.0
+        return max(0.0, 1.0 - progress)
+    }
+
+    // Slight scale reduction while dragging down (Native iOS Photos polish)
+    private var dragScale: CGFloat {
+        let progress = max(0, dragOffset.height) / 1000.0
+        return max(0.85, 1.0 - progress)
+    }
+
     var body: some View {
         ZStack {
-            // Background Layer (Smoothly shifts to pitch black when controls hide)
+            // Layer 1: Background Layer (Fades to transparent as user drags down)
             Color(isControlsHidden ? .black : .systemBackground)
+                .opacity(backgroundOpacity)
                 .ignoresSafeArea()
 
+            // Layer 2: Main Image Viewer & Thumbnail Strip Content
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
 
-                // Paging Main Image View with UIKit Zoom
+                // Paging Main Image View (Drag-to-dismiss gesture attached directly here)
                 TabView(selection: $selectedIndex) {
                     ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
                         if viewModel.referenceImages.indices.contains(index) {
                             ZoomableImageView(
                                 image: viewModel.referenceImages[index],
                                 isSelected: index == selectedIndex,
+                                isZoomed: $isZoomed,
                                 isControlsHidden: $isControlsHidden
                             )
                             .tag(index)
@@ -41,16 +60,19 @@ struct FullScreenImageView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .simultaneousGesture(
+                    isZoomed ? nil : dragToDismissGesture
+                )
 
                 Spacer(minLength: 0)
 
-                // Bottom Centered Thumbnail Strip (Native Photos Behavior)
+                // Bottom Centered Thumbnail Strip Overlay (Isolated from drag-to-dismiss)
                 if !viewModel.referenceImages.isEmpty {
                     GeometryReader { geometry in
                         let selectedSize: CGFloat = 44
-                        let unselectedWidth: CGFloat = 30
+                        let unselectedWidth: CGFloat = 28
                         let height: CGFloat = 44
-                        let centerPadding = (geometry.size.width - selectedSize) / 2
+                        let centerPadding = max(0, (geometry.size.width - selectedSize) / 2)
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 5) {
@@ -84,9 +106,10 @@ struct FullScreenImageView: View {
                                 }
                             }
                             .scrollTargetLayout()
-                            .padding(.horizontal, centerPadding)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedIndex)
                             .padding(.vertical, 4)
                         }
+                        .safeAreaPadding(.horizontal, centerPadding)
                         .scrollTargetBehavior(.viewAligned)
                         .scrollPosition(id: $scrollPositionID, anchor: .center)
                         .onChange(of: scrollPositionID) { _, newID in
@@ -111,6 +134,8 @@ struct FullScreenImageView: View {
                     .allowsHitTesting(!isControlsHidden)
                 }
             }
+            .offset(y: max(0, dragOffset.height))
+            .scaleEffect(dragScale)
         }
         .statusBarHidden(isControlsHidden)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .navigationBar)
@@ -136,11 +161,9 @@ struct FullScreenImageView: View {
             Text("It will be removed from this setup's references.")
         }
         .toolbar {
-            // Title & Subtitle Metadata
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     let displayIndex = viewModel.referenceImages.isEmpty ? 0 : min(selectedIndex + 1, viewModel.referenceImages.count)
-                    
                     let currentRefImage = viewModel.sortedReferenceImages.indices.contains(selectedIndex)
                         ? viewModel.sortedReferenceImages[selectedIndex]
                         : nil
@@ -172,6 +195,39 @@ struct FullScreenImageView: View {
         }
     }
 
+    // Drag-down gesture logic
+    private var dragToDismissGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+        .onChanged { value in
+            let horizontal = abs(value.translation.width)
+            let vertical = value.translation.height
+
+            if !isDraggingDown {
+                // Evaluate direction ONLY once at the start of the drag
+                if vertical > 8 && vertical > horizontal * 1.15 {
+                    isDraggingDown = true
+                    dragOffset = value.translation
+                }
+            } else {
+                // Once locked in, update continuously every frame without re-checking slope
+                dragOffset = value.translation
+            }
+        }
+        .onEnded { value in
+            let vertical = value.translation.height
+            let predictedVelocity = value.predictedEndTranslation.height
+
+            if isDraggingDown && (vertical > 120 || predictedVelocity > 350) {
+                dismiss()
+            } else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+                    dragOffset = .zero
+                }
+            }
+            isDraggingDown = false
+        }
+    }
+    
     private func deleteCurrentImage() {
         guard !viewModel.referenceImages.isEmpty,
               viewModel.referenceImages.indices.contains(selectedIndex) else { return }
