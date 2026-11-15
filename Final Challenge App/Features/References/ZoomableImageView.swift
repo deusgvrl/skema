@@ -2,7 +2,7 @@
 //  ZoomableImageView.swift
 //  Final Challenge App
 //
-//  Created by Satriya Handha Wibowo on 15/11/26.
+//  Created by Satriya Handha Wibowo on 14/11/26.
 //
 
 import SwiftUI
@@ -12,6 +12,7 @@ import UIKit
 struct ZoomableImageView: UIViewRepresentable {
     let image: UIImage
     let isSelected: Bool
+    @Binding var isControlsHidden: Bool
 
     func makeUIView(context: Context) -> UIScrollView {
         let scrollView = UIScrollView()
@@ -44,6 +45,12 @@ struct ZoomableImageView: UIViewRepresentable {
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTap)
+
+        // Single Tap to Toggle Toolbar & Controls
+        let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSingleTap(_:)))
+        singleTap.numberOfTapsRequired = 1
+        singleTap.require(toFail: doubleTap)
+        scrollView.addGestureRecognizer(singleTap)
 
         return scrollView
     }
@@ -96,16 +103,61 @@ struct ZoomableImageView: UIViewRepresentable {
 
                 imageView.frame = frameToCenter
             }
+
+            // Auto-hide controls when pinching in to zoom; show when pinch returns to 1.0x
+            if scrollView.zoomScale > 1.05 && !parent.isControlsHidden {
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        self.parent.isControlsHidden = true
+                    }
+                }
+            } else if scrollView.zoomScale <= 1.01 && parent.isControlsHidden {
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        self.parent.isControlsHidden = false
+                    }
+                }
+            }
+        }
+
+        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+            if scale <= 1.01 && parent.isControlsHidden {
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        self.parent.isControlsHidden = false
+                    }
+                }
+            }
+        }
+
+        @objc func handleSingleTap(_ gesture: UITapGestureRecognizer) {
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.parent.isControlsHidden.toggle()
+                }
+            }
         }
 
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = gesture.view as? UIScrollView else { return }
             if scrollView.zoomScale > 1.01 {
+                // Zoom Out -> Restore toolbar and thumbnail strip
                 scrollView.setZoomScale(1.0, animated: true)
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        self.parent.isControlsHidden = false
+                    }
+                }
             } else {
+                // Zoom In -> Hide toolbar and thumbnail strip
                 let pointInView = gesture.location(in: scrollView.viewWithTag(99))
                 let zoomRect = zoomRectForScale(scale: 2.5, center: pointInView, scrollView: scrollView)
                 scrollView.zoom(to: zoomRect, animated: true)
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        self.parent.isControlsHidden = true
+                    }
+                }
             }
         }
 
