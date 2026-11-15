@@ -12,11 +12,7 @@ struct FullScreenImageView: View {
     @Bindable var viewModel: SetupDetailViewModel
     @State var selectedIndex: Int
 
-    // Zoom state
-    @State private var currentScale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
     @State private var isDeleteAlert: Bool = false
-
     @State private var scrollPositionID: Int?
 
     private let feedbackGenerator = UISelectionFeedbackGenerator()
@@ -25,42 +21,15 @@ struct FullScreenImageView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 0)
 
-            // Paging Main Image View with Zoom
+            // Paging Main Image View with UIKit Zoom
             TabView(selection: $selectedIndex) {
                 ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
                     if viewModel.referenceImages.indices.contains(index) {
-                        Image(uiImage: viewModel.referenceImages[index])
-                            .resizable()
-                            .scaledToFit()
-                            .scaleEffect(selectedIndex == index ? currentScale : 1.0)
-                            .gesture(
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        currentScale = lastScale * value
-                                    }
-                                    .onEnded { _ in
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            if currentScale < 1.0 {
-                                                currentScale = 1.0
-                                            } else if currentScale > 4.0 {
-                                                currentScale = 4.0
-                                            }
-                                            lastScale = currentScale
-                                        }
-                                    }
-                            )
-                            .onTapGesture(count: 2) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    if currentScale > 1.0 {
-                                        currentScale = 1.0
-                                        lastScale = 1.0
-                                    } else {
-                                        currentScale = 2.5
-                                        lastScale = 2.5
-                                    }
-                                }
-                            }
-                            .tag(index)
+                        ZoomableImageView(
+                            image: viewModel.referenceImages[index],
+                            isSelected: index == selectedIndex
+                        )
+                        .tag(index)
                     }
                 }
             }
@@ -127,8 +96,6 @@ struct FullScreenImageView: View {
                                 scrollPositionID = newIndex
                             }
                         }
-                        currentScale = 1.0
-                        lastScale = 1.0
                     }
                 }
                 .frame(height: 56)
