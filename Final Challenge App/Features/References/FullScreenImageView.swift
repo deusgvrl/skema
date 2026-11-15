@@ -16,19 +16,19 @@ struct FullScreenImageView: View {
     @State private var isControlsHidden: Bool = false
     @State private var isZoomed: Bool = false
     @State private var dragOffset: CGSize = .zero
-    @State private var scrollPositionID: Int?
     @State private var isDraggingDown: Bool = false
+    @State private var scrollPositionID: Int?
 
     private let feedbackGenerator = UISelectionFeedbackGenerator()
 
-    // Dynamic background opacity based on drag distance
+    // Dynamic background opacity during drag-to-dismiss
     private var backgroundOpacity: Double {
         if isControlsHidden { return 1.0 }
         let progress = max(0, dragOffset.height) / 300.0
         return max(0.0, 1.0 - progress)
     }
 
-    // Slight scale reduction while dragging down (Native iOS Photos polish)
+    // Scale reduction during drag-to-dismiss
     private var dragScale: CGFloat {
         let progress = max(0, dragOffset.height) / 1000.0
         return max(0.85, 1.0 - progress)
@@ -36,37 +36,36 @@ struct FullScreenImageView: View {
 
     var body: some View {
         ZStack {
-            // Layer 1: Background Layer (Fades to transparent as user drags down)
+            // Layer 1: Background Layer
             Color(isControlsHidden ? .black : .systemBackground)
                 .opacity(backgroundOpacity)
                 .ignoresSafeArea()
 
-            // Layer 2: Main Image Viewer & Thumbnail Strip Content
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-
-                // Paging Main Image View (Drag-to-dismiss gesture attached directly here)
-                TabView(selection: $selectedIndex) {
-                    ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
-                        if viewModel.referenceImages.indices.contains(index) {
-                            ZoomableImageView(
-                                image: viewModel.referenceImages[index],
-                                isSelected: index == selectedIndex,
-                                isZoomed: $isZoomed,
-                                isControlsHidden: $isControlsHidden
-                            )
-                            .tag(index)
-                        }
+            // Layer 2: Main Full-Bleed Image Paging View
+            TabView(selection: $selectedIndex) {
+                ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
+                    if viewModel.referenceImages.indices.contains(index) {
+                        ZoomableImageView(
+                            image: viewModel.referenceImages[index],
+                            isSelected: index == selectedIndex,
+                            isZoomed: $isZoomed,
+                            isControlsHidden: $isControlsHidden
+                        )
+                        .ignoresSafeArea()
+                        .tag(index)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .simultaneousGesture(
-                    isZoomed ? nil : dragToDismissGesture
-                )
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
+            .offset(y: max(0, dragOffset.height))
+            .scaleEffect(dragScale)
+            .simultaneousGesture(isZoomed ? nil : dragToDismissGesture)
 
-                Spacer(minLength: 0)
+            // Layer 3: Floating Overlay Controls (Thumbnail Strip)
+            VStack {
+                Spacer()
 
-                // Bottom Centered Thumbnail Strip Overlay (Isolated from drag-to-dismiss)
                 if !viewModel.referenceImages.isEmpty {
                     GeometryReader { geometry in
                         let selectedSize: CGFloat = 44
@@ -75,7 +74,7 @@ struct FullScreenImageView: View {
                         let centerPadding = max(0, (geometry.size.width - selectedSize) / 2)
 
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 2) {
                                 ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
                                     if viewModel.referenceImages.indices.contains(index) {
                                         let isSelected = index == selectedIndex
@@ -97,8 +96,8 @@ struct FullScreenImageView: View {
                                             .id(index)
                                             .onTapGesture {
                                                 feedbackGenerator.selectionChanged()
+                                                selectedIndex = index
                                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                                    selectedIndex = index
                                                     scrollPositionID = index
                                                 }
                                             }
@@ -115,9 +114,7 @@ struct FullScreenImageView: View {
                         .onChange(of: scrollPositionID) { _, newID in
                             if let newID, viewModel.referenceImages.indices.contains(newID), newID != selectedIndex {
                                 feedbackGenerator.selectionChanged()
-                                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                    selectedIndex = newID
-                                }
+                                selectedIndex = newID
                             }
                         }
                         .onChange(of: selectedIndex) { _, newIndex in
@@ -129,7 +126,7 @@ struct FullScreenImageView: View {
                         }
                     }
                     .frame(height: 56)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 80)
                     .opacity(isControlsHidden ? 0 : 1)
                     .allowsHitTesting(!isControlsHidden)
                 }
@@ -137,9 +134,11 @@ struct FullScreenImageView: View {
             .offset(y: max(0, dragOffset.height))
             .scaleEffect(dragScale)
         }
+        .ignoresSafeArea()
         .statusBarHidden(isControlsHidden)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .navigationBar)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .bottomBar)
+        .toolbarBackground(.hidden, for: .navigationBar, .bottomBar)
         .onAppear {
             scrollPositionID = selectedIndex
             feedbackGenerator.prepare()
@@ -195,39 +194,37 @@ struct FullScreenImageView: View {
         }
     }
 
-    // Drag-down gesture logic
+    // Directionally-locked drag-down gesture
     private var dragToDismissGesture: some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .local)
-        .onChanged { value in
-            let horizontal = abs(value.translation.width)
-            let vertical = value.translation.height
+            .onChanged { value in
+                let horizontal = abs(value.translation.width)
+                let vertical = value.translation.height
 
-            if !isDraggingDown {
-                // Evaluate direction ONLY once at the start of the drag
-                if vertical > 8 && vertical > horizontal * 1.15 {
-                    isDraggingDown = true
+                if !isDraggingDown {
+                    if vertical > 8 && vertical > horizontal * 1.2 {
+                        isDraggingDown = true
+                        dragOffset = value.translation
+                    }
+                } else {
                     dragOffset = value.translation
                 }
-            } else {
-                // Once locked in, update continuously every frame without re-checking slope
-                dragOffset = value.translation
             }
-        }
-        .onEnded { value in
-            let vertical = value.translation.height
-            let predictedVelocity = value.predictedEndTranslation.height
+            .onEnded { value in
+                let vertical = value.translation.height
+                let predictedVelocity = value.predictedEndTranslation.height
 
-            if isDraggingDown && (vertical > 120 || predictedVelocity > 350) {
-                dismiss()
-            } else {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
-                    dragOffset = .zero
+                if isDraggingDown && (vertical > 120 || predictedVelocity > 350) {
+                    dismiss()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+                        dragOffset = .zero
+                    }
                 }
+                isDraggingDown = false
             }
-            isDraggingDown = false
-        }
     }
-    
+
     private func deleteCurrentImage() {
         guard !viewModel.referenceImages.isEmpty,
               viewModel.referenceImages.indices.contains(selectedIndex) else { return }

@@ -8,158 +8,195 @@
 import SwiftUI
 import UIKit
 
-/// Hardware-accelerated zoomable image view supporting zoom scale tracking for swipe/drag gestures.
+/// Hardware-accelerated zoomable image view using UIKit's UIScrollView.
+/// Fits exact aspect-fit image bounds to prevent layout jumps during toolbar toggle passes.
 struct ZoomableImageView: UIViewRepresentable {
     let image: UIImage
     let isSelected: Bool
     @Binding var isZoomed: Bool
     @Binding var isControlsHidden: Bool
 
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
-        scrollView.delegate = context.coordinator
-        scrollView.maximumZoomScale = 4.0
-        scrollView.minimumZoomScale = 1.0
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.bouncesZoom = true
-        scrollView.decelerationRate = .fast
-        scrollView.backgroundColor = .clear
-
-        let imageView = UIImageView(image: image)
-        imageView.contentMode = .scaleAspectFit
-        imageView.clipsToBounds = true
-        imageView.tag = 99
-        scrollView.addSubview(imageView)
-
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            imageView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            imageView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            imageView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
-            imageView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
-        ])
-
-        // Double Tap to Zoom (1.0x <-> 2.5x)
-        let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoubleTap(_:)))
-        doubleTap.numberOfTapsRequired = 2
-        scrollView.addGestureRecognizer(doubleTap)
-
-        // Single Tap to Toggle Controls
-        let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSingleTap(_:)))
-        singleTap.numberOfTapsRequired = 1
-        singleTap.require(toFail: doubleTap)
-        scrollView.addGestureRecognizer(singleTap)
-
+    func makeUIView(context: Context) -> ZoomableScrollView {
+        let scrollView = ZoomableScrollView()
+        scrollView.isZoomedBinding = { zoomed in
+            if self.isZoomed != zoomed {
+                self.isZoomed = zoomed
+            }
+        }
+        scrollView.isControlsHiddenBinding = { hidden in
+            if self.isControlsHidden != hidden {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.isControlsHidden = hidden
+                }
+            }
+        }
+        scrollView.onSingleTap = {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                self.isControlsHidden.toggle()
+            }
+        }
+        scrollView.setImage(image)
         return scrollView
     }
 
-    func updateUIView(_ uiView: UIScrollView, context: Context) {
-        if let imageView = uiView.viewWithTag(99) as? UIImageView {
-            if imageView.image != image {
-                imageView.image = image
-                uiView.setZoomScale(1.0, animated: false)
+    func updateUIView(_ uiView: ZoomableScrollView, context: Context) {
+        uiView.setImage(image)
+
+        // Reset zoom when swiping away from this image page
+        if !isSelected && uiView.zoomScale != 1.0 {
+            uiView.resetZoom(animated: false)
+        }
+    }
+
+    class ZoomableScrollView: UIScrollView, UIScrollViewDelegate {
+        let imageView = UIImageView()
+        var isZoomedBinding: ((Bool) -> Void)?
+        var isControlsHiddenBinding: ((Bool) -> Void)?
+        var onSingleTap: (() -> Void)?
+
+        private var lastBoundsSize: CGSize = .zero
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            setup()
+        }
+
+        required init?(coder: NSCoder) {
+            super.init(coder: coder)
+            setup()
+        }
+
+        private func setup() {
+            self.delegate = self
+            self.maximumZoomScale = 4.0
+            self.minimumZoomScale = 1.0
+            self.showsHorizontalScrollIndicator = false
+            self.showsVerticalScrollIndicator = false
+            self.bouncesZoom = true
+            self.decelerationRate = .fast
+            self.backgroundColor = .clear
+            self.contentInsetAdjustmentBehavior = .never
+            self.insetsLayoutMarginsFromSafeArea = false
+
+            imageView.contentMode = .scaleAspectFit
+            imageView.clipsToBounds = true
+            addSubview(imageView)
+
+            let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+            doubleTap.numberOfTapsRequired = 2
+            addGestureRecognizer(doubleTap)
+
+            let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap(_:)))
+            singleTap.numberOfTapsRequired = 1
+            singleTap.require(toFail: doubleTap)
+            addGestureRecognizer(singleTap)
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+
+            // Only recalculate image frame if bounds dimensions actually change (e.g., orientation change)
+            if bounds.size != lastBoundsSize && bounds.width > 0 && bounds.height > 0 {
+                lastBoundsSize = bounds.size
+                updateImageFrame()
+            } else {
+                centerImage()
             }
         }
 
-        // Reset zoom back to normal scale when swiping to another photo
-        if !isSelected && uiView.zoomScale != 1.0 {
-            uiView.setZoomScale(1.0, animated: false)
+        func setImage(_ image: UIImage) {
+            if imageView.image != image {
+                imageView.image = image
+                lastBoundsSize = .zero
+                setNeedsLayout()
+                layoutIfNeeded()
+                resetZoom(animated: false)
+            }
         }
-    }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject, UIScrollViewDelegate {
-        var parent: ZoomableImageView
-
-        init(_ parent: ZoomableImageView) {
-            self.parent = parent
+        func resetZoom(animated: Bool = false) {
+            setZoomScale(1.0, animated: animated)
+            updateImageFrame()
         }
+
+        func updateImageFrame() {
+            guard let image = imageView.image, bounds.width > 0, bounds.height > 0 else { return }
+
+            let imageSize = image.size
+            guard imageSize.width > 0 && imageSize.height > 0 else { return }
+
+            let widthRatio = bounds.width / imageSize.width
+            let heightRatio = bounds.height / imageSize.height
+            let scale = min(widthRatio, heightRatio)
+
+            let fittedWidth = imageSize.width * scale
+            let fittedHeight = imageSize.height * scale
+
+            let newFrame = CGRect(x: 0, y: 0, width: fittedWidth, height: fittedHeight)
+            imageView.frame = newFrame
+            contentSize = newFrame.size
+            centerImage()
+        }
+
+        func centerImage() {
+            guard imageView.image != nil else { return }
+            let boundsSize = bounds.size
+            var frameToCenter = imageView.frame
+
+            if frameToCenter.size.width < boundsSize.width {
+                frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2.0
+            } else {
+                frameToCenter.origin.x = 0
+            }
+
+            if frameToCenter.size.height < boundsSize.height {
+                frameToCenter.origin.y = (boundsSize.height - frameToCenter.size.height) / 2.0
+            } else {
+                frameToCenter.origin.y = 0
+            }
+
+            imageView.frame = frameToCenter
+        }
+
+        // MARK: - UIScrollViewDelegate
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-            scrollView.viewWithTag(99)
+            return imageView
         }
 
         func scrollViewDidZoom(_ scrollView: UIScrollView) {
-            // Keep image centered during zoom
-            if let imageView = scrollView.viewWithTag(99) {
-                let boundsSize = scrollView.bounds.size
-                var frameToCenter = imageView.frame
+            centerImage()
 
-                if frameToCenter.size.width < boundsSize.width {
-                    frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2
-                } else {
-                    frameToCenter.origin.x = 0
-                }
-
-                if frameToCenter.size.height < boundsSize.height {
-                    frameToCenter.origin.y = (boundsSize.height - frameToCenter.size.height) / 2
-                } else {
-                    frameToCenter.origin.y = 0
-                }
-
-                imageView.frame = frameToCenter
-            }
-
-            // Update zoomed state for drag-to-dismiss gesture enabling
             let currentlyZoomed = scrollView.zoomScale > 1.01
-            if parent.isZoomed != currentlyZoomed {
-                DispatchQueue.main.async {
-                    self.parent.isZoomed = currentlyZoomed
-                }
-            }
+            isZoomedBinding?(currentlyZoomed)
         }
 
         func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
             let currentlyZoomed = scale > 1.01
-            DispatchQueue.main.async {
-                self.parent.isZoomed = currentlyZoomed
-            }
+            isZoomedBinding?(currentlyZoomed)
         }
 
-        @objc func handleSingleTap(_ gesture: UITapGestureRecognizer) {
-            DispatchQueue.main.async {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    self.parent.isControlsHidden.toggle()
-                }
-            }
+        @objc private func handleSingleTap(_ gesture: UITapGestureRecognizer) {
+            onSingleTap?()
         }
 
-        @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-            guard let scrollView = gesture.view as? UIScrollView else { return }
-            if scrollView.zoomScale > 1.01 {
-                scrollView.setZoomScale(1.0, animated: true)
-                DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        self.parent.isZoomed = false
-                        self.parent.isControlsHidden = false
-                    }
-                }
+        @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+            if zoomScale > 1.01 {
+                setZoomScale(1.0, animated: true)
+                isZoomedBinding?(false)
+                isControlsHiddenBinding?(false)
             } else {
-                let pointInView = gesture.location(in: scrollView.viewWithTag(99))
-                let zoomRect = zoomRectForScale(scale: 2.5, center: pointInView, scrollView: scrollView)
-                scrollView.zoom(to: zoomRect, animated: true)
-                DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        self.parent.isZoomed = true
-                        self.parent.isControlsHidden = true
-                    }
-                }
+                let pointInView = gesture.location(in: imageView)
+                let newZoomScale: CGFloat = 2.5
+                let w = bounds.size.width / newZoomScale
+                let h = bounds.size.height / newZoomScale
+                let x = pointInView.x - (w / 2.0)
+                let y = pointInView.y - (h / 2.0)
+                let rectToZoomTo = CGRect(x: x, y: y, width: w, height: h)
+                zoom(to: rectToZoomTo, animated: true)
+                isZoomedBinding?(true)
+                isControlsHiddenBinding?(true)
             }
-        }
-
-        private func zoomRectForScale(scale: CGFloat, center: CGPoint, scrollView: UIScrollView) -> CGRect {
-            var zoomRect = CGRect.zero
-            zoomRect.size.height = scrollView.frame.size.height / scale
-            zoomRect.size.width  = scrollView.frame.size.width  / scale
-            zoomRect.origin.x    = center.x - (zoomRect.size.width  / 2.0)
-            zoomRect.origin.y    = center.y - (zoomRect.size.height / 2.0)
-            return zoomRect
         }
     }
 }
