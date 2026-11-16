@@ -144,6 +144,8 @@ nonisolated struct RawDetection: Codable, Equatable, Sendable {
     let maskHeight: Int
     /// The mask on the depth grid (the same mapping the depth sampler uses, no erosion).
     let depthMask: RawMaskGrid?
+    /// The mask before the depth trim (`DepthGrouping`), on the depth grid. Nil when the detection was not trimmed.
+    var untrimmedDepthMask: RawMaskGrid?
     /// Points inside the mask before any filter, and how many of them were saved to `mask_raw.ply`.
     let rawPointCount: Int
     let rawPointsSaved: Int
@@ -186,6 +188,8 @@ nonisolated struct RawLook: Codable, Equatable, Sendable {
     let items: [RawItem]
     /// Room points this look added to `room.ply` (0 when the room was not sampled at this look).
     let roomPointsAdded: Int
+    /// Everything the detectors looked at in this look, kept or not (YOLOE rows from 30%, every Vision blob).
+    var candidates: [RawCandidate] = []
 }
 
 nonisolated struct RawSubjectTap: Codable, Equatable, Sendable {
@@ -276,7 +280,7 @@ nonisolated struct RawCounts: Codable, Equatable, Sendable {
 
 /// `log.json`.
 nonisolated struct RawScanReport: Codable, Equatable, Sendable {
-    var formatVersion = 1
+    var formatVersion = 2
     let createdAt: Date
     var files = [
         "room.ply": "whole LiDAR room, 1 cm voxels: x y z red green blue",

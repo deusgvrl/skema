@@ -24,11 +24,23 @@ nonisolated struct CameraDetector: EquipmentDetecting {
             guard let bounds = MaskMapping.bounds(of: object) else { continue }
             let area = CGRect(x: bounds.x, y: 1 - bounds.y - bounds.height, width: bounds.width, height: bounds.height)
             let labels = try VisionDetector.classify(frame.image, orientation: frame.orientation, region: area)
+            RawCandidateStore.shared.record(
+                [Self.candidate(box: [Float(bounds.x), Float(bounds.y), Float(bounds.width), Float(bounds.height)],
+                                classifications: labels)], at: frame.timestamp)
             if let camera = Self.camera(from: object, classifications: labels, orientation: frame.orientation) {
                 cameras.append(camera)
             }
         }
         return cameras
+    }
+
+    /// Raw-data logger: one Vision blob with its "camera" score and its best label, kept or not.
+    static func candidate(box: [Float],
+                          classifications: [(identifier: String, confidence: Float)]) -> RawCandidate {
+        let score = classifications.first { $0.identifier == label }?.confidence ?? 0
+        let top = classifications.max { $0.confidence < $1.confidence }
+        return RawCandidate(source: "vision", label: label, confidence: score, box: box,
+                            kept: score >= minConfidence, topLabel: top?.identifier, topConfidence: top?.confidence)
     }
 
     /// Cases D3–D5: a camera when "camera" scores at least 60%, whatever the other labels score.

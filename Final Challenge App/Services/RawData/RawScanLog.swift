@@ -56,7 +56,8 @@ nonisolated struct RawScanLog: Sendable {
         return RawLookSampler.Request(
             detections: found, sightings: tracker.latestSightings, joinedIDs: tracker.latestJoinedIDs,
             items: tracker.items, frame: frame, look: nextLook, savesPoints: savesPoints,
-            samplesRoom: wantsRoom(at: frame.timestamp))
+            samplesRoom: wantsRoom(at: frame.timestamp),
+            candidates: RawCandidateStore.shared.take(at: frame.timestamp))
     }
 
     /// Adds a sampled look (from `request(for:tracker:frame:)`).
@@ -86,7 +87,7 @@ nonisolated struct RawScanLog: Sendable {
         looks.append(RawLook(index: looks.count, timestamp: time, camera: RawCamera(camera),
                              depthWidth: depth?.width, depthHeight: depth?.height,
                              detections: sample.detections, items: items.map(RawItem.init),
-                             roomPointsAdded: roomAdded))
+                             roomPointsAdded: roomAdded, candidates: sample.candidates))
     }
 
     mutating func addSubjectTap(_ tap: RawSubjectTap) {

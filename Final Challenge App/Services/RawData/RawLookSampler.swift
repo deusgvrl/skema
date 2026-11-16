@@ -10,6 +10,7 @@ nonisolated struct RawLookSample: Sendable {
     /// Room candidates (every `roomPixelStride`-th depth pixel); empty when the room was not sampled.
     let roomPoints: [(world: SIMD3<Float>, rgb: SIMD3<UInt8>)]
     let sampledRoom: Bool
+    var candidates: [RawCandidate] = []
 }
 
 /// Turns one look into raw records: each detection's mask points (unfiltered and kept), its sighting and item id,
@@ -32,6 +33,7 @@ nonisolated enum RawLookSampler {
         let look: Int
         let savesPoints: Bool
         let samplesRoom: Bool
+        var candidates: [RawCandidate] = []
     }
 
     @concurrent static func sample(_ request: Request) async -> RawLookSample {
@@ -47,10 +49,14 @@ nonisolated enum RawLookSampler {
             var raw: [RawMaskPoint] = []
             var kept: [SIMD3<Float>] = []
             var grid: RawMaskGrid?
+            var untrimmedGrid: RawMaskGrid?
             if let depth = frame.depth {
                 let unfiltered = maskPoints(in: found.mask, depth: depth, camera: frame.camera, tag: tag)
                 raw = unfiltered.points
                 grid = unfiltered.grid
+                if let before = found.untrimmedMask {
+                    untrimmedGrid = maskPoints(in: before, depth: depth, camera: frame.camera, tag: tag).grid
+                }
                 kept = DepthSampler.worldPoints(in: found.mask, depth: depth, camera: frame.camera,
                                                 maxRange: DepthSampler.maxRange)
             }
@@ -63,7 +69,7 @@ nonisolated enum RawLookSampler {
             detections.append(RawDetection(
                 index: index, kind: kindName(found.kind), confidence: found.confidence,
                 maskBounds: MaskMapping.bounds(of: found.mask).map(RawBox.init),
-                maskWidth: found.mask.width, maskHeight: found.mask.height, depthMask: grid,
+                maskWidth: found.mask.width, maskHeight: found.mask.height, depthMask: grid, untrimmedDepthMask: untrimmedGrid,
                 rawPointCount: raw.count, rawPointsSaved: savedRaw.count,
                 keptPointCount: kept.count, keptPointsSaved: savedKept.count, sighting: match))
         }
@@ -74,7 +80,7 @@ nonisolated enum RawLookSampler {
             room = zip(points, colours).map { (world: $0.world, rgb: $1) }
         }
         return RawLookSample(detections: detections, rawPoints: rawPoints, keptPoints: keptPoints,
-                             roomPoints: room, sampledRoom: request.samplesRoom)
+                             roomPoints: room, sampledRoom: request.samplesRoom, candidates: request.candidates)
     }
 
     /// The sighting each detection made, with the item id it joined; nil for a detection that made none.

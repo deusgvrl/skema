@@ -29,6 +29,8 @@ nonisolated struct EquipmentDetection: Equatable, Sendable {
     /// A light scoring from `weakFloor` up to `minConfidence` (A10-90, D20):
     /// it may only keep an item that is already accepted.
     var isWeak = false
+    /// Raw-data logger only: the mask before `CombinedDetector` trimmed it by depth. Nil when it was not trimmed.
+    var untrimmedMask: InstanceMask?
 }
 
 nonisolated protocol EquipmentDetecting: Sendable {
@@ -104,12 +106,33 @@ nonisolated final class EquipmentDetector: EquipmentDetecting, @unchecked Sendab
         }
         guard let rowArray = arrays.first(where: { $0.shape.count == 3 }),
               let protoArray = arrays.first(where: { $0.shape.count == 4 }) else { throw Failure.unexpectedOutputs }
-        let rows = YOLOSegmentDecoder.rows(output: try YOLOSegmentDetector.floats(from: rowArray),
-                                           count: rowArray.shape[1].intValue, minConfidence: Self.weakFloor)
+        // Raw-data logger: decode down to 30% so rows under the weak line can be logged, then apply the weak line.
+        let candidateRows = YOLOSegmentDecoder.rows(output: try YOLOSegmentDetector.floats(from: rowArray),
+                                                    count: rowArray.shape[1].intValue,
+                                                    minConfidence: Self.candidateFloor)
+        RawCandidateStore.shared.record(Self.candidates(from: candidateRows, classNames: classNames),
+                                        at: frame.timestamp)
+        let rows = candidateRows.filter { $0.confidence >= Self.weakFloor }
         guard !rows.isEmpty else { return [] }
         return Self.detections(from: rows, protos: try YOLOSegmentDetector.floats(from: protoArray),
                                protoSize: protoArray.shape[2].intValue, classNames: classNames,
                                orientation: frame.orientation)
+    }
+
+    /// Raw-data logger: rows from this confidence up are logged as candidates.
+    static let candidateFloor: Float = 0.30
+    static let maxCandidates = 20
+
+    /// Raw-data logger: the best rows from 30% up, each marked kept when it has a kept label and reaches the
+    /// weak line (35%); rows under `minConfidence` are kept as weak.
+    static func candidates(from rows: [YOLORow], classNames: [Int: String]) -> [RawCandidate] {
+        rows.sorted { $0.confidence > $1.confidence }.prefix(maxCandidates).map { row in
+            let label = classNames[row.classIndex] ?? "class \(row.classIndex)"
+            let size = Float(inputSize)
+            return RawCandidate(source: "yoloe", label: label, confidence: row.confidence,
+                                box: [row.x1 / size, row.y1 / size, (row.x2 - row.x1) / size, (row.y2 - row.y1) / size],
+                                kept: keptLabels.contains(label) && row.confidence >= weakFloor)
+        }
     }
 
     /// Decoded rows → filter (`EquipmentFilter.keep`) → 640 x 640 masks → native orientation. Best first.

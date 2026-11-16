@@ -22,7 +22,8 @@ nonisolated struct CombinedDetector: EquipmentDetecting {
     static func trimmed(_ detections: [EquipmentDetection], depth: DepthFrame) -> [EquipmentDetection] {
         detections.map {
             EquipmentDetection(kind: $0.kind, confidence: $0.confidence,
-                               mask: DepthGrouping.nearestGroup(in: $0.mask, depth: depth), isWeak: $0.isWeak)
+                               mask: DepthGrouping.nearestGroup(in: $0.mask, depth: depth), isWeak: $0.isWeak,
+                               untrimmedMask: $0.mask)
         }
     }
 
