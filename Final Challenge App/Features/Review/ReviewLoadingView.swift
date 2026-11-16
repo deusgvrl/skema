@@ -29,24 +29,6 @@ struct ReviewLoadingView: View {
             parts.append("\(cameraCount) \(cameraCount == 1 ? "camera" : "cameras")")
         }
         
-        // Count bounces
-        let bounceCount = nodes.filter {
-            $0.name.localizedCaseInsensitiveContains("bounce") ||
-            $0.role.localizedCaseInsensitiveContains("bounce")
-        }.count
-        if bounceCount > 0 {
-            parts.append("\(bounceCount) \(bounceCount == 1 ? "bounce" : "bounces")")
-        }
-        
-        // Check for backdrop
-        let hasBackdrop = nodes.contains {
-            $0.name.localizedCaseInsensitiveContains("backdrop") ||
-            $0.role.localizedCaseInsensitiveContains("backdrop")
-        }
-        if hasBackdrop {
-            parts.append("backdrop found")
-        }
-        
         if parts.isEmpty {
             return "\(nodes.count) \(nodes.count == 1 ? "item" : "items") found"
         }
