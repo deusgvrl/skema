@@ -246,6 +246,8 @@ final class LiDARScanViewModel {
         storageController.addSetup(draftSetup)
         stopListening()
         write(measurements.results(subject: subjectID, floorY: floorY ?? 0))
+        draftSetup.alignFirstCameraToSixOClock()
+        storageController.save()
         scan?.stop()
     }
 
