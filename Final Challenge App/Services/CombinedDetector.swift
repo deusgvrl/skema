@@ -1,5 +1,7 @@
+import MeasureKit
+
 /// Runs YOLOE (studio lighting) and Vision (cameras) on the same frame at the same time, and joins the results
-/// (A10-90, cases D6–D8). It fills the same `EquipmentDetecting` slot, so tracking and the overlay don't change.
+/// (A10-90, cases D6–D8), then trims each mask by depth (cases D15, D16, D18). It fills the same `EquipmentDetecting` slot, so tracking and the overlay don't change.
 nonisolated struct CombinedDetector: EquipmentDetecting {
     let lights: any EquipmentDetecting
     let cameras: any EquipmentDetecting
@@ -7,9 +9,20 @@ nonisolated struct CombinedDetector: EquipmentDetecting {
     /// Both sides start together (`async let`), so a look takes about as long as the slower side.
     @concurrent
     func detect(in frame: ScanFrame) async throws -> [EquipmentDetection] {
+        // Case D18: without depth the masks can't be trimmed, so the look finds nothing.
+        guard let depth = frame.depth else { return [] }
         async let lightLook = Self.attempt { try await lights.detect(in: frame) }
         async let cameraLook = Self.attempt { try await cameras.detect(in: frame) }
-        return try Self.join(lights: await lightLook, cameras: await cameraLook)
+        return Self.trimmed(try Self.join(lights: await lightLook, cameras: await cameraLook), depth: depth)
+    }
+
+    /// Cases D15–D16: each mask is cut down to its nearest depth group (`DepthGrouping`), so a wall behind a light
+    /// or a person behind a camera is not part of the item. The same mask then feeds the screen and the measuring.
+    static func trimmed(_ detections: [EquipmentDetection], depth: DepthFrame) -> [EquipmentDetection] {
+        detections.map {
+            EquipmentDetection(kind: $0.kind, confidence: $0.confidence,
+                               mask: DepthGrouping.nearestGroup(in: $0.mask, depth: depth))
+        }
     }
 
     /// One side's look, with a failure kept as a value instead of thrown, so the other side's result isn't lost.

@@ -4,6 +4,7 @@
 //
 //  A10-90 cases D3–D8 (written in the A10-90 Jira issue): cameras from Apple Vision at 60%,
 //  and one detector that runs YOLOE (studio lighting) and Vision (cameras) at the same time.
+//  D15, D16 and D18 (masks trimmed by depth) are here too; D10–D14 and D19 are in MeasureKit's DepthGroupingTests.
 //  D1–D2 are in EquipmentDetectorTests. D9 (Vision at every look) is covered by V4 in ScanDetectionTests.
 //
 
@@ -16,6 +17,14 @@ import Testing
 /// A 4 wide, 2 high mask (Vision's oriented frame) with only its top-left pixel on.
 private let orientedCorner = InstanceMask(width: 4, height: 2, pixels: [1, 0, 0, 0, 0, 0, 0, 0])
 private let lightMask = InstanceMask(width: 1, height: 1, pixels: [1])
+
+/// One depth pixel at 1 m, for the 1 x 1 masks.
+private let flatDepth = DepthFrame(width: 1, height: 1, depth: [1], confidence: [2])
+/// A 4 x 1 mask that is all on, and a 4 x 1 depth map: two pixels near, two far.
+private let wideMask = InstanceMask(width: 4, height: 1, pixels: [1, 1, 1, 1])
+private func nearFar(_ near: Float, _ far: Float) -> DepthFrame {
+    DepthFrame(width: 4, height: 1, depth: [near, near, far, far], confidence: [2, 2, 2, 2])
+}
 
 private struct SideFailed: Error {}
 
@@ -93,7 +102,7 @@ struct CameraDetectionTests {
         let both = CombinedDetector(lights: SideDetector(result: .success([light])),
                                     cameras: SideDetector(result: .success([camera])))
 
-        let found = try await both.detect(in: try makeScanFrame(timestamp: 0))
+        let found = try await both.detect(in: try makeScanFrame(timestamp: 0, depth: flatDepth))
 
         #expect(found.map(\.kind) == [.studioLighting, .camera])
     }
@@ -105,7 +114,7 @@ struct CameraDetectionTests {
             lights: SideDetector(result: .success([light]), probe: probe, delay: .milliseconds(50)),
             cameras: SideDetector(result: .success([camera]), probe: probe, delay: .milliseconds(50)))
 
-        _ = try await both.detect(in: try makeScanFrame(timestamp: 0))
+        _ = try await both.detect(in: try makeScanFrame(timestamp: 0, depth: flatDepth))
 
         #expect(probe.mostAtOnce == 2)
     }
@@ -115,7 +124,7 @@ struct CameraDetectionTests {
         let both = CombinedDetector(lights: SideDetector(result: .success([light])),
                                     cameras: SideDetector(result: .failure(SideFailed())))
 
-        let found = try await both.detect(in: try makeScanFrame(timestamp: 0))
+        let found = try await both.detect(in: try makeScanFrame(timestamp: 0, depth: flatDepth))
 
         #expect(found.map(\.kind) == [.studioLighting])
     }
@@ -125,7 +134,7 @@ struct CameraDetectionTests {
         let both = CombinedDetector(lights: SideDetector(result: .failure(SideFailed())),
                                     cameras: SideDetector(result: .success([camera])))
 
-        let found = try await both.detect(in: try makeScanFrame(timestamp: 0))
+        let found = try await both.detect(in: try makeScanFrame(timestamp: 0, depth: flatDepth))
 
         #expect(found.map(\.kind) == [.camera])
     }
@@ -134,10 +143,46 @@ struct CameraDetectionTests {
     func bothFailTheLookFails() async throws {
         let both = CombinedDetector(lights: SideDetector(result: .failure(SideFailed())),
                                     cameras: SideDetector(result: .failure(SideFailed())))
-        let frame = try makeScanFrame(timestamp: 0)
+        let frame = try makeScanFrame(timestamp: 0, depth: flatDepth)
 
         await #expect(throws: (any Error).self) {
             try await both.detect(in: frame)
         }
+    }
+
+    // MARK: D15–D18: masks trimmed by depth
+
+    @Test("Case D15: a light mask over the light at 2 m and a wall at 3 m keeps only the light")
+    func lightMaskLosesTheWall() async throws {
+        let wide = EquipmentDetection(kind: .studioLighting, confidence: 0.9, mask: wideMask)
+        let both = CombinedDetector(lights: SideDetector(result: .success([wide])),
+                                    cameras: SideDetector(result: .success([])))
+
+        let found = try await both.detect(in: try makeScanFrame(timestamp: 0, depth: nearFar(2, 3)))
+
+        #expect(found.map(\.mask.pixels) == [[1, 1, 0, 0]])
+    }
+
+    @Test("Case D16: a camera blob with a person behind it keeps only the camera, as one camera")
+    func cameraMaskLosesThePerson() async throws {
+        let blob = EquipmentDetection(kind: .camera, confidence: 0.7, mask: wideMask)
+        let both = CombinedDetector(lights: SideDetector(result: .success([])),
+                                    cameras: SideDetector(result: .success([blob])))
+
+        let found = try await both.detect(in: try makeScanFrame(timestamp: 0, depth: nearFar(1.5, 2)))
+
+        #expect(found.map(\.kind) == [.camera])
+        #expect(found.first?.mask.pixels == [1, 1, 0, 0])
+        #expect(found.first?.confidence == 0.7)
+    }
+
+    @Test("Case D18: a frame with no depth gives no detections")
+    func noDepthNoDetections() async throws {
+        let both = CombinedDetector(lights: SideDetector(result: .success([light])),
+                                    cameras: SideDetector(result: .success([camera])))
+
+        let found = try await both.detect(in: try makeScanFrame(timestamp: 0))
+
+        #expect(found.isEmpty)
     }
 }
