@@ -261,6 +261,8 @@ final class ScanViewModel {
         insertDraftSetup()
         stopListening()
         writeMeasurements()
+        draftSetup.alignFirstCameraToSixOClock()
+        storageController.save()
         scan?.stop()
     }
 

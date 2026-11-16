@@ -10,7 +10,31 @@ import SwiftUI
 struct ReviewLoadingView: View {
     let progress: Double
     let isScanComplete: Bool
-    var onContinue: () -> Void
+    let nodes: [Equipment]
+    
+    private var summaryText: String {
+        guard !nodes.isEmpty else { return "No equipment detected yet" }
+        
+        var parts: [String] = []
+        
+        // Count lights
+        let lightCount = nodes.filter { $0.category == .light }.count
+        if lightCount > 0 {
+            parts.append("\(lightCount) \(lightCount == 1 ? "light" : "lights")")
+        }
+        
+        // Count cameras
+        let cameraCount = nodes.filter { $0.category == .camera }.count
+        if cameraCount > 0 {
+            parts.append("\(cameraCount) \(cameraCount == 1 ? "camera" : "cameras")")
+        }
+        
+        if parts.isEmpty {
+            return "\(nodes.count) \(nodes.count == 1 ? "item" : "items") found"
+        }
+        
+        return parts.joined(separator: " · ")
+    }
     
     var body: some View {
         VStack(spacing: 40) {
@@ -36,45 +60,32 @@ struct ReviewLoadingView: View {
             
             Spacer()
             
-            if isScanComplete {
-                Button {
-                    onContinue()
-                } label: {
-                    Text("Continue to Layout")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.accentColor)
-                        .clipShape(Capsule())
-                }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 40)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else {
-                let secondsLeft = max(1, Int((1.0 - progress) * 20))
+            let secondsLeft = max(1, Int((1.0 - progress) * 20))
+            
+            VStack(spacing: 12) {
+                ProgressView(value: progress, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(.blue)
+                    .padding(.horizontal, 32)
                 
-                VStack(spacing: 12) {
-                    ProgressView(value: progress, total: 1.0)
-                        .progressViewStyle(.linear)
-                        .tint(.blue)
-                        .padding(.horizontal, 32)
-                    
-                    Text("Measuring distances... About \(secondsLeft) seconds left")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("4 lights · 1 bounce · 2 cameras · backdrop found")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.bottom, 40)
+                Text("Measuring distances... About \(secondsLeft) seconds left")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                
+                Text(summaryText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
+            .padding(.bottom, 40)
         }
         .background(Color(uiColor: .systemBackground))
     }
 }
 
 #Preview {
-    ReviewLoadingView(progress: 75.0, isScanComplete: false, onContinue: {})
+    ReviewLoadingView(
+        progress: 0.75,
+        isScanComplete: false,
+        nodes: []
+    )
 }

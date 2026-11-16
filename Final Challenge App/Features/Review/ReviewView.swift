@@ -53,11 +53,7 @@ struct ReviewView: View {
                 ReviewLoadingView(
                     progress: progress,
                     isScanComplete: isScanComplete,
-                    onContinue: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isShowingDiagram = true
-                        }
-                    }
+                    nodes: viewModel.nodes
                 )
             }
         }
@@ -251,8 +247,9 @@ struct ReviewView: View {
                 }
             }
             await MainActor.run {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                withAnimation(.easeInOut(duration: 0.4)) {
                     isScanComplete = true
+                    isShowingDiagram = true
                 }
             }
         }

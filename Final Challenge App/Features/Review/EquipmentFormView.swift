@@ -48,6 +48,7 @@ struct EquipmentFormView: View {
                         Spacer()
                         TextField("Required", text: $formViewModel.name)
                             .multilineTextAlignment(.trailing)
+                            .disabled(isReadOnly)
                     }
                     
                     if formViewModel.category != .accessory {
@@ -56,6 +57,7 @@ struct EquipmentFormView: View {
                             Spacer()
                             TextField(formViewModel.category == .light ? "e.g. Accent light" : "e.g. Second camera", text: $formViewModel.role)
                                 .multilineTextAlignment(.trailing)
+                                .disabled(isReadOnly)
                         }
                     }
                 }
@@ -68,6 +70,7 @@ struct EquipmentFormView: View {
                             Spacer()
                             TextField("-", text: $formViewModel.power)
                                 .multilineTextAlignment(.trailing)
+                                .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Color temperature")
@@ -75,6 +78,7 @@ struct EquipmentFormView: View {
                             TextField("-", text: $formViewModel.colorTemp)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.numberPad)
+                                .disabled(isReadOnly)
                             Text("K")
                                 .foregroundStyle(.secondary)
                         }
@@ -88,6 +92,7 @@ struct EquipmentFormView: View {
                             Spacer()
                             TextField("-", text: $formViewModel.lens)
                                 .multilineTextAlignment(.trailing)
+                                .disabled(isReadOnly)
                         }
                     }
                     
@@ -97,18 +102,21 @@ struct EquipmentFormView: View {
                             Spacer()
                             TextField("-", text: $formViewModel.iso)
                                 .multilineTextAlignment(.trailing)
+                                .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Aperture")
                             Spacer()
                             TextField("-", text: $formViewModel.aperture)
                                 .multilineTextAlignment(.trailing)
+                                .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Shutter speed")
                             Spacer()
                             TextField("-", text: $formViewModel.shutterSpeed)
                                 .multilineTextAlignment(.trailing)
+                                .disabled(isReadOnly)
                         }
                         HStack {
                             Text("White balance")
@@ -116,6 +124,7 @@ struct EquipmentFormView: View {
                             TextField("-", text: $formViewModel.whiteBalance)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.numberPad)
+                                .disabled(isReadOnly)
                             Text("K")
                                 .foregroundStyle(.secondary)
                         }
@@ -134,6 +143,7 @@ struct EquipmentFormView: View {
                             TextField("-", text: $formViewModel.height)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.decimalPad)
+                                .disabled(isReadOnly)
                             Text("m")
                                 .foregroundStyle(.secondary)
                         }
@@ -143,6 +153,7 @@ struct EquipmentFormView: View {
                             TextField("-", text: $formViewModel.tilt)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.numberPad)
+                                .disabled(isReadOnly)
                             Text("°")
                                 .foregroundStyle(.secondary)
                         }
@@ -154,6 +165,7 @@ struct EquipmentFormView: View {
                                 TextField("-", text: $formViewModel.horizontalAim)
                                     .multilineTextAlignment(.trailing)
                                     .keyboardType(.numberPad)
+                                    .disabled(isReadOnly)
                                 Text("°")
                                     .foregroundStyle(.secondary)
                             }
@@ -165,6 +177,7 @@ struct EquipmentFormView: View {
                             TextField("-", text: $formViewModel.distance)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.decimalPad)
+                                .disabled(isReadOnly)
                             Text("m")
                                 .foregroundStyle(.secondary)
                         }
@@ -176,11 +189,13 @@ struct EquipmentFormView: View {
                     Section(header: Text("Notes")) {
                         TextField("Add notes", text: $formViewModel.notes, axis: .vertical)
                             .lineLimit(4...8)
+                            .disabled(isReadOnly)
                     }
                 } else {
                     Section(header: Text("Accessories")) {
                         TextField("Add accessories", text: $formViewModel.accessories, axis: .vertical)
                             .lineLimit(4...8)
+                            .disabled(isReadOnly)
                     }
                 }
                 
@@ -194,7 +209,7 @@ struct EquipmentFormView: View {
                     }
                 }
             }
-            .disabled(isReadOnly)
+            // REMOVED: .disabled(isReadOnly) here so the Form scroll view remains interactive!
             .navigationTitle(formViewModel.isEditing ? (formViewModel.role.isEmpty ? "Equipment Details" : formViewModel.role) : "Add Equipment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -252,8 +267,4 @@ struct EquipmentFormView: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
-}
-
-#Preview {
-    EquipmentFormView(viewModel: ReviewViewModel(), editingNodeId: nil, undoManager: nil)
 }
