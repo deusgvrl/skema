@@ -26,6 +26,9 @@ nonisolated struct EquipmentDetection: Equatable, Sendable {
     let confidence: Float
     /// 640 x 640 in the model's oriented frame, mapped back to the camera's native orientation.
     let mask: InstanceMask
+    /// A light scoring from `weakFloor` up to `minConfidence` (A10-90, D20):
+    /// it may only keep an item that is already accepted.
+    var isWeak = false
 }
 
 nonisolated protocol EquipmentDetecting: Sendable {
@@ -48,10 +51,12 @@ nonisolated final class EquipmentDetector: EquipmentDetecting, @unchecked Sendab
 
     /// A10-60 decisions (10 Nov 2026): drop boxes over 80% of the frame, one box per object within a label.
     /// A10-90 (Amadeus, 13 Nov): 60% cutoff, to stop flickering (was 30%).
-    static let minConfidence: Float = 0.60
+    static let minConfidence: Float = 0.50
     /// A10-90 (option A, Amadeus, 13 Nov): YOLOE keeps only studio lighting. Its camera prompts stay in the model,
     /// so a camera is labelled "camera" (and dropped here) instead of passing as studio lighting. Vision finds cameras.
     static let keptLabels: Set<String> = ["studio lighting"]
+    /// A10-90 (Amadeus, 16 Nov): from here up to `minConfidence` a light is weak: it may only keep an accepted item.
+    static let weakFloor: Float = 0.35
     static let maxAreaFraction: Float = 0.8
     static let overlapThreshold: Float = 0.5
     static let inputSize = 640
@@ -100,7 +105,7 @@ nonisolated final class EquipmentDetector: EquipmentDetecting, @unchecked Sendab
         guard let rowArray = arrays.first(where: { $0.shape.count == 3 }),
               let protoArray = arrays.first(where: { $0.shape.count == 4 }) else { throw Failure.unexpectedOutputs }
         let rows = YOLOSegmentDecoder.rows(output: try YOLOSegmentDetector.floats(from: rowArray),
-                                           count: rowArray.shape[1].intValue, minConfidence: Self.minConfidence)
+                                           count: rowArray.shape[1].intValue, minConfidence: Self.weakFloor)
         guard !rows.isEmpty else { return [] }
         return Self.detections(from: rows, protos: try YOLOSegmentDetector.floats(from: protoArray),
                                protoSize: protoArray.shape[2].intValue, classNames: classNames,
@@ -118,7 +123,8 @@ nonisolated final class EquipmentDetector: EquipmentDetecting, @unchecked Sendab
             let mask = YOLOSegmentDecoder.upsampledMask(for: row, protos: protos, protoSize: protoSize,
                                                         inputSize: inputSize)
             return EquipmentDetection(kind: kind, confidence: row.confidence,
-                                      mask: MaskMapping.nativeMask(mask, orientation: orientation))
+                                      mask: MaskMapping.nativeMask(mask, orientation: orientation),
+                                      isWeak: row.confidence < minConfidence)
         }
     }
 }

@@ -38,7 +38,10 @@ nonisolated struct EquipmentTracker: Sendable {
                        at time: Double) -> [TrackedItem] {
         lastLook = time
         self.camera = camera
-        let sighted = EquipmentSightings.make(from: detections, depth: depth, camera: camera)
+        // A weak light (A10-90, D21–D23) only counts when it lands on an accepted item; it never starts one.
+        let sighted = EquipmentSightings.make(from: detections, depth: depth, camera: camera).filter {
+            !$0.isWeak || map.hasAcceptedObject(near: $0.sighting)
+        }
         let ids = map.update(sighted.map(\.sighting), at: time)
         masks = Dictionary(zip(ids, sighted.map(\.mask)), uniquingKeysWith: { first, _ in first })
         return newlyAccepted(map.items)

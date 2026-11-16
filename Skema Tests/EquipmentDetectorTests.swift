@@ -4,7 +4,8 @@
 //
 //  A10-60 test cases 1, 2, 8, 11 and 12 (docs/test-cases/A10-60_equipment-detector.md in the Challenge 5 folder).
 //  Cases 4–7 and 10 are in MeasureKit (EquipmentFilterTests, MaskUpsampleTests). Case 13 waits for mini-setup photos.
-//  A10-90 changed case 9 into D1 (YOLOE drops cameras) and case 3 into D2 (the 60% cutoff), both here.
+//  A10-90 changed case 9 into D1 (YOLOE drops cameras) and case 3 into D2
+//  (the 50% cutoff, weak lights from 35%), both here.
 //
 
 import CoreML
@@ -85,12 +86,27 @@ struct EquipmentDetectorTests {
         #expect(detections.map { $0.mask.pixels.reduce(0) { $0 + Int($1) } } == [100 * 100])
     }
 
-    @Test("Case D2: YOLOE results at 59% are dropped, at 60% and 61% kept")
-    func cutoffIsSixtyPercent() {
+    @Test("Case D2: YOLOE results at 49% are weak, at 50% and 51% kept as normal lights")
+    func cutoffIsFiftyPercent() {
+        let names: [Int: String] = [0: "studio lighting"]
+        func row(_ left: Float, _ conf: Float) -> YOLORow {
+            YOLORow(x1: left, y1: 0, x2: left + 50, y2: 50, confidence: conf, classIndex: 0, coefficients: [1])
+        }
+        let detections = EquipmentDetector.detections(
+            from: [row(0, 0.51), row(100, 0.50), row(200, 0.49)], protos: [Float](repeating: 1, count: 160 * 160),
+            protoSize: 160, classNames: names, orientation: .up)
+
+        #expect(detections.map(\.confidence) == [0.51, 0.50, 0.49])
+        #expect(detections.map(\.isWeak) == [false, false, true])
+    }
+
+    @Test("Case D20: a light at 34% is dropped, one at 35% to 49% is kept as weak")
+    func weakBandStartsAtThirtyFive() {
         func raw(_ conf: Float) -> [Float] { [0, 0, 10, 10, conf, 0] + [Float](repeating: 0, count: 32) }
-        let rows = YOLOSegmentDecoder.rows(output: raw(0.59) + raw(0.60) + raw(0.61), count: 3,
-                                           minConfidence: EquipmentDetector.minConfidence)
-        #expect(rows.map(\.confidence) == [0.60, 0.61])
+        let rows = YOLOSegmentDecoder.rows(output: raw(0.34) + raw(0.35) + raw(0.49), count: 3,
+                                           minConfidence: EquipmentDetector.weakFloor)
+        #expect(rows.map(\.confidence) == [0.35, 0.49])
+        #expect(EquipmentDetector.minConfidence == 0.50)
     }
 
     @Test("Case 11 (smoke): detect runs from a background task and returns")

@@ -6,6 +6,8 @@ import MeasureKitVision
 nonisolated struct SightedDetection: Equatable, Sendable {
     let sighting: Sighting
     let mask: InstanceMask
+    /// From a weak detection (A10-90, D21–D23).
+    var isWeak = false
 }
 
 /// Detection masks + the LiDAR depth → 3D sightings for tracking (A10-62).
@@ -22,7 +24,7 @@ nonisolated enum EquipmentSightings {
             }
             let detection = Detection(label: label, confidence: found.confidence, box: box, mask: found.mask)
             return Sighting.make(from: detection, depth: depth, camera: camera, maxRange: DepthSampler.maxRange)
-                .map { SightedDetection(sighting: $0, mask: found.mask) }
+                .map { SightedDetection(sighting: $0, mask: found.mask, isWeak: found.isWeak) }
         }
     }
 }

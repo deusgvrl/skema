@@ -1,7 +1,8 @@
 import MeasureKit
 
 /// Runs YOLOE (studio lighting) and Vision (cameras) on the same frame at the same time, and joins the results
-/// (A10-90, cases D6–D8), then trims each mask by depth (cases D15, D16, D18). It fills the same `EquipmentDetecting` slot, so tracking and the overlay don't change.
+/// (A10-90, cases D6–D8), then trims each mask by depth (cases D15, D16, D18).
+/// It fills the same `EquipmentDetecting` slot, so tracking and the overlay don't change.
 nonisolated struct CombinedDetector: EquipmentDetecting {
     let lights: any EquipmentDetecting
     let cameras: any EquipmentDetecting
@@ -21,7 +22,7 @@ nonisolated struct CombinedDetector: EquipmentDetecting {
     static func trimmed(_ detections: [EquipmentDetection], depth: DepthFrame) -> [EquipmentDetection] {
         detections.map {
             EquipmentDetection(kind: $0.kind, confidence: $0.confidence,
-                               mask: DepthGrouping.nearestGroup(in: $0.mask, depth: depth))
+                               mask: DepthGrouping.nearestGroup(in: $0.mask, depth: depth), isWeak: $0.isWeak)
         }
     }
 

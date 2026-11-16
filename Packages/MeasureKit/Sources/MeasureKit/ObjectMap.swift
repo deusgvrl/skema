@@ -135,6 +135,14 @@ public struct ObjectMap: Sendable {
         entries.removeAll()
     }
 
+    /// Cases D21–D22: is there an ACCEPTED object with the sighting's label within `mergeRadius` of it?
+    public func hasAcceptedObject(near s: Sighting) -> Bool {
+        entries.contains {
+            $0.status == .accepted && $0.label == s.label
+                && simd_distance($0.position, s.position) <= ObjectMap.mergeRadius
+        }
+    }
+
     /// The nearest object with the same label within `mergeRadius`, or nil.
     private func nearestIndex(for s: Sighting) -> Int? {
         entries.indices
