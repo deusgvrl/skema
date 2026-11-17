@@ -64,7 +64,7 @@ struct ProjectDetailsView: View {
             
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done", systemImage: "checkmark") {
-                    viewModel.handleClose()
+                    viewModel.handleClose(for: setup)
                     
                     if let onDismissToSetups {
                         onDismissToSetups()

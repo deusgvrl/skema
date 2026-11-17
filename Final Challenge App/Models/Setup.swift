@@ -11,6 +11,9 @@ final class Setup {
     var project: String
     var notes: String
     var subjectHeight: String = ""
+    /// Set on the first Save only, never changed after (A10-93).
+    /// Optional on purpose: no migration for the MVP, so setups saved before this field still load.
+    var firstSavedDate: Date?
     
     // 1-to-Many Relationship: Deleting a setup deletes its equipment
     @Relationship(deleteRule: .cascade, inverse: \Equipment.setup)
