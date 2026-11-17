@@ -42,6 +42,12 @@ struct ContrastRatioTests {
         #expect(contrastRatio(.white, DesignTokens.accentPrimary, style: .dark) >= 3.0)
     }
 
+    @Test("White button text (Recover) clears AA on an AccentPrimary fill")
+    func whiteTextOnAccent() {
+        #expect(contrastRatio(.white, DesignTokens.accentPrimary, style: .light) >= 4.5)
+        #expect(contrastRatio(.white, DesignTokens.accentPrimary, style: .dark) >= 4.5)
+    }
+
     @Test("Deleted-setup toast: message clears AA, bold Undo clears the large-text floor")
     func deletedToastContrast() {
         #expect(contrastRatio(.white, DesignTokens.toastBackground, style: .light) >= 4.5)

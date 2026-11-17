@@ -4,6 +4,7 @@ import SwiftUI
 struct SetupsView: View {
     @State private var viewModel = SetupsViewModel()
     @State private var isShowingLiDARScan = false
+    @State private var isShowingRecentlyDeleted = false
     @FocusState private var isSearchFocused: Bool
     @ScaledMetric(relativeTo: .title2) private var bottomControlSize: CGFloat = 48
 
@@ -37,8 +38,14 @@ struct SetupsView: View {
                     isShowingLiDARScan = false
                 })
             }
+            .navigationDestination(isPresented: $isShowingRecentlyDeleted) {
+                RecentlyDeletedView()
+            }
             .onAppear {
                 viewModel.fetchSetups()
+            }
+            .onChange(of: isShowingRecentlyDeleted) { _, isShowing in
+                if !isShowing { viewModel.fetchSetups() }
             }
         }
         .sheet(isPresented: $viewModel.isShowingScanGuide) {
@@ -168,6 +175,12 @@ struct SetupsView: View {
                 Text("By Client").tag(SetupsGrouping.byClient)
             }
             .pickerStyle(.inline)
+
+            Divider()
+
+            Button("Recently Deleted", systemImage: "trash") {
+                isShowingRecentlyDeleted = true
+            }
         } label: {
             Label("Group By", systemImage: "line.3.horizontal.decrease")
         }
