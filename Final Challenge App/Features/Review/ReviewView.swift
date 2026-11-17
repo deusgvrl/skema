@@ -2,18 +2,14 @@ import SwiftUI
 
 /// Top-down lighting diagram after scan, and editing it (Sketch R04, R09 · A10-10, A10-17).
 struct ReviewView: View {
-    let isFromLoadingScreen: Bool // true if coming from scan flow, false if opened from setups list
+    /// True when opened right after a scan (a new draft), false when opened from a saved setup.
+    /// The name is kept from when a processing screen came first; Finish Scan now opens the diagram directly.
+    let isFromLoadingScreen: Bool
     @Bindable var viewModel: ReviewViewModel
     var onDismissToSetups: (() -> Void)? = nil
     
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    
-    // MARK: - Loading State (from LoadingPageView)
-    @State private var isShowingDiagram: Bool
-    @State private var progress: Double = 0.0
-    @State private var isScanComplete: Bool = false
-    @State private var showCancelAlert: Bool = false
     
     // MARK: - Diagram State
     @State private var editingNode: Equipment? = nil
@@ -35,47 +31,20 @@ struct ReviewView: View {
         self.isFromLoadingScreen = isFromLoadingScreen
         self.viewModel = viewModel
         self.onDismissToSetups = onDismissToSetups
-        // If not from scan, immediately show the diagram
-        self._isShowingDiagram = State(initialValue: !isFromLoadingScreen)
     }
     
     var body: some View {
-        Group {
-            if isShowingDiagram {
-                ReviewDiagramContentView(
-                    viewModel: viewModel,
-                    undoManager: undoManager,
-                    onNodeTap: { node in editingNode = node },
-                    onSubjectTap: { isShowingSubjectSheet = true },
-                    onAddNodeTap: { isAddingNode = true }
-                )
-            } else {
-                ReviewLoadingView(
-                    progress: progress,
-                    isScanComplete: isScanComplete,
-                    nodes: viewModel.nodes
-                )
-            }
-        }
+        ReviewDiagramContentView(
+            viewModel: viewModel,
+            undoManager: undoManager,
+            onNodeTap: { node in editingNode = node },
+            onSubjectTap: { isShowingSubjectSheet = true },
+            onAddNodeTap: { isAddingNode = true }
+        )
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             toolbarContent
-        }
-        .onAppear {
-            if isFromLoadingScreen && !isScanComplete {
-                startLoadingSimulation()
-            }
-        }
-        // Alert while loading
-        .alert("Cancel This Scan?", isPresented: $showCancelAlert) {
-            Button("Continue", role: .cancel) { }
-            Button("Cancel Scan", role: .destructive) {
-                viewModel.discardSetup()
-                dismissAll()
-            }
-        } message: {
-            Text("Your scan is still processing and will be lost.")
         }
         // Alert while reviewing diagram
         .alert("Save This Setup?", isPresented: $showDiscardAlert) {
@@ -129,78 +98,60 @@ struct ReviewView: View {
     // MARK: - Toolbar Content
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if !isShowingDiagram {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Close", systemImage: "xmark") {
-                    showCancelAlert = true
-                }
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Close", systemImage: "xmark") {
+                handleClose()
             }
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text("Review Setup")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                    Text("Processing scan")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+        }
+        ToolbarItem(placement: .principal) {
+            VStack(alignment: viewModel.canUndo || viewModel.canRedo ? .leading : .center, spacing: 2) {
+                Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Text("\(viewModel.nodes.count) Equipment Items")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-        } else {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Close", systemImage: "xmark") {
-                    handleClose()
+        }
+        
+        ToolbarItemGroup(placement: .confirmationAction) {
+                        
+            // Undo / Redo Buttons
+            if viewModel.canUndo || viewModel.canRedo {
+                Button {
+                    undoManager?.undo()
+                    viewModel.updateUndoState(undoManager: undoManager)
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
                 }
-            }
-            ToolbarItem(placement: .principal) {
-                VStack(alignment: viewModel.canUndo || viewModel.canRedo ? .leading : .center, spacing: 2) {
-                    Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                    Text("\(viewModel.nodes.count) Equipment Items")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                .disabled(!viewModel.canUndo)
+                
+                Button {
+                    undoManager?.redo()
+                    viewModel.updateUndoState(undoManager: undoManager)
+                } label: {
+                    Image(systemName: "arrow.uturn.forward")
                 }
+                .disabled(!viewModel.canRedo)
             }
             
-            ToolbarItemGroup(placement: .confirmationAction) {
-                            
-                // Undo / Redo Buttons
-                if viewModel.canUndo || viewModel.canRedo {
-                    Button {
-                        undoManager?.undo()
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                    }
-                    .disabled(!viewModel.canUndo)
-                    
-                    Button {
-                        undoManager?.redo()
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    } label: {
-                        Image(systemName: "arrow.uturn.forward")
-                    }
-                    .disabled(!viewModel.canRedo)
-                }
+            // Done / Save Button (Two-Tap Logic)
+            Button("Done", systemImage: isFromLoadingScreen ? "chevron.right" : "checkmark") {
                 
-                // Done / Save Button (Two-Tap Logic)
-                Button("Done", systemImage: isFromLoadingScreen ? "chevron.right" : "checkmark") {
+                if viewModel.canUndo || viewModel.canRedo {
+                    // 1ST TAP: User has unsaved edits. Save and clear the stack.
+                    viewModel.finalizeAndSaveSetup()
+                    undoManager?.removeAllActions()
                     
-                    if viewModel.canUndo || viewModel.canRedo {
-                        // 1ST TAP: User has unsaved edits. Save and clear the stack.
-                        viewModel.finalizeAndSaveSetup()
-                        undoManager?.removeAllActions()
-                        
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.updateUndoState(undoManager: undoManager)
-                        }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.updateUndoState(undoManager: undoManager)
+                    }
+                } else {
+                    // 2ND TAP (or no edits made): Undo stack is clean. Navigate away.
+                    if isFromLoadingScreen {
+                        navigateToR07 = true
                     } else {
-                        // 2ND TAP (or no edits made): Undo stack is clean. Navigate away.
-                        if isFromLoadingScreen {
-                            navigateToR07 = true
-                        } else {
-                            dismiss()
-                        }
+                        dismiss()
                     }
                 }
             }
@@ -234,24 +185,6 @@ struct ReviewView: View {
             onDismissToSetups()
         } else {
             dismiss()
-        }
-    }
-    
-    private func startLoadingSimulation() {
-        guard !isScanComplete else { return }
-        Task {
-            for i in 1...100 {
-                try? await Task.sleep(nanoseconds: 40_000_000)
-                await MainActor.run {
-                    progress = Double(i) / 100.0
-                }
-            }
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.4)) {
-                    isScanComplete = true
-                    isShowingDiagram = true
-                }
-            }
         }
     }
 }
