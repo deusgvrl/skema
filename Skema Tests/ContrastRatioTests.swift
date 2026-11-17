@@ -56,6 +56,22 @@ struct ContrastRatioTests {
         #expect(contrastRatio(DesignTokens.accentPrimary, DesignTokens.toastBackground, style: .dark) >= 3.0)
     }
 
+    @Test("Sheet text (title, step body, Don't Show Again) clears AA on SheetBackground",
+          arguments: [UIUserInterfaceStyle.light, .dark])
+    func sheetTextContrast(style: UIUserInterfaceStyle) {
+        #expect(contrastRatio(DesignTokens.textPrimary, DesignTokens.sheetBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.textSecondary, DesignTokens.sheetBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.accentText, DesignTokens.sheetBackground, style: style) >= 4.5)
+    }
+
+    @Test("Add Equipment Manually link clears AA on the page background under its scrim",
+          arguments: [UIUserInterfaceStyle.light, .dark])
+    func accentTextOnPage(style: UIUserInterfaceStyle) {
+        let backdrop = blended(Color("ScrimGradientBottom"), over: DesignTokens.pageBackground, style: style)
+        #expect(contrastRatio(DesignTokens.accentText, DesignTokens.pageBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.accentText, backdrop, style: style) >= 4.5)
+    }
+
     @Test("NodeDetailFill clears the 3:1 UI-component floor against the canvas and the node body")
     func nodeDetailFillContrast() {
         let systemBackground = Color(uiColor: .systemBackground)

@@ -7,6 +7,11 @@ import SwiftUI
 
 enum DesignTokens {
     static let accentPrimary = Color("AccentPrimary")
+    /// Red text links ("Don't Show Again", "Add Equipment Manually"). Sketch's #FF5A4A in dark;
+    /// in light it fails AA on the sheet, so light uses AccentPrimary instead.
+    static let accentText = Color("AccentText")
+    /// Opaque sheet surface (Sketch R02 "Sheet chrome").
+    static let sheetBackground = Color("SheetBackground")
     static let textPrimary = Color("TextPrimary")
     static let textSecondary = Color("TextSecondary")
     static let glassCardFill = Color("GlassCardFill")

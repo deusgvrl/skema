@@ -76,6 +76,29 @@ struct DesignTokensTests {
         #expect(abs(resolved.blue - expected.blue) < 0.01)
     }
 
+    @Test("AccentText is the brand red in light and Sketch's lighter red in dark", arguments: [
+        (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.784, green: 0.157, blue: 0.102, alpha: 1.0)),
+        (.dark, ResolvedRGBA(red: 1.0, green: 0.353, blue: 0.290, alpha: 1.0))
+    ])
+    func accentText(style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
+        let resolved = resolvedComponents(DesignTokens.accentText, style: style)
+        #expect(abs(resolved.red - expected.red) < 0.01)
+        #expect(abs(resolved.green - expected.green) < 0.01)
+        #expect(abs(resolved.blue - expected.blue) < 0.01)
+    }
+
+    @Test("SheetBackground is opaque and differs light vs dark", arguments: [
+        (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.961, green: 0.961, blue: 0.969, alpha: 1.0)),
+        (.dark, ResolvedRGBA(red: 0.137, green: 0.141, blue: 0.157, alpha: 1.0))
+    ])
+    func sheetBackground(style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
+        let resolved = resolvedComponents(DesignTokens.sheetBackground, style: style)
+        #expect(abs(resolved.red - expected.red) < 0.01)
+        #expect(abs(resolved.green - expected.green) < 0.01)
+        #expect(abs(resolved.blue - expected.blue) < 0.01)
+        #expect(abs(resolved.alpha - expected.alpha) < 0.01)
+    }
+
     @Test("NodeDetailFill is opaque and legible against both the canvas and the node body", arguments: [
         (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.333, green: 0.333, blue: 0.353, alpha: 1.0)),
         (.dark, ResolvedRGBA(red: 0.557, green: 0.557, blue: 0.576, alpha: 1.0))
