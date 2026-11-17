@@ -49,11 +49,12 @@ struct SetupCardView: View {
 
     private var coverArt: some View {
         CoverImageView(reference: setup.coverImage, pointSize: cardWidth) {
+            // No reference photo yet: the setup's initials, like the By Client rows.
             ZStack {
                 Color(uiColor: .systemGray5)
-                Image(systemName: "camera.aperture")
+                Text(setup.initials)
                     .font(isProminent ? .largeTitle : .title)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignTokens.textSecondary)
             }
         }
         .accessibilityHidden(true)

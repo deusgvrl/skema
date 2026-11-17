@@ -55,3 +55,18 @@ struct CoverImageTests {
         #expect(await downsampledImage(from: Data([0, 1, 2]), maxPixelSize: 300) == nil)
     }
 }
+
+@Suite("Setup initials (placeholder when there is no reference photo)")
+struct SetupInitialsTests {
+    @Test("First letters of the first two words, split on spaces and slashes", arguments: [
+        ("Skincare / soft daylight", "SS"),
+        ("Export", "E"),
+        ("untitled setup", "US"),
+        ("Diamond Ring Close Up", "DR"),
+        ("   ", "?"),
+        ("", "?")
+    ])
+    func initials(name: String, expected: String) {
+        #expect(Setup(setupName: name).initials == expected)
+    }
+}

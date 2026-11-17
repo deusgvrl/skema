@@ -50,15 +50,9 @@ struct SetupRowView: View {
 struct SetupThumbnail: View {
     let setup: Setup
 
-    private var initials: String {
-        let words = setup.setupName.split(whereSeparator: { $0 == " " || $0 == "/" }).prefix(2)
-        let letters = words.compactMap(\.first).map { String($0).uppercased() }
-        return letters.isEmpty ? "?" : letters.joined()
-    }
-
     var body: some View {
         CoverImageView(reference: setup.coverImage, pointSize: 60) {
-            Text(initials)
+            Text(setup.initials)
                 .font(.title3)
                 .foregroundStyle(DesignTokens.textSecondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

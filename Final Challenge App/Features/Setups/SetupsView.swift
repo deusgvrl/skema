@@ -120,6 +120,8 @@ struct SetupsView: View {
                     }
                     .padding(.horizontal)
                 }
+                // Clipping cut the cards' shadow into a grey band across the row.
+                .scrollClipDisabled()
             case .byClient:
                 VStack(spacing: 8) {
                     ForEach(section.setups) { setup in
