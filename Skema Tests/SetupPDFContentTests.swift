@@ -139,11 +139,14 @@ struct SetupPDFContentTests {
 
         #expect(SetupPDFContent.diagramZoom(for: [], in: box) == 1)
         #expect(SetupPDFContent.diagramZoom(for: [CGPoint(x: 50, y: 40)], in: box) == 1)
+        // The lowest item's label must stay inside the box (C1 was clipped at y 200).
+        let camera = SetupPDFContent.diagramZoom(for: [CGPoint(x: 0, y: 200)], in: box)
+        #expect((200 + SetupPDFContent.diagramReachY) * camera <= box.height / 2 + 0.5)
         let far = SetupPDFContent.diagramZoom(for: [CGPoint(x: -400, y: 0), CGPoint(x: 0, y: 500)], in: box)
         #expect(far < 1)
         #expect(far > 0.3)
-        #expect((500 + 50) * far <= box.height / 2 + 0.5)
-        #expect((400 + 40) * far <= box.width / 2 + 0.5)
+        #expect((500 + SetupPDFContent.diagramReachY) * far <= box.height / 2 + 0.5)
+        #expect((400 + SetupPDFContent.diagramReachX) * far <= box.width / 2 + 0.5)
         #expect(SetupPDFContent.diagramZoom(for: [CGPoint(x: 0, y: 99_999)], in: box) == 0.3)
     }
 }

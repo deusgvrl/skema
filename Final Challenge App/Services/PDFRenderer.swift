@@ -181,8 +181,11 @@ private enum EquipmentTable {
         let cells = [row.accessories, row.distance, row.placement, row.settings]
         for (offset, value) in cells.enumerated() {
             let column = columns[offset + 2]
-            Draw.text(value, at: CGPoint(x: columnX, y: top + 10), width: column.width - 4, font: .regular(8),
-                      alignment: column.alignment)
+            let cellWidth = column.width - 4
+            // Long values (camera settings) wrap onto a second line instead of being cut off.
+            let lines = Draw.height(of: value, width: cellWidth, font: .regular(8)) > UIFont.regular(8).lineHeight + 2
+            let cell = CGRect(x: columnX, y: top + (lines ? 4 : 10), width: cellWidth, height: 24)
+            Draw.text(value, in: cell, font: .regular(8), alignment: column.alignment)
             columnX += column.width
         }
     }
@@ -220,8 +223,10 @@ private enum Draw {
     }
 
     /// Wrapped text inside `rect`.
-    static func text(_ string: String, in rect: CGRect, font: UIFont, color: UIColor = Palette.primary) {
+    static func text(_ string: String, in rect: CGRect, font: UIFont, color: UIColor = Palette.primary,
+                     alignment: NSTextAlignment = .left) {
         let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
         paragraph.lineBreakMode = .byWordWrapping
         paragraph.lineSpacing = 2
         (string as NSString).draw(with: rect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],

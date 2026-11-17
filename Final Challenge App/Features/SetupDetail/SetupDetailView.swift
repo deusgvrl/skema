@@ -5,6 +5,7 @@ import PhotosUI
 struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: SetupDetailViewModel
+    @State private var exportViewModel: ExportViewModel
 
     // Photo Pickers State
     @State private var showCamera = false
@@ -16,6 +17,7 @@ struct SetupDetailView: View {
     @State private var showReferenceDetail: Bool = false
 
     init(setup: Setup, storageController: StorageController? = nil) {
+        self._exportViewModel = State(initialValue: ExportViewModel(setup: setup))
         self._viewModel = State(initialValue: SetupDetailViewModel(
             setup: setup,
             storageController: storageController
@@ -131,7 +133,9 @@ struct SetupDetailView: View {
                     Button("Edit Project Details", systemImage: "pencil") {
                         viewModel.isEditingProjectDetails = true
                     }
-                    Button("Share", systemImage: "square.and.arrow.up") { }
+                    Button("Share", systemImage: "square.and.arrow.up") {
+                        exportViewModel.share()
+                    }
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         viewModel.isDeleteAlertPresented = true
                     }
@@ -186,6 +190,24 @@ struct SetupDetailView: View {
         }
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {
             SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
+        }
+        // R15: the system share sheet with the setup's PDF
+        .sheet(item: $exportViewModel.sharedPDF) { shared in
+            ExportView(fileURL: shared.url) {
+                exportViewModel.sharedPDF = nil
+            }
+            .presentationDetents([.medium, .large])
+            .ignoresSafeArea()
+        }
+        // R15f
+        .alert("Couldn’t Create PDF", isPresented: $exportViewModel.showsFailure) {
+            Button("Cancel", role: .cancel) { }
+            Button("Try Again") {
+                exportViewModel.share()
+            }
+            .keyboardShortcut(.defaultAction)
+        } message: {
+            Text("Something went wrong while building this PDF. Your setup is safe, so you can try again.")
         }
         .alert("Delete This Setup?", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }

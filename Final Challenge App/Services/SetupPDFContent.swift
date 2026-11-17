@@ -156,7 +156,7 @@ struct SetupPDFContent {
         static let pageSize = CGSize(width: 595, height: 842)
         static let margin: CGFloat = 40
         static let contentHeight: CGFloat = 842 - 40 - 56
-        static let firstDetailsHeader: CGFloat = 100
+        static let firstDetailsHeader: CGFloat = 70
         static let continuedHeader: CGFloat = 40
         static let tableHeader: CGFloat = 22
         static let row: CGFloat = 30
@@ -194,12 +194,16 @@ struct SetupPDFContent {
         return pages
     }
 
+    /// Room around an item's centre for its icon and the label under it ("C1 Main camera").
+    static let diagramReachX: CGFloat = 70
+    static let diagramReachY: CGFloat = 60
+
     /// Zoom for the diagram so every item (plus room for its label) fits the box; never above 1×,
     /// never below the diagram's own 0.3× minimum.
     static func diagramZoom(for positions: [CGPoint], in box: CGSize) -> CGFloat {
         guard !positions.isEmpty else { return 1 }
-        let reachX = (positions.map { abs($0.x) }.max() ?? 0) + 40
-        let reachY = (positions.map { abs($0.y) }.max() ?? 0) + 50
+        let reachX = (positions.map { abs($0.x) }.max() ?? 0) + diagramReachX
+        let reachY = (positions.map { abs($0.y) }.max() ?? 0) + diagramReachY
         let zoom = min(1, (box.width / 2) / reachX, (box.height / 2) / reachY)
         return max(0.3, zoom)
     }
