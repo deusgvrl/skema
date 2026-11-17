@@ -229,6 +229,18 @@ private struct ScanMessageView<Actions: View>: View {
     @ScaledMetric(relativeTo: .largeTitle) private var iconCircleSize: CGFloat = 80
 
     var body: some View {
+        // Scrolls only when large Dynamic Type no longer fits on screen.
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView {
+                content
+                    .padding(.vertical, 24)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             Image(systemName: systemImage)
                 .font(.system(size: 32, weight: .regular))
