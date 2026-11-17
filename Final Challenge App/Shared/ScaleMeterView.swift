@@ -15,12 +15,12 @@ struct ScaleMeterView: View {
         VStack(spacing: 3) {
             Text(labelText)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignTokens.textSecondary)
             
             HStack(spacing: 0) {
-                Rectangle().frame(width: 1.5, height: 8).foregroundStyle(.secondary)
-                Rectangle().frame(height: 1.5).foregroundStyle(.secondary)
-                Rectangle().frame(width: 1.5, height: 8).foregroundStyle(.secondary)
+                Rectangle().frame(width: 1.5, height: 8).foregroundStyle(DesignTokens.textSecondary)
+                Rectangle().frame(height: 1.5).foregroundStyle(DesignTokens.textSecondary)
+                Rectangle().frame(width: 1.5, height: 8).foregroundStyle(DesignTokens.textSecondary)
             }
             .frame(width: max(20, barWidth))
         }

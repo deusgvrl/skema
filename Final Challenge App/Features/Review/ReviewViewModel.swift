@@ -142,6 +142,24 @@ extension ReviewViewModel {
     /// Changes made since edit mode began that ✓ would keep and Discard would roll back.
     var hasPendingEdits: Bool { canUndo }
 
+    /// Chips under the diagram: lights, cameras, then accessories, each in label order ("L2" before "L10").
+    /// SwiftData does not keep relationship order, so `nodes` alone would shuffle between launches.
+    var chipOrder: [Equipment] {
+        func rank(_ category: EquipmentCategory) -> Int {
+            switch category {
+            case .light: 0
+            case .camera: 1
+            case .accessory: 2
+            }
+        }
+        return nodes.sorted { lhs, rhs in
+            if rank(lhs.category) != rank(rhs.category) {
+                return rank(lhs.category) < rank(rhs.category)
+            }
+            return lhs.label.localizedStandardCompare(rhs.label) == .orderedAscending
+        }
+    }
+
     /// "Estimated layout · 4 lights" under the Review Setup title.
     var layoutSubtitle: String {
         let lights = nodes.filter { $0.category == .light }.count

@@ -121,18 +121,21 @@ struct ReviewView: View {
         }
 
         if viewModel.isEditingDiagram {
-            ToolbarItemGroup(placement: .confirmationAction) {
-                Button("Undo", systemImage: "arrow.uturn.backward") {
-                    undoManager?.undo()
-                    viewModel.updateUndoState(undoManager: undoManager)
-                }
-                .disabled(!viewModel.canUndo)
+            // One item, so the bar draws undo and redo in a single glass capsule (Sketch R04m).
+            ToolbarItem(placement: .confirmationAction) {
+                HStack(spacing: 4) {
+                    Button("Undo", systemImage: "arrow.uturn.backward") {
+                        undoManager?.undo()
+                        viewModel.updateUndoState(undoManager: undoManager)
+                    }
+                    .disabled(!viewModel.canUndo)
 
-                Button("Redo", systemImage: "arrow.uturn.forward") {
-                    undoManager?.redo()
-                    viewModel.updateUndoState(undoManager: undoManager)
+                    Button("Redo", systemImage: "arrow.uturn.forward") {
+                        undoManager?.redo()
+                        viewModel.updateUndoState(undoManager: undoManager)
+                    }
+                    .disabled(!viewModel.canRedo)
                 }
-                .disabled(!viewModel.canRedo)
             }
 
             ToolbarSpacer(.fixed, placement: .confirmationAction)

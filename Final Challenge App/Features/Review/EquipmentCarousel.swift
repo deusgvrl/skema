@@ -4,37 +4,47 @@
 //
 //  Created by Satriya Handha Wibowo on 13/11/26.
 //
+//  Glass chips under the diagram, one per item ("L1 Key"); tapping opens its sheet (Sketch R04).
+//
 
 import SwiftUI
 
 struct EquipmentCarousel: View {
     let viewModel: ReviewViewModel
     var isReadOnly: Bool = false
-    var onNodeTap: ((Equipment) -> Void)? = nil
-    
+    var onNodeTap: ((Equipment) -> Void)?
+
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(viewModel.nodes) { node in
-                    VStack(alignment: .leading) {
-                        Text("\(node.name)")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Capsule().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                    .onTapGesture {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.chipOrder) { node in
+                    Button {
                         onNodeTap?(node)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(DesignTokens.textSecondary)
+                                .frame(width: 10, height: 10)
+                                .accessibilityHidden(true)
+                            Text(node.displayName)
+                                .font(.body)
+                                .foregroundStyle(DesignTokens.textPrimary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .glassEffect(.regular.tint(DesignTokens.glassControlFill).interactive(), in: .capsule)
                     }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
-        .background(Color(uiColor: .systemBackground))
+        .scrollIndicators(.hidden)
+        .background(DesignTokens.pageBackground)
     }
 }
-
 
 #Preview {
     EquipmentCarousel(viewModel: ReviewViewModel())

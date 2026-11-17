@@ -88,7 +88,8 @@ private struct DiagramTipPill<TipType: Tip>: View {
     @State private var isVisible = false
 
     var body: some View {
-        Group {
+        // A ZStack, not a Group: modifiers on an empty Group never run, so the task would not start.
+        ZStack {
             if isVisible {
                 HStack(spacing: 12) {
                     tip.title

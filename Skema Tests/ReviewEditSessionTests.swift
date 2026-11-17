@@ -115,6 +115,23 @@ struct ReviewEditSessionTests {
         #expect(viewModel.layoutSubtitle == expected)
     }
 
+    @Test("Chips list lights, then cameras, then accessories, each by label (Sketch R04)")
+    func chipOrder() {
+        let setup = Setup(setupName: "Studio A")
+        setup.nodes.append(contentsOf: [
+            Equipment(category: .accessory, label: "B1", name: "Bounce"),
+            Equipment(category: .camera, label: "C2", name: "Side"),
+            Equipment(category: .light, label: "L10", name: "Hair"),
+            Equipment(category: .camera, label: "C1", name: "Main"),
+            Equipment(category: .light, label: "L2", name: "Fill"),
+            Equipment(category: .light, label: "L1", name: "Key")
+        ])
+        storage.addSetup(setup)
+        let viewModel = ReviewViewModel(setup: setup, storageController: storage)
+
+        #expect(viewModel.chipOrder.map(\.label) == ["L1", "L2", "L10", "C1", "C2", "B1"])
+    }
+
     @Test("Display name is label and role, or the name when there is no role", arguments: [
         ("L1", "Profoto D2", "Key", "L1 Key"),
         ("C1", "Fujifilm GFX", "", "Fujifilm GFX"),
