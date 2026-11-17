@@ -1,34 +1,5 @@
 import SwiftUI
 
-// MARK: - 1. Adaptive Grid Configuration Helper
-
-struct GridConfig {
-    let stepInPoints: CGFloat // Grid tile width in canvas model points
-    let labelText: String     // Scale badge text (e.g. "25 cm", "50 cm", "1 m")
-    
-    /// Calculates the optimal grid subdivision step based on the active zoom factor
-    static func config(for scale: CGFloat) -> GridConfig {
-        // Target model distance that maps to roughly 50–70 screen pixels
-        let targetMeters = 0.5 / scale
-        
-        if targetMeters <= 0.35 {
-            // Zoomed In (scale >= 1.4x) -> 25 cm per tile (1.50m = 6 tiles)
-            return GridConfig(stepInPoints: 25, labelText: "25 cm")
-        } else if targetMeters <= 0.75 {
-            // Standard View (0.67x <= scale < 1.4x) -> 50 cm per tile (1.50m = 3 tiles)
-            return GridConfig(stepInPoints: 50, labelText: "50 cm")
-        } else if targetMeters <= 1.5 {
-            // Zoomed Out (0.33x <= scale < 0.67x) -> 1 meter per tile (1.50m = 1.5 tiles)
-            return GridConfig(stepInPoints: 100, labelText: "1 m")
-        } else {
-            // Far Zoomed Out (scale < 0.33x) -> 2 meters per tile
-            return GridConfig(stepInPoints: 200, labelText: "2 m")
-        }
-    }
-}
-
-// MARK: - 2. LightingDiagramView
-
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
@@ -219,78 +190,6 @@ struct LightingDiagramView: View {
             )
             .padding(16)
         }
-    }
-}
-
-// MARK: - 3. Supporting Components
-
-struct DiagramEntity: View {
-    let title: String
-    let icon: String
-    let position: CGPoint
-    var currentScale: CGFloat = 1.0
-    var onTap: () -> Void
-    
-    var body: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(Color(uiColor: .systemGray5))
-            .frame(width: 44, height: 44)
-            .overlay(
-                Image(systemName: icon)
-                    .foregroundStyle(.secondary)
-                    .font(.title3)
-            )
-            .overlay(alignment: .bottom) {
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                    .offset(y: 20)
-            }
-            .scaleEffect(1 / currentScale)
-            .position(position)
-            .onTapGesture {
-                onTap()
-            }
-    }
-}
-
-struct GridPattern: Shape {
-    var step: CGFloat = 50
-    
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        for x in stride(from: 0, through: rect.width, by: step) {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
-        }
-        for y in stride(from: 0, through: rect.height, by: step) {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
-        }
-        return path
-    }
-}
-
-struct ScaleMeterView: View {
-    let labelText: String
-    let barWidth: CGFloat
-    
-    var body: some View {
-        VStack(spacing: 3) {
-            Text(labelText)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            
-            HStack(spacing: 0) {
-                Rectangle().frame(width: 1.5, height: 8).foregroundStyle(.secondary)
-                Rectangle().frame(height: 1.5).foregroundStyle(.secondary)
-                Rectangle().frame(width: 1.5, height: 8).foregroundStyle(.secondary)
-            }
-            .frame(width: max(20, barWidth))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
     }
 }
 
