@@ -137,7 +137,8 @@ struct FullScreenImageView: View {
         .ignoresSafeArea()
         .statusBarHidden(isControlsHidden)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar(isControlsHidden ? .hidden : .visible, for: .bottomBar)
+        .toolbarBackground(.hidden, for: .navigationBar, .bottomBar)
         .onAppear {
             scrollPositionID = selectedIndex
             feedbackGenerator.prepare()
@@ -183,8 +184,11 @@ struct FullScreenImageView: View {
                 }
             }
             
-            // R13b: trash at the top right
-            ToolbarItem(placement: .primaryAction) {
+            // Sketch R13b puts the trash top right, but the bottom bar is what keeps the photo
+            // clear of the thumbnail strip (the paging view lays out between the bars), so it stays here.
+            ToolbarSpacer(placement: .bottomBar)
+
+            ToolbarItem(placement: .bottomBar) {
                 Button("Delete", systemImage: "trash") {
                     isDeleteAlert = true
                 }
