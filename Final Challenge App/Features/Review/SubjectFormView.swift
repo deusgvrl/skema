@@ -20,8 +20,13 @@ struct SubjectFormView: View {
         NavigationStack {
             Form {
                 Section(
-                    header: Text("Position"),
-                    footer: Text(isReadOnly ? "Viewing subject details in read-only mode." : "Set the distance from the floor to the bottom of your subject (e.g., tabletop height, posing stool, or floor).")
+                    header: FormSectionHeader("Position"),
+                    footer: Text(isReadOnly ? "Viewing subject details in read-only mode." : """
+                        Set the distance from the floor to the bottom of your subject \
+                        (e.g., tabletop height, posing stool, or floor).
+                        """)
+                        .font(.footnote)
+                        .foregroundStyle(DesignTokens.textSecondary)
                 ) {
                     HStack {
                         Text("Height from floor")
@@ -29,12 +34,17 @@ struct SubjectFormView: View {
                         TextField("0.0", text: $heightText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
+                            .foregroundStyle(DesignTokens.textSecondary)
                             .frame(width: 80)
                         Text("m")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.textSecondary)
                     }
                 }
+                .listRowBackground(DesignTokens.formRowBackground)
             }
+            .foregroundStyle(DesignTokens.textPrimary)
+            .scrollContentBackground(.hidden)
+            .background(DesignTokens.sheetBackground)
             .disabled(isReadOnly)
             .navigationTitle("Subject Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -55,6 +65,8 @@ struct SubjectFormView: View {
                             )
                             dismiss()
                         }
+                        .buttonStyle(.glassProminent)
+                        .tint(DesignTokens.accentPrimary)
                     }
                 }
             }
@@ -65,6 +77,7 @@ struct SubjectFormView: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .presentationBackground(DesignTokens.sheetBackground)
     }
 }
 
