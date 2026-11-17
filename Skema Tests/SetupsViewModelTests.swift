@@ -163,6 +163,18 @@ struct SetupsViewModelTests {
         #expect(viewModel.sections.map(\.title) == ["No Client"])
     }
 
+    @Test("By Client caption is the month of the newest setup in that client group")
+    func byClientCaptionIsNewestMonth() {
+        let storage = StorageController(inMemory: true)
+        let setup = Setup(setupName: "Candle", client: "Aesop", project: "November catalog")
+        storage.addSetup(setup)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.grouping = .byClient
+
+        #expect(viewModel.sections.first?.caption == setup.createdAt.formatted(.dateTime.month(.wide)))
+    }
+
     @Test("Searching filters sections to only matching setups")
     func searchFiltersSections() {
         let storage = StorageController(inMemory: true)

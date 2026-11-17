@@ -115,12 +115,10 @@ final class SetupsViewModel {
             calendar.dateInterval(of: .month, for: setup.createdAt)?.start ?? setup.createdAt
         }
         let currentMonthStart = calendar.dateInterval(of: .month, for: Date())?.start
-        let monthFormatter = DateFormatter()
-        monthFormatter.dateFormat = "LLLL"
 
         return grouped.keys.sorted(by: >).map { monthStart in
             let setupsInMonth = (grouped[monthStart] ?? []).sorted { $0.createdAt > $1.createdAt }
-            let title = monthFormatter.string(from: monthStart)
+            let title = monthName(monthStart)
             let caption = (monthStart == currentMonthStart) ? "This month" : nil
             return SetupSection(
                 id: "recent-\(monthStart.timeIntervalSince1970)",
@@ -144,8 +142,12 @@ final class SetupsViewModel {
 
         return sortedTitles.map { title in
             let setupsForClient = (grouped[title] ?? []).sorted { $0.createdAt > $1.createdAt }
-            let caption = setupsForClient.map(\.project).first { !$0.isEmpty }
+            let caption = setupsForClient.first.map { monthName($0.createdAt) }
             return SetupSection(id: "client-\(title)", title: title, caption: caption, setups: setupsForClient)
         }
+    }
+
+    private func monthName(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.wide))
     }
 }

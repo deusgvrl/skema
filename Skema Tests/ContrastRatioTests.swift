@@ -42,6 +42,14 @@ struct ContrastRatioTests {
         #expect(contrastRatio(.white, DesignTokens.accentPrimary, style: .dark) >= 3.0)
     }
 
+    @Test("Deleted-setup toast: message clears AA, bold Undo clears the large-text floor")
+    func deletedToastContrast() {
+        #expect(contrastRatio(.white, DesignTokens.toastBackground, style: .light) >= 4.5)
+        #expect(contrastRatio(.white, DesignTokens.toastBackground, style: .dark) >= 4.5)
+        #expect(contrastRatio(DesignTokens.accentPrimary, DesignTokens.toastBackground, style: .light) >= 3.0)
+        #expect(contrastRatio(DesignTokens.accentPrimary, DesignTokens.toastBackground, style: .dark) >= 3.0)
+    }
+
     @Test("NodeDetailFill clears the 3:1 UI-component floor against the canvas and the node body")
     func nodeDetailFillContrast() {
         let systemBackground = Color(uiColor: .systemBackground)
