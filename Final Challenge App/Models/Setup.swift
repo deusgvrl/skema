@@ -11,7 +11,9 @@ final class Setup {
     var project: String
     var notes: String
     var subjectHeight: String = ""
-    
+    var createdAt: Date = Date()
+    var deletedAt: Date?
+
     // 1-to-Many Relationship: Deleting a setup deletes its equipment
     @Relationship(deleteRule: .cascade, inverse: \Equipment.setup)
     var nodes: [Equipment] = []

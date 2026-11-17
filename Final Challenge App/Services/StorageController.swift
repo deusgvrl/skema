@@ -22,7 +22,11 @@ final class StorageController {
     }
         
     func fetchAllSetups() -> [Setup] {
-        let descriptor = FetchDescriptor<Setup>(sortBy: [SortDescriptor(\.setupName)])
+        let predicate = #Predicate<Setup> { $0.deletedAt == nil }
+        let descriptor = FetchDescriptor<Setup>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
         do {
             return try context.fetch(descriptor)
         } catch {
@@ -30,14 +34,46 @@ final class StorageController {
             return []
         }
     }
-    
+
+    func fetchDeletedSetups() -> [Setup] {
+        let predicate = #Predicate<Setup> { $0.deletedAt != nil }
+        let descriptor = FetchDescriptor<Setup>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\.deletedAt, order: .reverse)]
+        )
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            print("Failed to fetch deleted setups: \(error)")
+            return []
+        }
+    }
+
     func addSetup(_ setup: Setup) {
         context.insert(setup)
         save()
     }
-    
+
     func deleteSetup(_ setup: Setup) {
         context.delete(setup)
+        save()
+    }
+
+    func softDeleteSetup(_ setup: Setup) {
+        setup.deletedAt = Date()
+        save()
+    }
+
+    func restoreSetup(_ setup: Setup) {
+        setup.deletedAt = nil
+        save()
+    }
+
+    func purgeExpiredDeletions(now: Date = Date(), retentionDays: Int = 30) {
+        let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
+        for setup in fetchDeletedSetups() where (setup.deletedAt ?? now) < cutoff {
+            context.delete(setup)
+        }
         save()
     }
         
