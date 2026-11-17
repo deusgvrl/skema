@@ -23,9 +23,12 @@ struct NodeView: View {
     @State private var globalCenter: CGPoint = .zero
     @State private var dragStartPosition: CGPoint = .zero
     
-    // Haptic State
+    // Rotation Haptic State
     @State private var lastHapticAngle: Double = 0.0
     @State private var feedbackGenerator: UISelectionFeedbackGenerator? = nil
+    
+    // Cardinal Alignment Drag Haptic State (12, 3, 6, 9 o'clock)
+    @State private var lastCardinalSnap: Int? = nil
     
     var body: some View {
         VStack(spacing: 4) {
@@ -156,19 +159,81 @@ struct NodeView: View {
                     let canvasDeltaX = value.translation.width / zoomScale
                     let canvasDeltaY = value.translation.height / zoomScale
                     
-                    let newX = dragStartPosition.x + canvasDeltaX
-                    let newY = dragStartPosition.y + canvasDeltaY
+                    let rawX = dragStartPosition.x + canvasDeltaX
+                    let rawY = dragStartPosition.y + canvasDeltaY
+                    let rawPosition = CGPoint(x: rawX, y: rawY)
                     
-                    node.position = CGPoint(x: newX, y: newY)
+                    // 👈 Applies automatic snap positioning + haptic impulse
+                    let snappedPosition = applyCardinalSnap(to: rawPosition)
+                    
+                    node.position = snappedPosition
                     node.syncDistanceFromPosition()
                 }
                 .onEnded { _ in
                     if isDragging {
                         isDragging = false
+                        lastCardinalSnap = nil
                         onGestureEnd()
                     }
                 }
         )
+    }
+    
+    // MARK: - Cardinal Alignment & Auto-Snap Helper
+    
+    /// Evaluates if position is within ±1.0° of 12, 3, 6, or 9 o'clock. Snaps coordinate exactly to axis and triggers haptic feedback.
+    private func applyCardinalSnap(to rawPosition: CGPoint) -> CGPoint {
+        let dx = rawPosition.x
+        let dy = rawPosition.y
+        let r = hypot(dx, dy)
+        
+        // Prevent snapping jitter when dragging near subject center
+        guard r > 15 else {
+            lastCardinalSnap = nil
+            return rawPosition
+        }
+        
+        // Calculate angle in degrees [0, 360) where 3 o'clock = 0°
+        var angle = atan2(dy, dx) * 180 / .pi
+        if angle < 0 { angle += 360 }
+        
+        let cardinalAngles = [0, 90, 180, 270] // 3, 6, 9, 12 o'clock
+        let tolerance: Double = 1.0            // Snap window (±1.0°)
+        
+        var activeCardinal: Int? = nil
+        for cardinal in cardinalAngles {
+            let diff = abs(angle - Double(cardinal))
+            let minDiff = min(diff, 360 - diff)
+            if minDiff <= tolerance {
+                activeCardinal = cardinal
+                break
+            }
+        }
+        
+        if let cardinal = activeCardinal {
+            // Trigger haptic when first entering snap zone
+            if lastCardinalSnap != cardinal {
+                lastCardinalSnap = cardinal
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
+            
+            // Snap position directly to cardinal axis
+            switch cardinal {
+            case 0:   // 3 o'clock (0° -> +X axis)
+                return CGPoint(x: r, y: 0)
+            case 90:  // 6 o'clock (90° -> +Y axis)
+                return CGPoint(x: 0, y: r)
+            case 180: // 9 o'clock (180° -> -X axis)
+                return CGPoint(x: -r, y: 0)
+            case 270: // 12 o'clock (270° -> -Y axis)
+                return CGPoint(x: 0, y: -r)
+            default:
+                return rawPosition
+            }
+        } else {
+            lastCardinalSnap = nil
+            return rawPosition
+        }
     }
 }
 
