@@ -193,3 +193,22 @@ extension Equipment {
         return label.isEmpty ? role : "\(label) \(role)"
     }
 }
+
+extension Array where Element == Equipment {
+    /// Lights, cameras, then accessories, each in label order ("L2" before "L10") — chips, PDF table.
+    var inChipOrder: [Equipment] {
+        func rank(_ category: EquipmentCategory) -> Int {
+            switch category {
+            case .light: 0
+            case .camera: 1
+            case .accessory: 2
+            }
+        }
+        return sorted { lhs, rhs in
+            if rank(lhs.category) != rank(rhs.category) {
+                return rank(lhs.category) < rank(rhs.category)
+            }
+            return lhs.label.localizedStandardCompare(rhs.label) == .orderedAscending
+        }
+    }
+}
