@@ -2,6 +2,13 @@ import SwiftUI
 import SwiftData
 import Foundation
 
+extension Setup {
+    /// The earliest reference photo, the same one the setup's detail screen shows first.
+    var coverImage: ReferenceImage? {
+        referenceImages.min { $0.createdAt < $1.createdAt }
+    }
+}
+
 /// A saved lighting setup. Fields are added with A10-13.
 @Model
 final class Setup {

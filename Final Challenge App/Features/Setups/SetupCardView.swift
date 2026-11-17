@@ -47,21 +47,16 @@ struct SetupCardView: View {
         .glassCard()
     }
 
-    @ViewBuilder
     private var coverArt: some View {
-        if let data = setup.referenceImages.first?.imageData, let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFill()
-        } else {
+        CoverImageView(reference: setup.coverImage, pointSize: cardWidth) {
             ZStack {
                 Color(uiColor: .systemGray5)
                 Image(systemName: "camera.aperture")
                     .font(isProminent ? .largeTitle : .title)
                     .foregroundStyle(.secondary)
             }
-            .accessibilityHidden(true)
         }
+        .accessibilityHidden(true)
     }
 }
 

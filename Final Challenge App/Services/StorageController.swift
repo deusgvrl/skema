@@ -25,7 +25,7 @@ final class StorageController {
         let predicate = #Predicate<Setup> { $0.deletedAt == nil }
         let descriptor = FetchDescriptor<Setup>(
             predicate: predicate,
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse), SortDescriptor(\.setupName)]
         )
         do {
             return try context.fetch(descriptor)

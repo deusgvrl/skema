@@ -175,6 +175,57 @@ struct SetupsViewModelTests {
         #expect(viewModel.sections.first?.caption == setup.createdAt.formatted(.dateTime.month(.wide)))
     }
 
+    @Test("By Client trims client names and treats whitespace-only as No Client")
+    func byClientTrimsClientNames() {
+        let storage = StorageController(inMemory: true)
+        storage.addSetup(Setup(setupName: "Blank", client: "  "))
+        storage.addSetup(Setup(setupName: "Padded", client: "Aesop "))
+        storage.addSetup(Setup(setupName: "Plain", client: "Aesop"))
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.grouping = .byClient
+
+        #expect(viewModel.sections.map(\.title) == ["Aesop", "No Client"])
+        #expect(viewModel.sections.first?.setups.count == 2)
+    }
+
+    @Test("Setups created at the same moment are ordered by name")
+    func sameCreatedAtOrderedByName() {
+        let storage = StorageController(inMemory: true)
+        let now = Date()
+        let second = Setup(setupName: "B")
+        second.createdAt = now
+        let first = Setup(setupName: "A")
+        first.createdAt = now
+        storage.addSetup(second)
+        storage.addSetup(first)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        #expect(viewModel.setups.map(\.setupName) == ["A", "B"])
+        #expect(viewModel.sections.first?.setups.map(\.setupName) == ["A", "B"])
+    }
+
+    @Test("A month from a previous year shows the year in its header")
+    func previousYearMonthShowsYear() {
+        let storage = StorageController(inMemory: true)
+        let old = Setup(setupName: "Old")
+        old.createdAt = Calendar.current.date(byAdding: .year, value: -1, to: Date())!
+        storage.addSetup(old)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        let year = String(Calendar.current.component(.year, from: old.createdAt))
+        #expect(viewModel.sections.first?.title.contains(year) == true)
+    }
+
+    @Test("A month in the current year has no year in its header")
+    func currentYearMonthHasNoYear() {
+        let storage = StorageController(inMemory: true)
+        storage.addSetup(Setup(setupName: "New"))
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        #expect(viewModel.sections.first?.title == Date().formatted(.dateTime.month(.wide)))
+    }
+
     @Test("Searching filters sections to only matching setups")
     func searchFiltersSections() {
         let storage = StorageController(inMemory: true)

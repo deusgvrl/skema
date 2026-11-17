@@ -57,18 +57,12 @@ struct SetupThumbnail: View {
     }
 
     var body: some View {
-        Group {
-            if let data = setup.referenceImages.first?.imageData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Text(initials)
-                    .font(.title3)
-                    .foregroundStyle(DesignTokens.textSecondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(uiColor: .systemGray5))
-            }
+        CoverImageView(reference: setup.coverImage, pointSize: 60) {
+            Text(initials)
+                .font(.title3)
+                .foregroundStyle(DesignTokens.textSecondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(uiColor: .systemGray5))
         }
         .frame(width: 60, height: 60)
         .clipShape(RoundedRectangle(cornerRadius: 12))

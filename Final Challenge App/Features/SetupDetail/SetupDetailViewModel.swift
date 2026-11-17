@@ -49,7 +49,7 @@ final class SetupDetailViewModel {
     }
     
     func deleteSetup(completion: () -> Void) {
-        storageController.deleteSetup(setup)
+        storageController.softDeleteSetup(setup)
         completion()
     }
     

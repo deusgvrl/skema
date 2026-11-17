@@ -117,7 +117,7 @@ final class SetupsViewModel {
         let currentMonthStart = calendar.dateInterval(of: .month, for: Date())?.start
 
         return grouped.keys.sorted(by: >).map { monthStart in
-            let setupsInMonth = (grouped[monthStart] ?? []).sorted { $0.createdAt > $1.createdAt }
+            let setupsInMonth = (grouped[monthStart] ?? []).sorted(by: newestFirst)
             let title = monthName(monthStart)
             let caption = (monthStart == currentMonthStart) ? "This month" : nil
             return SetupSection(
@@ -132,7 +132,8 @@ final class SetupsViewModel {
     private func byClientSections(for setups: [Setup]) -> [SetupSection] {
         let noClientTitle = "No Client"
         let grouped = Dictionary(grouping: setups) { setup -> String in
-            setup.client.isEmpty ? noClientTitle : setup.client
+            let client = setup.client.trimmingCharacters(in: .whitespacesAndNewlines)
+            return client.isEmpty ? noClientTitle : client
         }
         let sortedTitles = grouped.keys.sorted { lhs, rhs in
             if lhs == noClientTitle { return false }
@@ -141,13 +142,24 @@ final class SetupsViewModel {
         }
 
         return sortedTitles.map { title in
-            let setupsForClient = (grouped[title] ?? []).sorted { $0.createdAt > $1.createdAt }
+            let setupsForClient = (grouped[title] ?? []).sorted(by: newestFirst)
             let caption = setupsForClient.first.map { monthName($0.createdAt) }
             return SetupSection(id: "client-\(title)", title: title, caption: caption, setups: setupsForClient)
         }
     }
 
+    /// Newest first; setups saved at the same moment (e.g. all given the same `createdAt`
+    /// by the migration that added it) fall back to name order so the list is stable.
+    private func newestFirst(_ lhs: Setup, _ rhs: Setup) -> Bool {
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+        return lhs.setupName.localizedStandardCompare(rhs.setupName) == .orderedAscending
+    }
+
     private func monthName(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.wide))
+        let calendar = Calendar.current
+        if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
+            return date.formatted(.dateTime.month(.wide))
+        }
+        return date.formatted(.dateTime.month(.wide).year())
     }
 }

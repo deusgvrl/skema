@@ -309,7 +309,7 @@ struct SetupDetailView: View {
                 }
             }
         } message: {
-            Text("Are you sure you want to delete this setup? This action cannot be undone.")
+            Text("This setup will move to Recently Deleted. You can recover it there for 30 days.")
         }
     }
 
