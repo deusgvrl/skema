@@ -8,11 +8,13 @@ import simd
 private func look(_ index: Int) -> TimeInterval { TimeInterval(index) / 10 }
 
 private func light(_ x: Float = 0) -> Sighting {
-    Sighting(label: "studio lighting", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50)
+    Sighting(label: "studio lighting", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50,
+             box: cube(at: SIMD3(x, 0, 0)))
 }
 
 private func camera(_ x: Float = 0) -> Sighting {
-    Sighting(label: "camera", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50)
+    Sighting(label: "camera", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50,
+             box: cube(at: SIMD3(x, 0, 0)))
 }
 
 @Suite struct ObjectMapTrackingTests {
@@ -66,14 +68,20 @@ private func camera(_ x: Float = 0) -> Sighting {
         #expect(map.items.map(\.status) == [.accepted])
     }
 
-    // Cases 6 and 7.
-    @Test func cameraWithinTwentyCentimetresIsTheSameItemFartherIsANewOne() {
+    // Case 6 (changed, A10-90 rule E): a 30 cm camera seen 15 cm to the side shares 50% of its box: same item.
+    @Test func cameraSharingHalfItsBoxIsTheSameItem() {
         var map = ObjectMap()
         for index in 0...10 { map.update([camera(0)], at: look(index)) }
         for index in 11...21 { map.update([camera(0.15)], at: look(index)) }
         #expect(map.items.count == 1)
         #expect(map.items.first?.number == 1)
-        for index in 22...32 { map.update([camera(1)], at: look(index)) }
+    }
+
+    // Case 7 (changed, A10-90 rule E): a camera 1 m away, boxes not touching, for 1 s is a new accepted item, number 2.
+    @Test func cameraWhoseBoxDoesNotTouchIsANewItem() {
+        var map = ObjectMap()
+        for index in 0...10 { map.update([camera(0)], at: look(index)) }
+        for index in 11...21 { map.update([camera(1)], at: look(index)) }
         #expect(map.items.map(\.number) == [1, 2])
         #expect(map.items.map(\.status) == [.accepted, .accepted])
     }
