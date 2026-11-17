@@ -10,6 +10,9 @@ final class SetupsViewModel {
     var isShowingScanGuide = false
     var isShowingScan = false
     var showsEmptyState: Bool { setups.isEmpty }
+    var grouping: SetupsGrouping = .recent
+    var recentSections: [SetupSection] { SetupSections.recent(from: setups) }
+    var clientGroups: [ClientGroup] { SetupSections.byClient(from: setups) }
 
     @ObservationIgnored private let scanGuide: ScanGuideSettings
     @ObservationIgnored private let storageController: StorageController
@@ -50,10 +53,6 @@ final class SetupsViewModel {
     
     func fetchSetups() {
         self.setups = storageController.fetchAllSetups()
-        print("[SwiftData Test] Fetched \(setups.count) setup(s):")
-        for s in setups {
-            print(" '\(s.setupName)' | Client: '\(s.client)' | Project: '\(s.project)' | Equipment total: '\(s.nodes.count)'")
-        }
     }
     
     func deleteSetup(_ setup: Setup) {

@@ -4,7 +4,6 @@ import SwiftUI
 struct SetupsView: View {
     @State private var viewModel = SetupsViewModel()
     @State private var searchText = ""
-    @State private var grouping = SetupsGrouping.recent
     @State private var isShowingLiDARScan = false
     @ScaledMetric(relativeTo: .title2) private var newSetupButtonSize: CGFloat = 48
 
@@ -12,7 +11,7 @@ struct SetupsView: View {
         @Bindable var viewModel = viewModel
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Group setups", selection: $grouping) {
+                Picker("Group setups", selection: $viewModel.grouping) {
                 Text("Recent").tag(SetupsGrouping.recent)
                 Text("By Client").tag(SetupsGrouping.byClient)
                 }
@@ -27,26 +26,31 @@ struct SetupsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 120)
                 } else {
-                    List(viewModel.setups) { setup in
-                        NavigationLink(value: setup) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(setup.setupName) • \(setup.nodes.count) equipment")
-                                    .font(.headline)
-                                
-                                let subtitle = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " › ")
-                                if !subtitle.isEmpty {
-                                    Text(subtitle)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
+                    List {
+                        switch viewModel.grouping {
+                        case .recent:
+                            ForEach(viewModel.recentSections) { section in
+                                Section(header: Text(section.title)) {
+                                    ForEach(section.setups) { setup in
+                                        setupRow(setup)
+                                    }
                                 }
                             }
-                            .padding(.vertical, 2)
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                viewModel.deleteSetup(setup)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                        case .byClient:
+                            ForEach(viewModel.clientGroups) { group in
+                                Section(header: Text(group.title)) {
+                                    ForEach(group.sections) { section in
+                                        // Drafts have no month, so their label is empty and not shown.
+                                        if !section.title.isEmpty {
+                                            Text(section.title)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        ForEach(section.setups) { setup in
+                                            setupRow(setup)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -95,6 +99,30 @@ struct SetupsView: View {
         }
         
     }
+    private func setupRow(_ setup: Setup) -> some View {
+        NavigationLink(value: setup) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(setup.setupName) • \(setup.nodes.count) equipment")
+                    .font(.headline)
+
+                let subtitle = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " › ")
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                viewModel.deleteSetup(setup)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
     private var emptyState: some View {
             ContentUnavailableView {
                 Label {
