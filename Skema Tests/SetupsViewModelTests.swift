@@ -132,4 +132,75 @@ struct SetupsViewModelTests {
 
         #expect(!viewModel.isShowingScan)
     }
+
+    @Test("Recent grouping puts setups in the right month section, newest first")
+    func recentGroupingByMonth() {
+        let storage = StorageController(inMemory: true)
+        let newer = Setup(setupName: "Newer")
+        newer.createdAt = Date()
+        let older = Setup(setupName: "Older")
+        older.createdAt = Calendar.current.date(byAdding: .month, value: -1, to: Date())!
+        storage.addSetup(older)
+        storage.addSetup(newer)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.grouping = .recent
+
+        #expect(viewModel.sections.count == 2)
+        #expect(viewModel.sections[0].setups.map(\.setupName) == ["Newer"])
+        #expect(viewModel.sections[1].setups.map(\.setupName) == ["Older"])
+    }
+
+    @Test("By Client grouping falls back to \"No Client\" for a blank client")
+    func byClientGroupingFallsBackForBlankClient() {
+        let storage = StorageController(inMemory: true)
+        let setup = Setup(setupName: "Orphan", client: "")
+        storage.addSetup(setup)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.grouping = .byClient
+
+        #expect(viewModel.sections.map(\.title) == ["No Client"])
+    }
+
+    @Test("Searching filters sections to only matching setups")
+    func searchFiltersSections() {
+        let storage = StorageController(inMemory: true)
+        storage.addSetup(Setup(setupName: "Ring flash shoot", client: "Lulapin"))
+        storage.addSetup(Setup(setupName: "Candle", client: "Aesop"))
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.searchText = "lulapin"
+
+        #expect(viewModel.sections.flatMap(\.setups).map(\.setupName) == ["Ring flash shoot"])
+        #expect(!viewModel.showsNoResults)
+    }
+
+    @Test("Searching with no match shows the no-results state, not an empty section list")
+    func searchWithNoMatchShowsNoResults() {
+        let storage = StorageController(inMemory: true)
+        storage.addSetup(Setup(setupName: "Candle", client: "Aesop"))
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.searchText = "ring flash"
+
+        #expect(viewModel.sections.isEmpty)
+        #expect(viewModel.showsNoResults)
+    }
+
+    @Test("Deleting a setup soft-deletes it and undo restores it to the same grouping")
+    func deleteThenUndoRestoresSetup() {
+        let storage = StorageController(inMemory: true)
+        let setup = Setup(setupName: "Candle", client: "Aesop")
+        storage.addSetup(setup)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.deleteSetup(setup)
+        #expect(viewModel.setups.isEmpty)
+        #expect(storage.fetchDeletedSetups().map(\.setupName) == ["Candle"])
+
+        viewModel.undoDelete()
+        #expect(viewModel.setups.map(\.setupName) == ["Candle"])
+        #expect(storage.fetchDeletedSetups().isEmpty)
+    }
 }

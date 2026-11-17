@@ -138,11 +138,6 @@ struct SetupsView: View {
     }
 }
 
-enum SetupsGrouping {
-    case recent
-    case byClient
-}
-
 #Preview {
     SetupsView()
 }
