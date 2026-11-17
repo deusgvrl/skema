@@ -24,4 +24,19 @@ struct SetupDetailViewModelTests {
         #expect(storage.fetchAllSetups().isEmpty)
         #expect(storage.fetchDeletedSetups().map(\.setupName) == ["Candle"])
     }
+
+    @Test("Subtitle joins client and project with a dot, skipping blanks (Sketch R08)", arguments: [
+        ("Aesop", "November catalog", "Aesop · November catalog"),
+        ("Aesop", "", "Aesop"),
+        ("", "November catalog", "November catalog"),
+        ("", "", "")
+    ])
+    func subtitle(client: String, project: String, expected: String) {
+        let storage = StorageController(inMemory: true)
+        let setup = Setup(setupName: "Candle", client: client, project: project)
+        storage.addSetup(setup)
+        let viewModel = SetupDetailViewModel(setup: setup, storageController: storage)
+
+        #expect(viewModel.formattedSubtitle == expected)
+    }
 }

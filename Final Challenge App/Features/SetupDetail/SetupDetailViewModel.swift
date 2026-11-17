@@ -23,7 +23,6 @@ final class SetupDetailViewModel {
     var isShowSubjectSheet: Bool = false
     
     // References Tab State
-    var isSelectionMode: Bool = false
     var referenceImages: [UIImage] = []
     
     /// Deterministically sorted SwiftData models by creation date
@@ -43,9 +42,12 @@ final class SetupDetailViewModel {
         setup.setupName.isEmpty ? "Untitled Setup" : setup.setupName
     }
     
+    /// "Aesop · November catalog" under the title (Sketch R08); empty when neither is set.
     var formattedSubtitle: String {
-        let components = [setup.client, setup.project].filter { !$0.isEmpty }
-        return components.isEmpty ? "No Details" : components.joined(separator: " › ")
+        [setup.client, setup.project]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
     
     func deleteSetup(completion: () -> Void) {
@@ -108,22 +110,5 @@ final class SetupDetailViewModel {
         }
         
         storageController.deleteReferenceImage(refImageToDelete)
-    }
-    
-    /// Batch deletes reference images by a set of indices
-    func deleteReferenceImages(at indices: Set<Int>) {
-        let sorted = sortedReferenceImages
-        let sortedIndices = indices.sorted(by: >)
-        
-        for index in sortedIndices {
-            guard sorted.indices.contains(index) else { continue }
-            let refImageToDelete = sorted[index]
-            
-            if referenceImages.indices.contains(index) {
-                referenceImages.remove(at: index)
-            }
-            
-            storageController.deleteReferenceImage(refImageToDelete)
-        }
     }
 }

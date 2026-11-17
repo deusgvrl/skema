@@ -70,14 +70,10 @@ struct ReviewDiagramContentView: View {
                 .frame(width: 48, height: 48)
                 .glassEffect(.regular.tint(DesignTokens.glassControlFill).interactive(), in: .circle)
         } else {
-            Button("Edit Diagram", systemImage: "pencil", action: onEditTap)
-                .labelStyle(.iconOnly)
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .background(DesignTokens.accentPrimary, in: .circle)
-                .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+            Button(action: onEditTap) {
+                AccentCircleLabel(title: "Edit Diagram", systemImage: "pencil")
+            }
+            .buttonStyle(.plain)
         }
     }
 }

@@ -12,10 +12,8 @@ struct SetupDetailView: View {
     @State private var photoPickerSelection: [PhotosPickerItem] = []
 
     // Selection & Preview State
-    @State private var selectedImageIndices: Set<Int> = []
     @State private var selectedPreviewIndex: Int = 0
     @State private var showReferenceDetail: Bool = false
-    @State private var showDeleteConfirmation: Bool = false
 
     init(setup: Setup, storageController: StorageController? = nil) {
         self._viewModel = State(initialValue: SetupDetailViewModel(
@@ -52,18 +50,13 @@ struct SetupDetailView: View {
                         }
                     )
 
-                    // Edit Diagram FAB
+                    // Edit Diagram FAB (Sketch R08)
                     Button {
                         viewModel.isEditingDiagram = true
                     } label: {
-                        Image(systemName: "pencil")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color.accentColor, in: .circle)
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        AccentCircleLabel(title: "Edit Diagram", systemImage: "pencil")
                     }
-                    .accessibilityLabel("Edit Diagram")
+                    .buttonStyle(.plain)
                     .padding(16)
                 }
 
@@ -77,182 +70,75 @@ struct SetupDetailView: View {
                 )
 
             } else {
-                // MARK: - References Tab
-                ZStack {
+                // MARK: - References Tab (Sketch R11, R13)
+                ZStack(alignment: .bottomTrailing) {
                     if viewModel.referenceImages.isEmpty {
-                        ContentUnavailableView {
-                            Label {
-                                Text("No References Yet")
-                                    .font(.title2.bold())
-                            } icon: {
-                                Image(systemName: "photo.on.rectangle")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 40, height: 40)
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 80, height: 80)
-                                    .background(Color(.tertiarySystemFill), in: .circle)
-                            }
-                        } description: {
-                            Text("Add photos from the shoot (final shot, set photos, product placement) to recreate this lighting setup anytime.")
-                                .font(.subheadline)
-                        }
+                        referencesEmptyState
                     } else {
                         ScrollView {
                             let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
                             LazyVGrid(columns: columns, spacing: 2) {
-                                ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
-                                    if viewModel.referenceImages.indices.contains(index) {
-                                        let isSelected = selectedImageIndices.contains(index)
-                                        
-                                        ZStack(alignment: .topTrailing) {
-                                            Image(uiImage: viewModel.referenceImages[index])
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                                                .aspectRatio(1, contentMode: .fit)
-                                                .clipped()
-                                                .opacity(viewModel.isSelectionMode && isSelected ? 0.75 : 1.0)
-
-                                            // Selection Checkmark Badge
-                                            if viewModel.isSelectionMode {
-                                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                                    .font(.title3.weight(.semibold))
-                                                    .foregroundStyle(isSelected ? Color.accentColor : .white)
-                                                    .shadow(color: .black.opacity(0.3), radius: 2)
-                                                    .padding(6)
-                                            }
-                                        }
+                                ForEach(viewModel.referenceImages.indices, id: \.self) { index in
+                                    Image(uiImage: viewModel.referenceImages[index])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .clipped()
                                         .contentShape(Rectangle())
                                         .onTapGesture {
-                                            if viewModel.isSelectionMode {
-                                                if isSelected {
-                                                    selectedImageIndices.remove(index)
-                                                } else {
-                                                    selectedImageIndices.insert(index)
-                                                }
-                                            } else {
-                                                selectedPreviewIndex = index
-                                                showReferenceDetail = true
-                                            }
+                                            selectedPreviewIndex = index
+                                            showReferenceDetail = true
                                         }
-                                    }
+                                        .accessibilityLabel("Reference \(index + 1)")
+                                        .accessibilityAddTraits(.isButton)
                                 }
                             }
                         }
                     }
+
+                    // R12: + opens Take Photo / Choose from Library
+                    Menu {
+                        Button("Take Photo", systemImage: "camera") { showCamera = true }
+                        Button("Choose from Library", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
+                    } label: {
+                        AccentCircleLabel(title: "Add Reference", systemImage: "plus")
+                    }
+                    .padding(16)
                 }
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(DesignTokens.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: viewModel.selectedTab) { _, _ in
-            viewModel.isSelectionMode = false
-            selectedImageIndices.removeAll()
-        }
-        .onChange(of: viewModel.isSelectionMode) { _, isSelecting in
-            if !isSelecting {
-                selectedImageIndices.removeAll()
-            }
-        }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text(viewModel.setupName)
                         .font(.headline)
-                        .fontWeight(.bold)
-
-                    Text(viewModel.formattedSubtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
+                    if !viewModel.formattedSubtitle.isEmpty {
+                        Text(viewModel.formattedSubtitle)
+                            .font(.caption)
+                            .foregroundStyle(DesignTokens.textSecondary)
+                    }
                 }
+                .accessibilityElement(children: .combine)
             }
 
+            // R14 / R13m
             ToolbarItem(placement: .primaryAction) {
-                if viewModel.selectedTab == 0 {
-                    Menu {
-                        Button("Edit Project Details", systemImage: "pencil") {
-                            viewModel.isEditingProjectDetails = true
-                        }
-                        Button("Share", systemImage: "square.and.arrow.up") { }
-                        Divider()
-                        Button("Delete Setup", systemImage: "trash", role: .destructive) {
-                            viewModel.isDeleteAlertPresented = true
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
+                Menu {
+                    Button("Edit Project Details", systemImage: "pencil") {
+                        viewModel.isEditingProjectDetails = true
                     }
-                } else {
-                    if viewModel.isSelectionMode {
-                        Button("Cancel", systemImage: "xmark") {
-                            withAnimation {
-                                viewModel.isSelectionMode = false
-                            }
-                        }
-                    } else {
-                        Button("Select") {
-                            withAnimation {
-                                viewModel.isSelectionMode = true
-                            }
-                        }
-                        .disabled(viewModel.referenceImages.isEmpty)
+                    Button("Share", systemImage: "square.and.arrow.up") { }
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        viewModel.isDeleteAlertPresented = true
                     }
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
-            }
-
-            if viewModel.selectedTab == 1 {
-                ToolbarSpacer(placement: .bottomBar)
-                ToolbarItem(placement: .bottomBar) {
-                    if viewModel.isSelectionMode {
-                        Button(role: .destructive) {
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label(
-                                selectedImageIndices.isEmpty ? "Delete" : "Delete (\(selectedImageIndices.count))",
-                                systemImage: "trash"
-                            )
-                        }
-                        .disabled(selectedImageIndices.isEmpty)
-                        .confirmationDialog(
-                            selectedImageIndices.count == 1
-                                ? "This photo will be deleted from this setup."
-                                : "These \(selectedImageIndices.count) photos will be deleted from this setup.",
-                            isPresented: $showDeleteConfirmation,
-                            titleVisibility: .hidden
-                        ) {
-                            Button(
-                                selectedImageIndices.count == 1 ? "Delete Photo" : "Delete \(selectedImageIndices.count) Photos",
-                                role: .destructive
-                            ) {
-                                deleteSelectedImages()
-                            }
-                            
-                            Button("Cancel", role: .cancel) { }
-                        } message: {
-                            Text(
-                                selectedImageIndices.count == 1
-                                    ? "This photo will be deleted from your setup reference."
-                                    : "These photos will be deleted from your setup references."
-                            )
-                        }
-                    } else {
-                        Menu {
-                            Button {
-                                showCamera = true
-                            } label: {
-                                Label("Take Photo", systemImage: "camera")
-                            }
-
-                            Button {
-                                showPhotoPicker = true
-                            } label: {
-                                Label("Choose from Library", systemImage: "photo.on.rectangle")
-                            }
-                        } label: {
-                            Label("Add Reference", systemImage: "plus")
-                        }
-                    }
-                }
+                .accessibilityLabel("More")
             }
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerSelection, matching: .images)
@@ -301,7 +187,7 @@ struct SetupDetailView: View {
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {
             SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
         }
-        .alert("Delete Setup", isPresented: $viewModel.isDeleteAlertPresented) {
+        .alert("Delete This Setup?", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 viewModel.deleteSetup {
@@ -309,14 +195,32 @@ struct SetupDetailView: View {
                 }
             }
         } message: {
-            Text("This setup will move to Recently Deleted. You can recover it there for 30 days.")
+            Text("The diagram, equipment and references will move to Recently Deleted for 30 days.")
         }
     }
 
-    private func deleteSelectedImages() {
-        viewModel.deleteReferenceImages(at: selectedImageIndices)
-        selectedImageIndices.removeAll()
-        viewModel.isSelectionMode = false
+    /// R11: glass circle icon, title and Sketch copy.
+    private var referencesEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "photo")
+                .font(.system(size: 30))
+                .foregroundStyle(DesignTokens.textPrimary)
+                .frame(width: 80, height: 80)
+                .glassEffect(.regular.tint(DesignTokens.glassControlFill), in: .circle)
+                .accessibilityHidden(true)
+            Text("No References Yet")
+                .font(.title2.bold())
+                .foregroundStyle(DesignTokens.textPrimary)
+            Text("""
+                Add any photos from the shoot, like the final shot, the product, or the set, \
+                so you can match this setup next time. Tap + to add a reference.
+                """)
+                .font(.subheadline)
+                .foregroundStyle(DesignTokens.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
