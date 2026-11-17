@@ -170,15 +170,17 @@ struct SetupsView: View {
 
     private var groupMenu: some View {
         Menu {
+            // Every row has an icon, so all titles line up in one column.
             Picker("Group By", selection: Bindable(viewModel).grouping) {
-                Text("Recent").tag(SetupsGrouping.recent)
-                Text("By Client").tag(SetupsGrouping.byClient)
+                Label("Recent", systemImage: "clock").tag(SetupsGrouping.recent)
+                Label("By Client", systemImage: "person.2").tag(SetupsGrouping.byClient)
             }
             .pickerStyle(.inline)
 
             Divider()
 
-            Button("Recently Deleted", systemImage: "trash") {
+            // Destructive role is what turns a menu row's title and icon red.
+            Button("Recently Deleted", systemImage: "trash", role: .destructive) {
                 isShowingRecentlyDeleted = true
             }
         } label: {
