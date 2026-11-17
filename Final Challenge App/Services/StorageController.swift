@@ -102,12 +102,17 @@ final class StorageController {
     }
         
     func save() {
+        do {
+            try saveChanges()
+        } catch {
+            print("Failed to save context: \(error.localizedDescription)")
+        }
+    }
+
+    /// Like `save()`, but lets the caller show the failure (Sketch R07f "Couldn't Save Setup").
+    func saveChanges() throws {
         if context.hasChanges {
-            do {
-                try context.save()
-            } catch {
-                print("Failed to save context: \(error.localizedDescription)")
-            }
+            try context.save()
         }
     }
 }
