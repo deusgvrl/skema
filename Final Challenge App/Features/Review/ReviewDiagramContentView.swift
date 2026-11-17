@@ -71,11 +71,11 @@ struct ReviewDiagramContentView: View {
                 }
             }
             
-//            EquipmentCarousel(
-//                viewModel: viewModel,
-//                isReadOnly: isReadOnly,
-//                onNodeTap: onNodeTap
-//            )
+            EquipmentCarousel(
+                viewModel: viewModel,
+                isReadOnly: isReadOnly,
+                onNodeTap: onNodeTap
+            )
         }
     }
 }

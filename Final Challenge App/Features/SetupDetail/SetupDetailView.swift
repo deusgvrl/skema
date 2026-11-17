@@ -338,7 +338,6 @@ struct SetupDetailView: View {
                 ProjectDetailsView(setup: viewModel.setup)
             }
         }
-        .sheet(isPresented :)
         .alert("Discard Unsaved Changes?", isPresented: $showDiscardAlert) {
             Button("Discard Changes", role: .destructive) {
                 while undoManager?.canUndo == true {
