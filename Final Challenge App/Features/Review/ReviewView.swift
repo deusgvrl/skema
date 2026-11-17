@@ -1,28 +1,25 @@
 import SwiftUI
 
-/// Top-down lighting diagram after scan, and editing it (Sketch R04, R09 · A10-10, A10-17).
+/// Top-down lighting diagram after scan, and editing it (Sketch R04, R04m, R09 · A10-10, A10-17).
+/// Opens in view mode (Next, pencil); the pencil enters edit mode (undo/redo, ✓, +). Moving items
+/// keeps the long-press-then-drag gesture and only works in edit mode.
 struct ReviewView: View {
     /// True when opened right after a scan (a new draft), false when opened from a saved setup.
     /// The name is kept from when a processing screen came first; Finish Scan now opens the diagram directly.
     let isFromLoadingScreen: Bool
     @Bindable var viewModel: ReviewViewModel
-    var onDismissToSetups: (() -> Void)? = nil
-    
+    var onDismissToSetups: (() -> Void)?
+
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    
-    // MARK: - Diagram State
-    @State private var editingNode: Equipment? = nil
+
+    @State private var editingNode: Equipment?
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
-    @State private var showHint = true
-    @State private var selectedNewCategory: EquipmentCategory = .light
-    @State private var showDiscardAlert = false
-    @State private var showUnsavedEditsAlert = false
+    @State private var showsSaveSetupAlert = false
+    @State private var showsDiscardChangesAlert = false
     @State private var isShowingSubjectSheet = false
-    @State private var initialSubjectHeight: String = ""
 
-    
     init(
         isFromLoadingScreen: Bool,
         viewModel: ReviewViewModel,
@@ -32,49 +29,52 @@ struct ReviewView: View {
         self.viewModel = viewModel
         self.onDismissToSetups = onDismissToSetups
     }
-    
+
     var body: some View {
         ReviewDiagramContentView(
             viewModel: viewModel,
             undoManager: undoManager,
             onNodeTap: { node in editingNode = node },
             onSubjectTap: { isShowingSubjectSheet = true },
-            onAddNodeTap: { isAddingNode = true }
+            onAddNodeTap: { isAddingNode = true },
+            onEditTap: { viewModel.beginEditing(undoManager: undoManager) }
         )
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             toolbarContent
         }
-        // Alert while reviewing diagram
-        .alert("Save This Setup?", isPresented: $showDiscardAlert) {
+        .onAppear {
+            // From a saved setup the pencil was already tapped (Edit Diagram), so start in edit mode.
+            if !isFromLoadingScreen && !viewModel.isEditingDiagram {
+                viewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+        // R04x
+        .alert("Save This Setup?", isPresented: $showsSaveSetupAlert) {
             Button("Save Setup") {
                 navigateToR07 = true
             }
             .keyboardShortcut(.defaultAction)
-            
-            Button("Discard Setup", role: .destructive) {
+            Button("Discard", role: .destructive) {
                 viewModel.discardSetup()
                 dismissAll()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("If you leave now, this scan and it's diagram will be lost.")
+            Text("If you leave now, this scan and its diagram will be lost.")
         }
-        .alert("Discard Unsaved Changes?", isPresented: $showUnsavedEditsAlert) {
-            Button("Discard Changes", role: .destructive) {
-                while undoManager?.canUndo == true {
-                    undoManager?.undo()
+        // R04mx
+        .alert("Discard Changes?", isPresented: $showsDiscardChangesAlert) {
+            Button("Keep Editing", role: .cancel) { }
+            Button("Discard", role: .destructive) {
+                viewModel.discardEdits(undoManager: undoManager)
+                if !isFromLoadingScreen {
+                    dismiss()
                 }
-                
-                // 2. Clear memory and close
-                undoManager?.removeAllActions()
-                viewModel.updateUndoState(undoManager: undoManager)
-                dismiss()
             }
-            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Any edits you made to this diagram will be reverted.")
+            Text("Your changes to this diagram won’t be saved.")
         }
         .navigationDestination(isPresented: $navigateToR07) {
             ProjectDetailsView(
@@ -93,93 +93,93 @@ struct ReviewView: View {
             SubjectFormView(viewModel: viewModel, undoManager: undoManager)
         }
     }
-    
-    
-    // MARK: - Toolbar Content
+
+    // MARK: - Toolbar
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
             Button("Close", systemImage: "xmark") {
-                handleClose()
+                if viewModel.isEditingDiagram {
+                    closeEditMode()
+                } else {
+                    closeReview()
+                }
             }
         }
+
         ToolbarItem(placement: .principal) {
-            VStack(alignment: viewModel.canUndo || viewModel.canRedo ? .leading : .center, spacing: 2) {
+            VStack(spacing: 2) {
                 Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
                     .font(.headline)
-                    .fontWeight(.bold)
-                Text("\(viewModel.nodes.count) Equipment Items")
+                    .foregroundStyle(DesignTokens.textPrimary)
+                Text(viewModel.layoutSubtitle)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(DesignTokens.textSecondary)
             }
+            .accessibilityElement(children: .combine)
         }
-        
-        ToolbarItemGroup(placement: .confirmationAction) {
-                        
-            // Undo / Redo Buttons
-            if viewModel.canUndo || viewModel.canRedo {
-                Button {
+
+        if viewModel.isEditingDiagram {
+            ToolbarItemGroup(placement: .confirmationAction) {
+                Button("Undo", systemImage: "arrow.uturn.backward") {
                     undoManager?.undo()
                     viewModel.updateUndoState(undoManager: undoManager)
-                } label: {
-                    Image(systemName: "arrow.uturn.backward")
                 }
                 .disabled(!viewModel.canUndo)
-                
-                Button {
+
+                Button("Redo", systemImage: "arrow.uturn.forward") {
                     undoManager?.redo()
                     viewModel.updateUndoState(undoManager: undoManager)
-                } label: {
-                    Image(systemName: "arrow.uturn.forward")
                 }
                 .disabled(!viewModel.canRedo)
             }
-            
-            // Done / Save Button (Two-Tap Logic)
-            Button("Done", systemImage: isFromLoadingScreen ? "chevron.right" : "checkmark") {
-                
-                if viewModel.canUndo || viewModel.canRedo {
-                    // 1ST TAP: User has unsaved edits. Save and clear the stack.
-                    viewModel.finalizeAndSaveSetup()
-                    undoManager?.removeAllActions()
-                    
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    }
-                } else {
-                    // 2ND TAP (or no edits made): Undo stack is clean. Navigate away.
-                    if isFromLoadingScreen {
-                        navigateToR07 = true
-                    } else {
+
+            ToolbarSpacer(.fixed, placement: .confirmationAction)
+
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save Changes", systemImage: "checkmark") {
+                    viewModel.confirmEdits(undoManager: undoManager)
+                    if !isFromLoadingScreen {
                         dismiss()
                     }
                 }
+                .buttonStyle(.glassProminent)
+                .tint(DesignTokens.accentPrimary)
+                .disabled(!viewModel.hasPendingEdits)
+            }
+        } else {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Next", systemImage: "chevron.right") {
+                    navigateToR07 = true
+                }
+                .buttonStyle(.glassProminent)
+                .tint(DesignTokens.accentPrimary)
             }
         }
     }
-    
-    private func handleClose() {
-        let hasUnsavedChanges = viewModel.canUndo
-        
+
+    /// X in view mode (R04 → R04x). A fresh scan is unsaved until Add Details, so always ask.
+    private func closeReview() {
         if isFromLoadingScreen {
-            if hasUnsavedChanges {
-                // They are in a new scan and haven't saved yet
-                showDiscardAlert = true
-            } else {
-                viewModel.discardSetup()
-                dismissAll()
-            }
+            showsSaveSetupAlert = true
         } else {
-            if hasUnsavedChanges {
-                // They are editing an existing setup and made changes
-                showUnsavedEditsAlert = true
-            } else {
-                // No changes made, safe to close instantly
+            dismiss()
+        }
+    }
+
+    /// X in edit mode (R04m → R04mx when something changed, else back to view mode).
+    private func closeEditMode() {
+        if viewModel.hasPendingEdits {
+            showsDiscardChangesAlert = true
+        } else {
+            viewModel.discardEdits(undoManager: undoManager)
+            if !isFromLoadingScreen {
                 dismiss()
             }
         }
     }
-    
+
     private func dismissAll() {
         if let onDismissToSetups {
             onDismissToSetups()
@@ -190,5 +190,7 @@ struct ReviewView: View {
 }
 
 #Preview {
-    ReviewView(isFromLoadingScreen: false, viewModel: ReviewViewModel())
+    NavigationStack {
+        ReviewView(isFromLoadingScreen: true, viewModel: ReviewViewModel())
+    }
 }

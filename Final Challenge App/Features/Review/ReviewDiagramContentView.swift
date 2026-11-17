@@ -4,6 +4,8 @@
 //
 //  Created by Satriya Handha Wibowo on 13/11/26.
 //
+//  Diagram, tip, floating button and equipment chips (Sketch R04 view mode, R04m edit mode).
+//
 
 import SwiftUI
 import TipKit
@@ -11,68 +13,120 @@ import TipKit
 struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
     var undoManager: UndoManager?
-    
+
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
     var onAddNodeTap: () -> Void
-    
-    // TipKit Instance
-    private let interactionTip = DiagramInteractionTip()
-    
+    var onEditTap: () -> Void = {}
+
+    private let viewTip = ReviewViewModeTip()
+    private let editTip = ReviewEditModeTip()
+
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
                 LightingDiagramView(
                     viewModel: viewModel,
-                    isReadOnly: false,
+                    isReadOnly: !viewModel.isEditingDiagram,
                     undoManager: undoManager,
                     onNodeTap: onNodeTap,
                     onSubjectTap: onSubjectTap
                 )
                 .overlay(alignment: .bottomTrailing) {
-                    Button {
-                        onAddNodeTap()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color.blue, in: .circle)
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    }
-                    .padding(16)
+                    floatingButton
+                        .padding(16)
                 }
-                
-                // Prominent TipKit Card Overlay
+
                 if !viewModel.nodes.isEmpty {
-                    TipView(interactionTip, arrowEdge: .none)
-                        .tipBackground(Color(uiColor: .secondarySystemGroupedBackground))
-                        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
+                    Group {
+                        if viewModel.isEditingDiagram {
+                            DiagramTipPill(tip: editTip)
+                        } else {
+                            DiagramTipPill(tip: viewTip)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
                 }
             }
-            
+
             EquipmentCarousel(
                 viewModel: viewModel,
                 isReadOnly: false,
                 onNodeTap: onNodeTap
             )
         }
+        .background(DesignTokens.pageBackground.ignoresSafeArea())
+    }
+
+    /// Pencil in view mode (red), + in edit mode (glass) — Sketch R04 / R04m.
+    @ViewBuilder
+    private var floatingButton: some View {
+        if viewModel.isEditingDiagram {
+            Button("Add Equipment", systemImage: "plus", action: onAddNodeTap)
+                .labelStyle(.iconOnly)
+                .font(.title3.weight(.medium))
+                .foregroundStyle(DesignTokens.textPrimary)
+                .frame(width: 48, height: 48)
+                .glassEffect(.regular.tint(DesignTokens.glassControlFill).interactive(), in: .circle)
+        } else {
+            Button("Edit Diagram", systemImage: "pencil", action: onEditTap)
+                .labelStyle(.iconOnly)
+                .font(.title3.weight(.medium))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(DesignTokens.accentPrimary, in: .circle)
+                .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+        }
     }
 }
 
-struct DiagramInteractionTip: Tip {
+/// A one-line glass tip with a close button, backed by TipKit so closing it is remembered.
+private struct DiagramTipPill<TipType: Tip>: View {
+    let tip: TipType
+    @State private var isVisible = false
+
+    var body: some View {
+        Group {
+            if isVisible {
+                HStack(spacing: 12) {
+                    tip.title
+                        .font(.subheadline)
+                        .foregroundStyle(DesignTokens.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Close Tip", systemImage: "xmark") {
+                        tip.invalidate(reason: .tipClosed)
+                    }
+                    .labelStyle(.iconOnly)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(DesignTokens.textSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 4)
+                .glassControl(cornerRadius: 24)
+                .transition(.opacity)
+            }
+        }
+        .task {
+            for await status in tip.statusUpdates {
+                withAnimation { isVisible = status == .available }
+            }
+        }
+    }
+}
+
+struct ReviewViewModeTip: Tip {
     var title: Text {
-        Text("Diagram Gestures")
+        Text("Tap the pencil to move or edit your equipment")
     }
-    
-    var message: Text? {
-        Text("Long press equipment icon to move or rotate. Tap to edit details.")
-    }
-    
-    var image: Image? {
-        Image(systemName: "hand.tap.fill")
+}
+
+/// Sketch says "Drag to move…"; the app keeps its long-press-then-drag gesture, so the copy says so.
+struct ReviewEditModeTip: Tip {
+    var title: Text {
+        Text("Long-press an item to move or rotate it, or tap it to edit")
     }
 }
 
@@ -84,7 +138,6 @@ struct DiagramInteractionTip: Tip {
         onAddNodeTap: {}
     )
     .task {
-        // Enables previewing TipKit cards inside Xcode Canvas
         try? Tips.resetDatastore()
         try? Tips.configure([.displayFrequency(.immediate)])
     }
