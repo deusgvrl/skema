@@ -65,6 +65,17 @@ struct DesignTokensTests {
         #expect(abs(resolved.alpha - expected.alpha) < 0.01)
     }
 
+    @Test("PageBackground differs light vs dark", arguments: [
+        (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.957, green: 0.953, blue: 0.945, alpha: 1.0)),
+        (.dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 1.0))
+    ])
+    func pageBackground(style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
+        let resolved = resolvedComponents(DesignTokens.pageBackground, style: style)
+        #expect(abs(resolved.red - expected.red) < 0.01)
+        #expect(abs(resolved.green - expected.green) < 0.01)
+        #expect(abs(resolved.blue - expected.blue) < 0.01)
+    }
+
     @Test("NodeDetailFill is opaque and legible against both the canvas and the node body", arguments: [
         (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.333, green: 0.333, blue: 0.353, alpha: 1.0)),
         (.dark, ResolvedRGBA(red: 0.557, green: 0.557, blue: 0.576, alpha: 1.0))
