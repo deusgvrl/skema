@@ -38,6 +38,9 @@ func relativeLuminance(_ color: Color, style: UIUserInterfaceStyle) -> Double {
     return 0.2126 * red + 0.7152 * green + 0.0722 * blue
 }
 
+/// Ignores alpha on both inputs. A translucent `background` (a glass token) must be
+/// composited with `blended(_:over:style:)` onto its real backdrop first, or this
+/// silently measures against the token's raw color instead of what actually renders.
 func contrastRatio(_ foreground: Color, _ background: Color, style: UIUserInterfaceStyle) -> Double {
     let foregroundLuminance = relativeLuminance(foreground, style: style)
     let backgroundLuminance = relativeLuminance(background, style: style)

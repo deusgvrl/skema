@@ -16,7 +16,7 @@ struct DiagramEntity: View {
     
     var body: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(DesignTokens.glassCardFill)
+            .fill(Color(uiColor: .systemGray5))
             .frame(width: 44, height: 44)
             .overlay(
                 Image(systemName: icon)

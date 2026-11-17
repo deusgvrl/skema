@@ -128,7 +128,7 @@ struct NodeView: View {
             Text(node.role.isEmpty ? node.name : "\(node.label) \(node.role)")
                 .font(.caption2)
                 .fontWeight(isSelected ? .bold : .regular)
-                .foregroundColor(isSelected ? DesignTokens.accentPrimary : .primary)
+                .foregroundColor(.primary)
                 .lineLimit(1)
                 .fixedSize()
                 .offset(y: 20)
@@ -270,7 +270,7 @@ struct TopViewCameraShapeView: View {
                 .offset(y: 12)
 
             RoundedRectangle(cornerRadius: 3)
-                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.glassCardFill)
+                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.nodeDetailFill)
                 .frame(width: 18, height: 14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
@@ -305,12 +305,12 @@ struct TopViewLightShapeView: View {
                 .offset(y: 2)
 
             Rectangle()
-                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.glassCardFill)
+                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.nodeDetailFill)
                 .frame(width: 38, height: 3)
                 .offset(y: 2)
 
             RoundedRectangle(cornerRadius: 3)
-                .fill(DesignTokens.glassCardFill)
+                .fill(DesignTokens.nodeDetailFill)
                 .frame(width: 18, height: 14)
                 .offset(y: 22)
         }
@@ -341,7 +341,7 @@ struct TopViewAccessoryShapeView: View {
                 .offset(y: 11)
 
             Rectangle()
-                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.glassCardFill)
+                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.nodeDetailFill)
                 .frame(width: 14, height: 4)
                 .cornerRadius(1)
                 .offset(y: 8)

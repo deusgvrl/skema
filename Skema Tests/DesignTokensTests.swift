@@ -55,10 +55,46 @@ struct DesignTokensTests {
 
     @Test("GlassCardFill has the right fill and alpha per appearance", arguments: [
         (UIUserInterfaceStyle.light, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.722)),
-        (.dark, ResolvedRGBA(red: 0.224, green: 0.239, blue: 0.263, alpha: 0.549))
+        (.dark, ResolvedRGBA(red: 0.224, green: 0.239, blue: 0.263, alpha: 0.920))
     ])
     func glassCardFill(style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
         let resolved = resolvedComponents(DesignTokens.glassCardFill, style: style)
+        #expect(abs(resolved.red - expected.red) < 0.01)
+        #expect(abs(resolved.green - expected.green) < 0.01)
+        #expect(abs(resolved.blue - expected.blue) < 0.01)
+        #expect(abs(resolved.alpha - expected.alpha) < 0.01)
+    }
+
+    @Test("NodeDetailFill is opaque and legible against both the canvas and the node body", arguments: [
+        (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.333, green: 0.333, blue: 0.353, alpha: 1.0)),
+        (.dark, ResolvedRGBA(red: 0.557, green: 0.557, blue: 0.576, alpha: 1.0))
+    ])
+    func nodeDetailFill(style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
+        let resolved = resolvedComponents(DesignTokens.nodeDetailFill, style: style)
+        #expect(abs(resolved.red - expected.red) < 0.01)
+        #expect(abs(resolved.green - expected.green) < 0.01)
+        #expect(abs(resolved.blue - expected.blue) < 0.01)
+        #expect(abs(resolved.alpha - expected.alpha) < 0.01)
+    }
+
+    @Test("Every remaining token has a dark entry distinct from its light one", arguments: [
+        ("GlassCardBorder", UIUserInterfaceStyle.light, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.902)),
+        ("GlassCardBorder", .dark, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.122)),
+        ("GlassControlFill", .light, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.722)),
+        ("GlassControlFill", .dark, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.122)),
+        ("GlassControlBorderTop", .light, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)),
+        ("GlassControlBorderTop", .dark, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.302)),
+        ("GlassControlBorderBottom", .light, ResolvedRGBA(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.102)),
+        ("GlassControlBorderBottom", .dark, ResolvedRGBA(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.400)),
+        ("ScrimGradientTop", .light, ResolvedRGBA(red: 0.957, green: 0.953, blue: 0.945, alpha: 0.651)),
+        ("ScrimGradientTop", .dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 0.650)),
+        ("ScrimGradientMid", .light, ResolvedRGBA(red: 0.957, green: 0.953, blue: 0.945, alpha: 0.820)),
+        ("ScrimGradientMid", .dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 0.651)),
+        ("ScrimGradientBottom", .light, ResolvedRGBA(red: 0.957, green: 0.953, blue: 0.945, alpha: 0.949)),
+        ("ScrimGradientBottom", .dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 0.902))
+    ])
+    func remainingTokens(name: String, style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
+        let resolved = resolvedComponents(Color(name), style: style)
         #expect(abs(resolved.red - expected.red) < 0.01)
         #expect(abs(resolved.green - expected.green) < 0.01)
         #expect(abs(resolved.blue - expected.blue) < 0.01)
