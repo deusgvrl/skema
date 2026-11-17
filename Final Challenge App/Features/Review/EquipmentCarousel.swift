@@ -31,6 +31,7 @@ struct EquipmentCarousel: View {
             }
             .padding()
         }
+        .frame(height: 64)
         .background(Color(uiColor: .systemBackground))
     }
 }

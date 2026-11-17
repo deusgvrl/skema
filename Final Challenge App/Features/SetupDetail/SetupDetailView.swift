@@ -4,6 +4,7 @@ import PhotosUI
 /// One saved setup with Diagram and References tabs (Sketch R08 · A10-13).
 struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.undoManager) private var undoManager
     @State private var viewModel: SetupDetailViewModel
 
     // Photo Pickers State
@@ -17,6 +18,13 @@ struct SetupDetailView: View {
     @State private var showReferenceDetail: Bool = false
     @State private var showDeleteConfirmation: Bool = false
 
+    // Diagram & Edit State
+    @State private var isReadOnly: Bool = true
+    @State private var editingNode: Equipment? = nil
+    @State private var isAddingNode: Bool = false
+    @State private var isShowSubjectSheet: Bool = false
+    @State private var showDiscardAlert: Bool = false
+
     init(setup: Setup, storageController: StorageController? = nil) {
         self._viewModel = State(initialValue: SetupDetailViewModel(
             setup: setup,
@@ -28,54 +36,39 @@ struct SetupDetailView: View {
         @Bindable var viewModel = viewModel
 
         VStack(spacing: 0) {
-            // Segmented Tab Control
-            Picker("Tabs", selection: $viewModel.selectedTab) {
-                Text("Diagram").tag(0)
-                Text("References").tag(1)
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.large)
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-
-            if viewModel.selectedTab == 0 {
-                // MARK: - Diagram Tab
-                ZStack(alignment: .bottomTrailing) {
-                    LightingDiagramView(
-                        viewModel: viewModel.reviewViewModel,
-                        isReadOnly: true,
-                        onNodeTap: { node in
-                            viewModel.selectedEquipment = node
-                        },
-                        onSubjectTap: {
-                            viewModel.isShowSubjectSheet = true
-                        }
-                    )
-
-                    // Edit Diagram FAB
-                    Button {
-                        viewModel.isEditingDiagram = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color.accentColor, in: .circle)
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    }
-                    .accessibilityLabel("Edit Diagram")
-                    .padding(16)
+            // Segmented Tab Control (hidden in edit mode)
+            if isReadOnly {
+                Picker("Tabs", selection: $viewModel.selectedTab) {
+                    Text("Diagram").tag(0)
+                    Text("References").tag(1)
                 }
+                .pickerStyle(.segmented)
+                .controlSize(.large)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
 
-                // Equipment Carousel
-                EquipmentCarousel(
+            if !isReadOnly || viewModel.selectedTab == 0 {
+                // MARK: - Diagram Tab (Reusable ReviewDiagramContentView)
+                ReviewDiagramContentView(
                     viewModel: viewModel.reviewViewModel,
-                    isReadOnly: true,
+                    undoManager: undoManager,
+                    isReadOnly: isReadOnly,
                     onNodeTap: { node in
-                        viewModel.selectedEquipment = node
+                        editingNode = node
+                    },
+                    onSubjectTap: {
+                        isShowSubjectSheet = true
+                    },
+                    onAddNodeTap: {
+                        isAddingNode = true
+                    },
+                    onEditTap: {
+                        withAnimation {
+                            isReadOnly = false
+                        }
                     }
                 )
-
             } else {
                 // MARK: - References Tab
                 ZStack {
@@ -146,6 +139,7 @@ struct SetupDetailView: View {
         }
         .background(Color(uiColor: .systemBackground))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(!isReadOnly)
         .onChange(of: viewModel.selectedTab) { _, _ in
             viewModel.isSelectionMode = false
             selectedImageIndices.removeAll()
@@ -156,20 +150,62 @@ struct SetupDetailView: View {
             }
         }
         .toolbar {
+            if !isReadOnly {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", systemImage: "xmark") {
+                        if viewModel.reviewViewModel.canUndo {
+                            showDiscardAlert = true
+                        } else {
+                            withAnimation {
+                                isReadOnly = true
+                            }
+                        }
+                    }
+                }
+            }
+            
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
+                VStack(alignment: !isReadOnly && (viewModel.reviewViewModel.canUndo || viewModel.reviewViewModel.canRedo) ? .leading : .center, spacing: 2) {
                     Text(viewModel.setupName)
                         .font(.headline)
                         .fontWeight(.bold)
-
                     Text(viewModel.formattedSubtitle)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
+            
+            ToolbarItemGroup(placement: .confirmationAction) {
+                if !isReadOnly {
+                    // Edit Mode Toolbar: Undo/Redo + Checkmark Save Button
+                    if viewModel.reviewViewModel.canUndo || viewModel.reviewViewModel.canRedo {
+                        Button {
+                            undoManager?.undo()
+                            viewModel.reviewViewModel.updateUndoState(undoManager: undoManager)
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                        }
+                        .disabled(!viewModel.reviewViewModel.canUndo)
 
-            ToolbarItem(placement: .primaryAction) {
-                if viewModel.selectedTab == 0 {
+                        Button {
+                            undoManager?.redo()
+                            viewModel.reviewViewModel.updateUndoState(undoManager: undoManager)
+                        } label: {
+                            Image(systemName: "arrow.uturn.forward")
+                        }
+                        .disabled(!viewModel.reviewViewModel.canRedo)
+                    }
+
+                    Button("Save", systemImage: "checkmark") {
+                        viewModel.reviewViewModel.finalizeAndSaveSetup()
+                        undoManager?.removeAllActions()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.reviewViewModel.updateUndoState(undoManager: undoManager)
+                            isReadOnly = true
+                        }
+                    }
+                } else if viewModel.selectedTab == 0 {
+                    // Read-only Diagram Tab Toolbar: 3 dots Menu
                     Menu {
                         Button("Edit Project Details", systemImage: "pencil") {
                             viewModel.isEditingProjectDetails = true
@@ -183,6 +219,7 @@ struct SetupDetailView: View {
                         Image(systemName: "ellipsis")
                     }
                 } else {
+                    // References Tab Toolbar
                     if viewModel.isSelectionMode {
                         Button("Cancel", systemImage: "xmark") {
                             withAnimation {
@@ -200,7 +237,7 @@ struct SetupDetailView: View {
                 }
             }
 
-            if viewModel.selectedTab == 1 {
+            if isReadOnly && viewModel.selectedTab == 1 {
                 ToolbarSpacer(placement: .bottomBar)
                 ToolbarItem(placement: .bottomBar) {
                     if viewModel.isSelectionMode {
@@ -267,39 +304,55 @@ struct SetupDetailView: View {
             }
             .ignoresSafeArea()
         }
-        // Direct Navigation Destination via boolean flag
         .navigationDestination(isPresented: $showReferenceDetail) {
             FullScreenImageView(
                 viewModel: viewModel,
                 selectedIndex: selectedPreviewIndex
             )
         }
-        .sheet(item: $viewModel.selectedEquipment) { node in
+        .sheet(item: $editingNode) { node in
             EquipmentFormView(
                 viewModel: viewModel.reviewViewModel,
                 editingNodeId: node.id,
-                undoManager: nil,
-                isReadOnly: true
+                undoManager: isReadOnly ? nil : undoManager,
+                isReadOnly: isReadOnly
             )
         }
-        .fullScreenCover(isPresented: $viewModel.isEditingDiagram) {
-            NavigationStack {
-                ReviewView(
-                    isFromLoadingScreen: false,
-                    viewModel: viewModel.reviewViewModel,
-                    onDismissToSetups: {
-                        viewModel.isEditingDiagram = false
-                    }
-                )
-            }
+        .sheet(isPresented: $isAddingNode) {
+            EquipmentFormView(
+                viewModel: viewModel.reviewViewModel,
+                editingNodeId: nil,
+                undoManager: undoManager,
+                isReadOnly: false
+            )
+        }
+        .sheet(isPresented: $isShowSubjectSheet) {
+            SubjectFormView(
+                viewModel: viewModel.reviewViewModel,
+                undoManager: isReadOnly ? nil : undoManager,
+                isReadOnly: isReadOnly
+            )
         }
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
                 ProjectDetailsView(setup: viewModel.setup)
             }
         }
-        .sheet(isPresented: $viewModel.isShowSubjectSheet) {
-            SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
+        .sheet(isPresented :)
+        .alert("Discard Unsaved Changes?", isPresented: $showDiscardAlert) {
+            Button("Discard Changes", role: .destructive) {
+                while undoManager?.canUndo == true {
+                    undoManager?.undo()
+                }
+                undoManager?.removeAllActions()
+                viewModel.reviewViewModel.updateUndoState(undoManager: undoManager)
+                withAnimation {
+                    isReadOnly = true
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Any edits you made to this diagram will be reverted.")
         }
         .alert("Delete Setup", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }
@@ -317,6 +370,14 @@ struct SetupDetailView: View {
         viewModel.deleteReferenceImages(at: selectedImageIndices)
         selectedImageIndices.removeAll()
         viewModel.isSelectionMode = false
+    }
+}
+
+struct EquipmentCarouselSheet: View {
+    @Binding var sheetDetents: PresentationDetent
+    
+    var body: some View {
+        
     }
 }
 

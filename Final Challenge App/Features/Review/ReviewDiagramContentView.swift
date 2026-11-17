@@ -10,11 +10,13 @@ import TipKit
 
 struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
-    var undoManager: UndoManager?
+    var undoManager: UndoManager? = nil
+    var isReadOnly: Bool = true
     
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
     var onAddNodeTap: () -> Void
+    var onEditTap: () -> Void
     
     // TipKit Instance
     private let interactionTip = DiagramInteractionTip()
@@ -24,27 +26,43 @@ struct ReviewDiagramContentView: View {
             ZStack(alignment: .top) {
                 LightingDiagramView(
                     viewModel: viewModel,
-                    isReadOnly: false,
+                    isReadOnly: isReadOnly,
                     undoManager: undoManager,
                     onNodeTap: onNodeTap,
                     onSubjectTap: onSubjectTap
                 )
                 .overlay(alignment: .bottomTrailing) {
-                    Button {
-                        onAddNodeTap()
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .background(Color.blue, in: .circle)
-                            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                    if isReadOnly {
+                        Button {
+                            onEditTap()
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 48, height: 48)
+                                .background(Color.accentColor, in: .circle)
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        }
+                        .accessibilityLabel("Edit Diagram")
+                        .padding(16)
+                    } else {
+                        Button {
+                            onAddNodeTap()
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 48, height: 48)
+                                .background(Color.accentColor, in: .circle)
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        }
+                        .accessibilityLabel("Add Equipment")
+                        .padding(16)
                     }
-                    .padding(16)
                 }
                 
-                // Prominent TipKit Card Overlay
-                if !viewModel.nodes.isEmpty {
+                // Prominent TipKit Card Overlay - only in edit mode
+                if !isReadOnly && !viewModel.nodes.isEmpty {
                     TipView(interactionTip, arrowEdge: .none)
                         .tipBackground(Color(uiColor: .secondarySystemGroupedBackground))
                         .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
@@ -53,11 +71,11 @@ struct ReviewDiagramContentView: View {
                 }
             }
             
-            EquipmentCarousel(
-                viewModel: viewModel,
-                isReadOnly: false,
-                onNodeTap: onNodeTap
-            )
+//            EquipmentCarousel(
+//                viewModel: viewModel,
+//                isReadOnly: isReadOnly,
+//                onNodeTap: onNodeTap
+//            )
         }
     }
 }
@@ -79,9 +97,11 @@ struct DiagramInteractionTip: Tip {
 #Preview {
     ReviewDiagramContentView(
         viewModel: ReviewViewModel(),
+        isReadOnly: true,
         onNodeTap: { _ in },
         onSubjectTap: {},
-        onAddNodeTap: {}
+        onAddNodeTap: {},
+        onEditTap: {}
     )
     .task {
         // Enables previewing TipKit cards inside Xcode Canvas

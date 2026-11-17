@@ -16,16 +16,13 @@ struct ReviewView: View {
     @State private var showCancelAlert: Bool = false
     
     // MARK: - Diagram State
+    @State private var isReadOnly: Bool = true
     @State private var editingNode: Equipment? = nil
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
-    @State private var showHint = true
-    @State private var selectedNewCategory: EquipmentCategory = .light
     @State private var showDiscardAlert = false
     @State private var showUnsavedEditsAlert = false
     @State private var isShowingSubjectSheet = false
-    @State private var initialSubjectHeight: String = ""
-
     
     init(
         isFromLoadingScreen: Bool,
@@ -37,6 +34,7 @@ struct ReviewView: View {
         self.onDismissToSetups = onDismissToSetups
         // If not from scan, immediately show the diagram
         self._isShowingDiagram = State(initialValue: !isFromLoadingScreen)
+        self._isReadOnly = State(initialValue: true)
     }
     
     var body: some View {
@@ -45,9 +43,15 @@ struct ReviewView: View {
                 ReviewDiagramContentView(
                     viewModel: viewModel,
                     undoManager: undoManager,
+                    isReadOnly: isReadOnly,
                     onNodeTap: { node in editingNode = node },
                     onSubjectTap: { isShowingSubjectSheet = true },
-                    onAddNodeTap: { isAddingNode = true }
+                    onAddNodeTap: { isAddingNode = true },
+                    onEditTap: {
+                        withAnimation {
+                            isReadOnly = false
+                        }
+                    }
                 )
             } else {
                 ReviewLoadingView(
@@ -90,7 +94,7 @@ struct ReviewView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("If you leave now, this scan and it's diagram will be lost.")
+            Text("If you leave now, this scan and its diagram will be lost.")
         }
         .alert("Discard Unsaved Changes?", isPresented: $showUnsavedEditsAlert) {
             Button("Discard Changes", role: .destructive) {
@@ -98,10 +102,11 @@ struct ReviewView: View {
                     undoManager?.undo()
                 }
                 
-                // 2. Clear memory and close
                 undoManager?.removeAllActions()
                 viewModel.updateUndoState(undoManager: undoManager)
-                dismiss()
+                withAnimation {
+                    isReadOnly = true
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
@@ -115,16 +120,29 @@ struct ReviewView: View {
             )
         }
         .sheet(item: $editingNode) { node in
-            EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
+            EquipmentFormView(
+                viewModel: viewModel,
+                editingNodeId: node.id,
+                undoManager: isReadOnly ? nil : undoManager,
+                isReadOnly: isReadOnly
+            )
         }
         .sheet(isPresented: $isAddingNode) {
-            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
+            EquipmentFormView(
+                viewModel: viewModel,
+                editingNodeId: nil,
+                undoManager: undoManager,
+                isReadOnly: false
+            )
         }
         .sheet(isPresented: $isShowingSubjectSheet) {
-            SubjectFormView(viewModel: viewModel, undoManager: undoManager)
+            SubjectFormView(
+                viewModel: viewModel,
+                undoManager: isReadOnly ? nil : undoManager,
+                isReadOnly: isReadOnly
+            )
         }
     }
-    
     
     // MARK: - Toolbar Content
     @ToolbarContentBuilder
@@ -152,7 +170,7 @@ struct ReviewView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                VStack(alignment: viewModel.canUndo || viewModel.canRedo ? .leading : .center, spacing: 2) {
+                VStack(alignment: !isReadOnly && (viewModel.canUndo || viewModel.canRedo) ? .leading : .center, spacing: 2) {
                     Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
                         .font(.headline)
                         .fontWeight(.bold)
@@ -163,44 +181,39 @@ struct ReviewView: View {
             }
             
             ToolbarItemGroup(placement: .confirmationAction) {
-                            
-                // Undo / Redo Buttons
-                if viewModel.canUndo || viewModel.canRedo {
-                    Button {
-                        undoManager?.undo()
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                    }
-                    .disabled(!viewModel.canUndo)
-                    
-                    Button {
-                        undoManager?.redo()
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    } label: {
-                        Image(systemName: "arrow.uturn.forward")
-                    }
-                    .disabled(!viewModel.canRedo)
-                }
-                
-                // Done / Save Button (Two-Tap Logic)
-                Button("Done", systemImage: isFromLoadingScreen ? "chevron.right" : "checkmark") {
-                    
+                if !isReadOnly {
+                    // Undo / Redo Buttons in Edit Mode
                     if viewModel.canUndo || viewModel.canRedo {
-                        // 1ST TAP: User has unsaved edits. Save and clear the stack.
+                        Button {
+                            undoManager?.undo()
+                            viewModel.updateUndoState(undoManager: undoManager)
+                        } label: {
+                            Image(systemName: "arrow.uturn.backward")
+                        }
+                        .disabled(!viewModel.canUndo)
+                        
+                        Button {
+                            undoManager?.redo()
+                            viewModel.updateUndoState(undoManager: undoManager)
+                        } label: {
+                            Image(systemName: "arrow.uturn.forward")
+                        }
+                        .disabled(!viewModel.canRedo)
+                    }
+                    
+                    // Edit Mode Save Button: Checkmark to save
+                    Button("Save", systemImage: "checkmark") {
                         viewModel.finalizeAndSaveSetup()
                         undoManager?.removeAllActions()
-                        
                         withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.updateUndoState(undoManager: undoManager)
+                            isReadOnly = true
                         }
-                    } else {
-                        // 2ND TAP (or no edits made): Undo stack is clean. Navigate away.
-                        if isFromLoadingScreen {
-                            navigateToR07 = true
-                        } else {
-                            dismiss()
-                        }
+                    }
+                } else {
+                    // View Only: Chevron Right to proceed to ProjectDetails
+                    Button("Next", systemImage: "chevron.right") {
+                        navigateToR07 = true
                     }
                 }
             }
@@ -208,24 +221,21 @@ struct ReviewView: View {
     }
     
     private func handleClose() {
-        let hasUnsavedChanges = viewModel.canUndo
-        
-        if isFromLoadingScreen {
-            if hasUnsavedChanges {
-                // They are in a new scan and haven't saved yet
-                showDiscardAlert = true
-            } else {
-                viewModel.discardSetup()
-                dismissAll()
-            }
-        } else {
-            if hasUnsavedChanges {
-                // They are editing an existing setup and made changes
+        if !isReadOnly {
+            if viewModel.canUndo {
                 showUnsavedEditsAlert = true
             } else {
-                // No changes made, safe to close instantly
-                dismiss()
+                withAnimation {
+                    isReadOnly = true
+                }
             }
+            return
+        }
+        
+        if isFromLoadingScreen {
+            showDiscardAlert = true
+        } else {
+            dismiss()
         }
     }
     
