@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import TipKit
 
 struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
@@ -15,7 +16,8 @@ struct ReviewDiagramContentView: View {
     var onSubjectTap: () -> Void
     var onAddNodeTap: () -> Void
     
-    @State private var showHint = true
+    // TipKit Instance
+    private let interactionTip = DiagramInteractionTip()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -35,37 +37,19 @@ struct ReviewDiagramContentView: View {
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(.white)
                             .frame(width: 48, height: 48)
-                            .background(Color.gray, in: .circle)
+                            .background(Color.blue, in: .circle)
                             .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                     }
                     .padding(16)
                 }
                 
-                if showHint && !viewModel.nodes.isEmpty {
-                    HStack {
-                        Text("Long press to move/rotate, or tap to edit details")
-                            .font(.subheadline)
-                            .foregroundStyle(.primary)
-                        
-                        Spacer()
-                        
-                        Button {
-                            withAnimation { showHint = false }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color(uiColor: .systemBackground))
-                            .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                // Prominent TipKit Card Overlay
+                if !viewModel.nodes.isEmpty {
+                    TipView(interactionTip, arrowEdge: .none)
+                        .tipBackground(Color(uiColor: .secondarySystemGroupedBackground))
+                        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
                 }
             }
             
@@ -78,6 +62,30 @@ struct ReviewDiagramContentView: View {
     }
 }
 
+struct DiagramInteractionTip: Tip {
+    var title: Text {
+        Text("Diagram Gestures")
+    }
+    
+    var message: Text? {
+        Text("Long press equipment icon to move or rotate. Tap to edit details.")
+    }
+    
+    var image: Image? {
+        Image(systemName: "hand.tap.fill")
+    }
+}
+
 #Preview {
-    ReviewDiagramContentView(viewModel: ReviewViewModel(), onNodeTap: {_ in }, onSubjectTap: {}, onAddNodeTap: {})
+    ReviewDiagramContentView(
+        viewModel: ReviewViewModel(),
+        onNodeTap: { _ in },
+        onSubjectTap: {},
+        onAddNodeTap: {}
+    )
+    .task {
+        // Enables previewing TipKit cards inside Xcode Canvas
+        try? Tips.resetDatastore()
+        try? Tips.configure([.displayFrequency(.immediate)])
+    }
 }
