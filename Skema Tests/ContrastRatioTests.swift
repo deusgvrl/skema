@@ -72,6 +72,24 @@ struct ContrastRatioTests {
         #expect(contrastRatio(DesignTokens.accentText, backdrop, style: style) >= 4.5)
     }
 
+    @Test("Diagram: node outlines clear 3:1, labels and distances clear AA on the canvas",
+          arguments: [UIUserInterfaceStyle.light, .dark])
+    func diagramContrast(style: UIUserInterfaceStyle) {
+        #expect(contrastRatio(DesignTokens.diagramStroke, DesignTokens.pageBackground, style: style) >= 3.0)
+        #expect(contrastRatio(DesignTokens.diagramStroke, DesignTokens.diagramNodeFill, style: style) >= 3.0)
+        #expect(contrastRatio(DesignTokens.textPrimary, DesignTokens.pageBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.textSecondary, DesignTokens.pageBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.textPrimary, DesignTokens.diagramSubjectFill, style: style) >= 4.5)
+    }
+
+    @Test("Equipment sheet rows: label, value and red category clear AA on FormRowBackground",
+          arguments: [UIUserInterfaceStyle.light, .dark])
+    func formRowContrast(style: UIUserInterfaceStyle) {
+        #expect(contrastRatio(DesignTokens.textPrimary, DesignTokens.formRowBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.textSecondary, DesignTokens.formRowBackground, style: style) >= 4.5)
+        #expect(contrastRatio(DesignTokens.accentText, DesignTokens.formRowBackground, style: style) >= 4.5)
+    }
+
     @Test("NodeDetailFill clears the 3:1 UI-component floor against the canvas and the node body")
     func nodeDetailFillContrast() {
         let systemBackground = Color(uiColor: .systemBackground)

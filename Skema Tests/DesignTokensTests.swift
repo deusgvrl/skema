@@ -76,9 +76,9 @@ struct DesignTokensTests {
         #expect(abs(resolved.blue - expected.blue) < 0.01)
     }
 
-    @Test("AccentText is the brand red in light and Sketch's lighter red in dark", arguments: [
+    @Test("AccentText is the brand red in light and a lighter red in dark that clears AA on form rows", arguments: [
         (UIUserInterfaceStyle.light, ResolvedRGBA(red: 0.784, green: 0.157, blue: 0.102, alpha: 1.0)),
-        (.dark, ResolvedRGBA(red: 1.0, green: 0.353, blue: 0.290, alpha: 1.0))
+        (.dark, ResolvedRGBA(red: 1.0, green: 0.502, blue: 0.459, alpha: 1.0))
     ])
     func accentText(style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
         let resolved = resolvedComponents(DesignTokens.accentText, style: style)
@@ -125,7 +125,23 @@ struct DesignTokensTests {
         ("ScrimGradientMid", .light, ResolvedRGBA(red: 0.957, green: 0.953, blue: 0.945, alpha: 0.820)),
         ("ScrimGradientMid", .dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 0.651)),
         ("ScrimGradientBottom", .light, ResolvedRGBA(red: 0.957, green: 0.953, blue: 0.945, alpha: 0.949)),
-        ("ScrimGradientBottom", .dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 0.902))
+        ("ScrimGradientBottom", .dark, ResolvedRGBA(red: 0.055, green: 0.055, blue: 0.059, alpha: 0.902)),
+        ("DiagramGrid", .light, ResolvedRGBA(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.06)),
+        ("DiagramGrid", .dark, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.05)),
+        ("DiagramGuide", .light, ResolvedRGBA(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.25)),
+        ("DiagramGuide", .dark, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.22)),
+        ("DiagramStroke", .light, ResolvedRGBA(red: 0.110, green: 0.110, blue: 0.118, alpha: 1.0)),
+        ("DiagramStroke", .dark, ResolvedRGBA(red: 0.902, green: 0.902, blue: 0.902, alpha: 1.0)),
+        ("DiagramNodeFill", .light, ResolvedRGBA(red: 0.949, green: 0.945, blue: 0.937, alpha: 1.0)),
+        ("DiagramNodeFill", .dark, ResolvedRGBA(red: 0.165, green: 0.173, blue: 0.188, alpha: 1.0)),
+        ("DiagramGlow", .light, ResolvedRGBA(red: 1.0, green: 0.698, blue: 0.302, alpha: 0.25)),
+        ("DiagramGlow", .dark, ResolvedRGBA(red: 1.0, green: 0.941, blue: 0.863, alpha: 0.35)),
+        ("DiagramSubjectFill", .light, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)),
+        ("DiagramSubjectFill", .dark, ResolvedRGBA(red: 0.118, green: 0.122, blue: 0.133, alpha: 1.0)),
+        ("DiagramSubjectBorder", .light, ResolvedRGBA(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.10)),
+        ("DiagramSubjectBorder", .dark, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.14)),
+        ("FormRowBackground", .light, ResolvedRGBA(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)),
+        ("FormRowBackground", .dark, ResolvedRGBA(red: 0.227, green: 0.231, blue: 0.247, alpha: 1.0))
     ])
     func remainingTokens(name: String, style: UIUserInterfaceStyle, expected: ResolvedRGBA) {
         let resolved = resolvedComponents(Color(name), style: style)
