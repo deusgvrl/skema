@@ -22,7 +22,11 @@ final class StorageController {
     }
         
     func fetchAllSetups() -> [Setup] {
-        let descriptor = FetchDescriptor<Setup>(sortBy: [SortDescriptor(\.setupName)])
+        // Setups in Recently Deleted are hidden everywhere else.
+        let descriptor = FetchDescriptor<Setup>(
+            predicate: #Predicate { $0.deletedDate == nil },
+            sortBy: [SortDescriptor(\.setupName)]
+        )
         do {
             return try context.fetch(descriptor)
         } catch {
@@ -41,6 +45,37 @@ final class StorageController {
         save()
     }
         
+    /// Hides a setup in Recently Deleted. Its data stays until `purgeExpiredSetups` removes it.
+    func moveToRecentlyDeleted(_ setup: Setup, at date: Date) {
+        setup.deletedDate = date
+        save()
+    }
+
+    func recover(_ setup: Setup) {
+        setup.deletedDate = nil
+        save()
+    }
+
+    func fetchRecentlyDeleted() -> [Setup] {
+        let descriptor = FetchDescriptor<Setup>(predicate: #Predicate { $0.deletedDate != nil })
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            print("Failed to fetch recently deleted setups: \(error)")
+            return []
+        }
+    }
+
+    /// Removes for good every setup past its last day. The delete rules also remove its equipment and photos.
+    func purgeExpiredSetups(now: Date, calendar: Calendar = .current) {
+        for setup in fetchRecentlyDeleted() {
+            guard let deletedDate = setup.deletedDate,
+                  RecentlyDeleted.isExpired(deletedOn: deletedDate, now: now, calendar: calendar) else { continue }
+            context.delete(setup)
+        }
+        save()
+    }
+
     func addEquipment(_ equipment: Equipment, to setup: Setup) {
         setup.nodes.append(equipment)
         save()

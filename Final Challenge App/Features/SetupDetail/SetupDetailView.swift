@@ -301,7 +301,7 @@ struct SetupDetailView: View {
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {
             SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
         }
-        .alert("Delete Setup", isPresented: $viewModel.isDeleteAlertPresented) {
+        .alert("Delete This Setup?", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 viewModel.deleteSetup {
@@ -309,7 +309,7 @@ struct SetupDetailView: View {
                 }
             }
         } message: {
-            Text("Are you sure you want to delete this setup? This action cannot be undone.")
+            Text(viewModel.deleteMessage)
         }
     }
 

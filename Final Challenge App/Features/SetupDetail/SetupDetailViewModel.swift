@@ -11,6 +11,7 @@ final class SetupDetailViewModel {
     let setup: Setup
     let reviewViewModel: ReviewViewModel
     @ObservationIgnored private let storageController: StorageController
+    @ObservationIgnored private let now: () -> Date
     
     // Tab Navigation
     var selectedTab: Int = 0 // 0 = Diagram, 1 = References
@@ -31,8 +32,9 @@ final class SetupDetailViewModel {
         setup.referenceImages.sorted(by: { $0.createdAt < $1.createdAt })
     }
     
-    init(setup: Setup, storageController: StorageController? = nil) {
+    init(setup: Setup, storageController: StorageController? = nil, now: @escaping () -> Date = { Date() }) {
         let storage = storageController ?? StorageController.shared
+        self.now = now
         self.setup = setup
         self.storageController = storage
         self.reviewViewModel = ReviewViewModel(setup: setup, storageController: storage)
@@ -48,8 +50,20 @@ final class SetupDetailViewModel {
         return components.isEmpty ? "No Details" : components.joined(separator: " › ")
     }
     
+    /// The alert text: saved setups can be recovered for 30 days, drafts cannot (A10-95).
+    var deleteMessage: String {
+        setup.firstSavedDate == nil
+            ? "This draft will be deleted. This can't be undone."
+            : "This setup will move to Recently Deleted for \(RecentlyDeleted.keepDays) days."
+    }
+
     func deleteSetup(completion: () -> Void) {
-        storageController.deleteSetup(setup)
+        if setup.firstSavedDate == nil {
+            // A draft was never saved by the user, so it skips Recently Deleted.
+            storageController.deleteSetup(setup)
+        } else {
+            storageController.moveToRecentlyDeleted(setup, at: now())
+        }
         completion()
     }
     

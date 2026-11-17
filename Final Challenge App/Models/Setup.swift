@@ -14,6 +14,9 @@ final class Setup {
     /// Set on the first Save only, never changed after (A10-93).
     /// Optional on purpose: no migration for the MVP, so setups saved before this field still load.
     var firstSavedDate: Date?
+    /// Set when the setup is moved to Recently Deleted, nil otherwise (A10-95).
+    /// Optional on purpose, so setups saved before this field still load.
+    var deletedDate: Date?
     
     // 1-to-Many Relationship: Deleting a setup deletes its equipment
     @Relationship(deleteRule: .cascade, inverse: \Equipment.setup)

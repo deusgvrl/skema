@@ -6,6 +6,8 @@ struct SetupsView: View {
     @State private var searchText = ""
     @State private var isShowingLiDARScan = false
     @ScaledMetric(relativeTo: .title2) private var newSetupButtonSize: CGFloat = 48
+    /// How long the "Setup deleted" toast stays before it goes away on its own.
+    private let undoToastSeconds = 5
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -25,6 +27,12 @@ struct SetupsView: View {
                     emptyState
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 120)
+                    if viewModel.hasRecentlyDeleted {
+                        List { recentlyDeletedRow }
+                            .listStyle(.insetGrouped)
+                            .scrollDisabled(true)
+                            .frame(height: 100)
+                    }
                 } else {
                     List {
                         switch viewModel.grouping {
@@ -52,6 +60,9 @@ struct SetupsView: View {
                                     }
                                 }
                             }
+                        }
+                        if viewModel.hasRecentlyDeleted {
+                            recentlyDeletedRow
                         }
                     }
                     .listStyle(.insetGrouped)
@@ -84,6 +95,29 @@ struct SetupsView: View {
                 .overlay(alignment: .bottomTrailing) {
                     newSetupButton
             }
+                .overlay(alignment: .bottom) {
+                    if viewModel.lastDeleted != nil {
+                        undoToast
+                    }
+                }
+                .task(id: viewModel.lastDeleted?.id) {
+                    guard viewModel.lastDeleted != nil else { return }
+                    try? await Task.sleep(for: .seconds(undoToastSeconds))
+                    viewModel.dismissUndo()
+                }
+                .alert(
+                    "Delete This Setup?",
+                    isPresented: Binding(
+                        get: { viewModel.setupPendingDelete != nil },
+                        set: { isPresented in if !isPresented { viewModel.cancelDelete() } }
+                    ),
+                    presenting: viewModel.setupPendingDelete
+                ) { _ in
+                    Button("Delete", role: .destructive) { viewModel.confirmDelete() }
+                    Button("Cancel", role: .cancel) { viewModel.cancelDelete() }
+                } message: { setup in
+                    Text(viewModel.deleteMessage(for: setup))
+                }
             .onAppear {
                 viewModel.fetchSetups()
             }
@@ -116,11 +150,33 @@ struct SetupsView: View {
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
-                viewModel.deleteSetup(setup)
+                viewModel.deleteTapped(setup)
             } label: {
                 Label("Delete", systemImage: "trash")
             }
         }
+    }
+
+    private var recentlyDeletedRow: some View {
+        NavigationLink {
+            RecentlyDeletedView()
+        } label: {
+            Label("Recently Deleted", systemImage: "trash")
+        }
+    }
+
+    private var undoToast: some View {
+        HStack {
+            Text("Setup deleted")
+            Spacer()
+            Button("Undo") { viewModel.undoDelete() }
+                .bold()
+        }
+        .padding()
+        .background(.regularMaterial, in: .capsule)
+        .padding(.horizontal)
+        // Sits above the + button so the two never overlap.
+        .padding(.bottom, newSetupButtonSize + 32)
     }
 
     private var emptyState: some View {
