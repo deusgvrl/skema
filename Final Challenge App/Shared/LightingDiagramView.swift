@@ -1,6 +1,33 @@
 import SwiftUI
 
-/// Top-down lighting diagram, reused by Review, SetupDetail and the PDF (A10-10).
+// MARK: - 1. Adaptive Grid Configuration Helper
+
+struct GridConfig {
+    let stepInPoints: CGFloat // Grid tile width in canvas model points
+    let labelText: String     // Scale badge text (e.g. "25 cm", "50 cm", "1 m")
+    
+    /// Calculates the optimal grid subdivision step based on the active zoom factor
+    static func config(for scale: CGFloat) -> GridConfig {
+        // Target model distance that maps to roughly 50–70 screen pixels
+        let targetMeters = 0.5 / scale
+        
+        if targetMeters <= 0.35 {
+            // Zoomed In (scale >= 1.4x) -> 25 cm per tile (1.50m = 6 tiles)
+            return GridConfig(stepInPoints: 25, labelText: "25 cm")
+        } else if targetMeters <= 0.75 {
+            // Standard View (0.67x <= scale < 1.4x) -> 50 cm per tile (1.50m = 3 tiles)
+            return GridConfig(stepInPoints: 50, labelText: "50 cm")
+        } else if targetMeters <= 1.5 {
+            // Zoomed Out (0.33x <= scale < 0.67x) -> 1 meter per tile (1.50m = 1.5 tiles)
+            return GridConfig(stepInPoints: 100, labelText: "1 m")
+        } else {
+            // Far Zoomed Out (scale < 0.33x) -> 2 meters per tile
+            return GridConfig(stepInPoints: 200, labelText: "2 m")
+        }
+    }
+}
+
+// MARK: - 2. LightingDiagramView
 
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
@@ -18,19 +45,36 @@ struct LightingDiagramView: View {
     @State private var offset: CGSize = .zero
     @GestureState private var dragOffset: CGSize = .zero
     
+    init(
+        viewModel: ReviewViewModel,
+        isReadOnly: Bool = false,
+        undoManager: UndoManager? = nil,
+        initialZoomScale: CGFloat = 1.0, // Default 1.0x = 50 cm scale
+        onNodeTap: ((Equipment) -> Void)? = nil,
+        onSubjectTap: (() -> Void)? = nil
+    ) {
+        self.viewModel = viewModel
+        self.isReadOnly = isReadOnly
+        self.undoManager = undoManager
+        self._zoomScale = State(initialValue: initialZoomScale)
+        self.onNodeTap = onNodeTap
+        self.onSubjectTap = onSubjectTap
+    }
+    
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
             let currentScale = zoomScale * magnifyBy // Unified active zoom factor
+            let gridConfig = GridConfig.config(for: currentScale) // Dynamic grid resolution
             
             ZStack {
-                // Background Grid
-                GridPattern()
+                // Background Grid (Adapts step automatically)
+                GridPattern(step: gridConfig.stepInPoints)
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1 / currentScale)
                     .frame(width: 6000, height: 6000)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
                  
-                // Connecting Lines (Constant line thickness regardless of zoom)
+                // Connecting Lines
                 Path { path in
                     for node in viewModel.nodes {
                         path.move(to: subjectCenter)
@@ -42,19 +86,16 @@ struct LightingDiagramView: View {
                     style: StrokeStyle(lineWidth: 1.5 / currentScale, dash: [5 / currentScale])
                 )
                  
-                // Distance Labels (Aligned, Offset, and Staggered)
-                
+                // Distance Labels
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
                     let dx = node.position.x
                     let dy = node.position.y
                     let length = max(1.0, hypot(dx, dy))
                     
-                    // 1. Stagger position ratio along the line (alternates 0.45 and 0.60 based on index)
                     let ratio: CGFloat = (index % 2 == 0) ? 0.45 : 0.60
                     let posX = subjectCenter.x + dx * ratio
                     let posY = subjectCenter.y + dy * ratio
                     
-                    // 2. Calculate ray angle in degrees & keep text right-side-up (inside closure)
                     let angle: Double = {
                         var rawAngle = atan2(dy, dx) * 180 / .pi
                         if rawAngle > 90 {
@@ -65,10 +106,9 @@ struct LightingDiagramView: View {
                         return rawAngle
                     }()
                     
-                    // 3. Calculate perpendicular unit normal vector to offset text off the line
                     let normalX = -dy / length
                     let normalY = dx / length
-                    let offsetDistance: CGFloat = 12 / currentScale // Counter-scaled offset
+                    let offsetDistance: CGFloat = 12 / currentScale
                     
                     let labelPos = CGPoint(
                         x: posX + normalX * offsetDistance,
@@ -84,12 +124,12 @@ struct LightingDiagramView: View {
                                 .fill(Color(uiColor: .systemBackground).opacity(0.85))
                                 .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
                         )
-                        .rotationEffect(.degrees(angle)) // Aligns text along line direction
-                        .scaleEffect(1 / currentScale)    // Counter-scales font size
+                        .rotationEffect(.degrees(angle))
+                        .scaleEffect(1 / currentScale)
                         .position(labelPos)
                 }
                 
-                // Subject Icon (Constant icon & font size)
+                // Subject Icon (Centered on Grid Point)
                 DiagramEntity(
                     title: "Subject",
                     icon: "person.fill",
@@ -130,7 +170,6 @@ struct LightingDiagramView: View {
                     )
                 }
             }
-            // Apply Canvas Pan Offset
             .offset(
                 x: offset.width + dragOffset.width,
                 y: offset.height + dragOffset.height
@@ -171,13 +210,20 @@ struct LightingDiagramView: View {
         .clipped()
         .overlay(alignment: .bottomLeading) {
             let activeScale = zoomScale * magnifyBy
-            ScaleMeterView(currentScale: activeScale)
-                    .padding(16)
+            let activeConfig = GridConfig.config(for: activeScale)
+            
+            // Scale bar width matches 1 grid square on screen
+            ScaleMeterView(
+                labelText: activeConfig.labelText,
+                barWidth: activeConfig.stepInPoints * activeScale
+            )
+            .padding(16)
         }
     }
 }
 
-// Counter-scaled Diagram Entity (Subject)
+// MARK: - 3. Supporting Components
+
 struct DiagramEntity: View {
     let title: String
     let icon: String
@@ -186,7 +232,6 @@ struct DiagramEntity: View {
     var onTap: () -> Void
     
     var body: some View {
-        // 1. Core 44x44 icon box centered at position
         RoundedRectangle(cornerRadius: 6)
             .fill(Color(uiColor: .systemGray5))
             .frame(width: 44, height: 44)
@@ -195,7 +240,6 @@ struct DiagramEntity: View {
                     .foregroundStyle(.secondary)
                     .font(.title3)
             )
-            // 2. Hang text label below without shifting the icon's center
             .overlay(alignment: .bottom) {
                 Text(title)
                     .font(.caption2)
@@ -203,8 +247,8 @@ struct DiagramEntity: View {
                     .fixedSize()
                     .offset(y: 20)
             }
-            .scaleEffect(1 / currentScale) // Counter-scale icon and text
-            .position(position)            // Now centers the 44x44 box exactly on the point
+            .scaleEffect(1 / currentScale)
+            .position(position)
             .onTapGesture {
                 onTap()
             }
@@ -212,9 +256,10 @@ struct DiagramEntity: View {
 }
 
 struct GridPattern: Shape {
+    var step: CGFloat = 50
+    
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let step: CGFloat = 50
         for x in stride(from: 0, through: rect.width, by: step) {
             path.move(to: CGPoint(x: x, y: 0))
             path.addLine(to: CGPoint(x: x, y: rect.height))
@@ -228,24 +273,10 @@ struct GridPattern: Shape {
 }
 
 struct ScaleMeterView: View {
-    var currentScale: CGFloat
+    let labelText: String
+    let barWidth: CGFloat
     
     var body: some View {
-        // 50 points bar at pointsPerMeter = 100.0 represents 0.5m (50 cm) at 1.0x zoom
-        let baseMeters: CGFloat = 0.5
-        let calculatedMeters = baseMeters / currentScale
-        
-        let labelText: String = {
-            if calculatedMeters < 1.0 {
-                let cm = Int(round(calculatedMeters * 100))
-                return "\(max(1, cm)) cm"
-            } else if calculatedMeters >= 10.0 {
-                return "\(Int(round(calculatedMeters))) m"
-            } else {
-                return String(format: "%.1f m", calculatedMeters)
-            }
-        }()
-        
         VStack(spacing: 3) {
             Text(labelText)
                 .font(.system(size: 12, weight: .medium))
@@ -256,7 +287,7 @@ struct ScaleMeterView: View {
                 Rectangle().frame(height: 1.5).foregroundStyle(.secondary)
                 Rectangle().frame(width: 1.5, height: 8).foregroundStyle(.secondary)
             }
-            .frame(width: 50)
+            .frame(width: max(20, barWidth))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -264,5 +295,5 @@ struct ScaleMeterView: View {
 }
 
 #Preview {
-   LightingDiagramView(viewModel: ReviewViewModel(), isReadOnly: false, undoManager: nil)
+    LightingDiagramView(viewModel: ReviewViewModel(), isReadOnly: false, undoManager: nil)
 }
