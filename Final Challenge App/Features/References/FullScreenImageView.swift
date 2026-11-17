@@ -37,7 +37,7 @@ struct FullScreenImageView: View {
     var body: some View {
         ZStack {
             // Layer 1: Background Layer
-            Color(isControlsHidden ? .black : .systemBackground)
+            (isControlsHidden ? Color.black : DesignTokens.pageBackground)
                 .opacity(backgroundOpacity)
                 .ignoresSafeArea()
 
@@ -89,7 +89,7 @@ struct FullScreenImageView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: isSelected ? 8 : 4))
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: isSelected ? 8 : 4)
-                                                    .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
+                                                    .stroke(isSelected ? DesignTokens.textPrimary : Color.clear, lineWidth: 2)
                                             )
                                             .opacity(isSelected ? 1.0 : 0.5)
                                             .contentShape(Rectangle())
@@ -137,8 +137,7 @@ struct FullScreenImageView: View {
         .ignoresSafeArea()
         .statusBarHidden(isControlsHidden)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .navigationBar)
-        .toolbar(isControlsHidden ? .hidden : .visible, for: .bottomBar)
-        .toolbarBackground(.hidden, for: .navigationBar, .bottomBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
             scrollPositionID = selectedIndex
             feedbackGenerator.prepare()
@@ -151,7 +150,8 @@ struct FullScreenImageView: View {
                 scrollPositionID = selectedIndex
             }
         }
-        .alert("Delete This Photo", isPresented: $isDeleteAlert) {
+        // R13c
+        .alert("Delete This Photo?", isPresented: $isDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 deleteCurrentImage()
@@ -169,23 +169,22 @@ struct FullScreenImageView: View {
 
                     Text("Reference \(displayIndex)")
                         .font(.headline)
-                        .fontWeight(.bold)
+                        .foregroundStyle(DesignTokens.textPrimary)
 
                     if let currentRefImage {
                         Text("\(displayIndex) of \(viewModel.referenceImages.count) · Added \(currentRefImage.formattedDateString)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.textSecondary)
                     } else {
                         Text("\(displayIndex) of \(viewModel.referenceImages.count)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.textSecondary)
                     }
                 }
             }
             
-            ToolbarSpacer(placement: .bottomBar)
-
-            ToolbarItem(placement: .bottomBar) {
+            // R13b: trash at the top right
+            ToolbarItem(placement: .primaryAction) {
                 Button("Delete", systemImage: "trash") {
                     isDeleteAlert = true
                 }
