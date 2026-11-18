@@ -67,42 +67,51 @@ struct LightingDiagramView: View {
                     onSubjectTap?()
                 }
                  
-                // Distance Labels
+                // MARK: - Distance Labels Loop
+
+                // At initial 1.0x scale (50 cm grid), only show equipment >= 1.5 meters away.
+                // Zooming in (higher currentScale) lowers the threshold, revealing closer equipment.
+                let minDistanceThreshold = 1.5 / currentScale
+
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
-                    let dx = node.position.x
-                    let dy = node.position.y
-                    let length = max(1.0, hypot(dx, dy))
+                    // Extract numeric distance value (handling Double, Float, or String model types)
+                    let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
                     
-                    let ratio: CGFloat = (index % 2 == 0) ? 0.45 : 0.60
-                    let posX = subjectCenter.x + dx * ratio
-                    let posY = subjectCenter.y + dy * ratio
-                    
-                    let angle: Double = {
-                        var rawAngle = atan2(dy, dx) * 180 / .pi
-                        if rawAngle > 90 {
-                            rawAngle -= 180
-                        } else if rawAngle < -90 {
-                            rawAngle += 180
-                        }
-                        return rawAngle
-                    }()
-                    
-                    let normalX = -dy / length
-                    let normalY = dx / length
-                    let offsetDistance: CGFloat = 12 / currentScale
-                    
-                    let labelPos = CGPoint(
-                        x: posX + normalX * offsetDistance,
-                        y: posY + normalY * offsetDistance
-                    )
-                    
-                    Text("\(node.distance) m")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(DesignTokens.textSecondary)
-                        .fixedSize()
-                        .rotationEffect(.degrees(angle))
-                        .scaleEffect(1 / currentScale)
-                        .position(labelPos)
+                    // Only render label if node meets the minimum distance for the current zoom scale
+                    if distanceValue >= minDistanceThreshold {
+                        let dx = node.position.x
+                        let dy = node.position.y
+                        let length = max(1.0, hypot(dx, dy))
+                        
+                        // Midpoint calculation (50%)
+                        let posX = subjectCenter.x + dx * 0.5
+                        let posY = subjectCenter.y + dy * 0.5
+                        
+                        let angle: Double = {
+                            var rawAngle = atan2(dy, dx) * 180 / .pi
+                            if rawAngle > 90 {
+                                rawAngle -= 180
+                            } else if rawAngle < -90 {
+                                rawAngle += 180
+                            }
+                            return rawAngle
+                        }()
+                        
+                        Text("\(node.distance) m")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DesignTokens.textSecondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(DesignTokens.pageBackground.opacity(0.9))
+                            )
+                            .fixedSize()
+                            .rotationEffect(.degrees(angle))
+                            .scaleEffect(1 / currentScale)
+                            .position(x: posX, y: posY)
+                            .transition(.opacity) // Smooth fade in/out during pinch zoom
+                    }
                 }
                 
                 // Draggable Nodes
