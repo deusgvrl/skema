@@ -23,9 +23,13 @@ struct SetupDetailView: View {
 
     // Diagram view / edit state
     @State private var editingNode: Equipment?
+    @State private var activeNode: Equipment?
+    @State private var selectedNodeId: UUID? = nil
     @State private var isAddingNode = false
     @State private var isShowingSubjectSheet = false
     @State private var showsDiscardChangesAlert = false
+    
+    @State private var selectedDetent: PresentationDetent = .height(76)
 
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
 
@@ -40,125 +44,27 @@ struct SetupDetailView: View {
         @Bindable var viewModel = viewModel
 
         VStack(spacing: 0) {
-            // Segmented Tab Control (hidden while editing the diagram, Sketch R09)
-            if !isEditing {
-                Picker("Tabs", selection: $viewModel.selectedTab) {
-                    Text("Diagram").tag(0)
-                    Text("References").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .controlSize(.large)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-            }
+            tabPicker
 
             if isEditing || viewModel.selectedTab == 0 {
-                // MARK: - Diagram Tab (pencil in view mode, + in edit mode, chips below)
-                ReviewDiagramContentView(
-                    viewModel: viewModel.reviewViewModel,
-                    undoManager: undoManager,
-                    onNodeTap: { node in editingNode = node },
-                    onSubjectTap: { isShowingSubjectSheet = true } 
-                )
-                .ignoresSafeArea(edges: .bottom)
-
+                diagramContent
             } else {
-                // MARK: - References Tab (Sketch R11, R13)
-                ZStack(alignment: .bottomTrailing) {
-                    if viewModel.referenceImages.isEmpty {
-                        referencesEmptyState
-                    } else {
-                        ScrollView {
-                            let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
-                            LazyVGrid(columns: columns, spacing: 2) {
-                                ForEach(viewModel.referenceImages.indices, id: \.self) { index in
-                                    Image(uiImage: viewModel.referenceImages[index])
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .clipped()
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            selectedPreviewIndex = index
-                                            showReferenceDetail = true
-                                        }
-                                        .accessibilityLabel("Reference \(index + 1)")
-                                        .accessibilityAddTraits(.isButton)
-                                }
-                            }
-                        }
-                    }
-                }
+                referencesContent
             }
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
+        .onChange(of: viewModel.selectedTab) { _, _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedNodeId = nil
+                editingNode = nil
+                activeNode = nil
+                selectedDetent = .height(76)
+            }
+        }
         .toolbar {
-            ToolbarSpacer(placement: .bottomBar)
-
-            if viewModel.selectedTab == 1 {
-                ToolbarItem(placement: .bottomBar) {
-                    Menu {
-                        Button("Take Photo", systemImage: "camera") {
-                            showCamera = true
-                        }
-                        Button("Choose from Library", systemImage: "photo.on.rectangle") {
-                            showPhotoPicker = true
-                        }
-                    } label: {
-                        Label("Add Image", systemImage: "plus")
-                    }
-                }
-            }
-            
-            ToolbarItem(placement: .bottomBar) {
-                floatingButton
-            }
-            
-            if isEditing {
-                editToolbar
-            }
-
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(viewModel.setupName)
-                        .font(.headline)
-                        .foregroundStyle(DesignTokens.textPrimary)
-                    if !viewModel.formattedSubtitle.isEmpty {
-                        Text(viewModel.formattedSubtitle)
-                            .font(.caption)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                    }
-                }
-                .accessibilityElement(children: .combine)
-            }
-
-            // R14 / R13m
-            if !isEditing {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button("Edit Project Details", systemImage: "pencil") {
-                        viewModel.isEditingProjectDetails = true
-                    }
-                    Button("Share", systemImage: "square.and.arrow.up") {
-                        shareTapped()
-                    }
-                    .disabled(viewModel.isPreparingPDF)
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        viewModel.isDeleteAlertPresented = true
-                    }
-                } label: {
-                    if viewModel.isPreparingPDF {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "ellipsis")
-                    }
-                }
-                .accessibilityLabel("More")
-            }
-            }
+            toolbarContent
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerSelection, matching: .images)
         .task(id: photoPickerSelection) {
@@ -180,16 +86,21 @@ struct SetupDetailView: View {
             )
         }
         // View mode shows details read-only; the pencil makes them editable (A10-101).
-        .sheet(item: $editingNode) { node in
-            EquipmentFormView(
-                viewModel: viewModel.reviewViewModel,
-                editingNodeId: node.id,
-                undoManager: isEditing ? undoManager : nil,
-                isReadOnly: !isEditing
-            )
+        .sheet(isPresented: nodeSheetBinding, onDismiss: {
+            selectedNodeId = nil
+            editingNode = nil
+            activeNode = nil
+            selectedDetent = .height(76)
+        }) {
+            nodeSheetContent
         }
         .sheet(isPresented: $isAddingNode) {
-            EquipmentFormView(viewModel: viewModel.reviewViewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
+            EquipmentFormView(
+                viewModel: viewModel.reviewViewModel,
+                editingNodeId: nil,
+                undoManager: undoManager,
+                isReadOnly: false
+            )
         }
         .sheet(isPresented: $isShowingSubjectSheet) {
             SubjectFormView(
@@ -238,48 +149,129 @@ struct SetupDetailView: View {
         }
     }
 
-    /// Draws the diagram into an image for the PDF, then lets the view model make the file (A10-99).
-    private func shareTapped() {
-        let base = PDFLayout.diagramCanvasSize
-        let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
-        
-        let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true, isExportedToPdf: true)
-            .frame(width: canvas.width, height: canvas.height)
-            // Paper is light, whatever the phone's appearance.
-            .environment(\.colorScheme, .light)
-        let renderer = ImageRenderer(content: diagram)
-        // A bigger canvas gets a lower scale, so the image keeps about the same pixel size.
-        renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
-        viewModel.shareTapped(diagram: renderer.uiImage)
-    }
-    
-   
-    /// Pencil in Diagram view mode, + (Add Node) in Diagram edit mode, and + (Menu) in References tab.
+    // MARK: - Sub-Expressions
+
     @ViewBuilder
-    private var floatingButton: some View {
-        if isEditing || viewModel.selectedTab == 0 {
-            if isEditing {
-                Button {
-                    isAddingNode = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.white)
+    private var tabPicker: some View {
+        // Segmented Tab Control (hidden while editing the diagram, Sketch R09)
+        if !isEditing {
+            Picker("Tabs", selection: $viewModel.selectedTab) {
+                Text("Diagram").tag(0)
+                Text("References").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.large)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var diagramContent: some View {
+        ReviewDiagramContentView(
+            viewModel: viewModel.reviewViewModel,
+            undoManager: undoManager,
+            selectedNodeId: $selectedNodeId,
+            onNodeTap: { node in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    selectedDetent = .height(76)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(DesignTokens.accentPrimary)
+                selectedNodeId = node.id
+                activeNode = node
+                editingNode = node
+            },
+            onSubjectTap: { isShowingSubjectSheet = true },
+            onEmptyTap: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedNodeId = nil
+                    editingNode = nil
+                    selectedDetent = .height(76)
+                }
+            }
+        )
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    @ViewBuilder
+    private var referencesContent: some View {
+        // MARK: - References Tab (Sketch R11, R13)
+        ZStack {
+            if viewModel.referenceImages.isEmpty {
+                referencesEmptyState
             } else {
-                Button {
-                    viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
-                } label: {
-                    Image(systemName: "pencil")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.white)
+                ScrollView {
+                    let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+                    LazyVGrid(columns: columns, spacing: 2) {
+                        ForEach(viewModel.referenceImages.indices, id: \.self) { index in
+                            Image(uiImage: viewModel.referenceImages[index])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                                .aspectRatio(1, contentMode: .fit)
+                                .clipped()
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedPreviewIndex = index
+                                    showReferenceDetail = true
+                                }
+                                .accessibilityLabel("Reference \(index + 1)")
+                                .accessibilityAddTraits(.isButton)
+                        }
+                    }
                 }
-                .buttonStyle(.glassProminent)
-                .tint(DesignTokens.accentPrimary)
             }
         }
+    }
+
+    // MARK: - Sheet Sub-Expressions
+
+    private var nodeSheetBinding: Binding<Bool> {
+        Binding(
+            get: { editingNode != nil },
+            set: { isPresented in
+                if !isPresented {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedNodeId = nil
+                        editingNode = nil
+                        selectedDetent = .height(76)
+                    }
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var nodeSheetContent: some View {
+        if let node = editingNode ?? activeNode {
+            EquipmentFormView(
+                viewModel: viewModel.reviewViewModel,
+                editingNodeId: node.id,
+                undoManager: isEditing ? undoManager : nil,
+                isReadOnly: !isEditing,
+                selectedDetent: $selectedDetent
+            )
+            .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
+            .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
+            .interactiveDismissDisabled(true)
+            .presentationDragIndicator(.visible)
+            .presentationBackground(DesignTokens.sheetBackground)
+        }
+    }
+
+    // MARK: - Toolbar Content
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if isEditing {
+            editToolbar
+        }
+
+        principalToolbar
+
+        if !isEditing {
+            moreMenuToolbar
+        }
+
+        bottomToolbar
     }
 
     /// Edit mode (Sketch R09): X, undo/redo in one capsule, and a red ✓ once something changed.
@@ -321,6 +313,110 @@ struct SetupDetailView: View {
             .tint(DesignTokens.accentPrimary)
             .disabled(!viewModel.reviewViewModel.hasPendingEdits)
         }
+    }
+
+    @ToolbarContentBuilder
+    private var principalToolbar: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            VStack(spacing: 2) {
+                Text(viewModel.setupName)
+                    .font(.headline)
+                    .foregroundStyle(DesignTokens.textPrimary)
+                if !viewModel.formattedSubtitle.isEmpty {
+                    Text(viewModel.formattedSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    // R14 / R13m
+    @ToolbarContentBuilder
+    private var moreMenuToolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button("Edit Project Details", systemImage: "pencil") {
+                    viewModel.isEditingProjectDetails = true
+                }
+                Button("Share", systemImage: "square.and.arrow.up") {
+                    shareTapped()
+                }
+                .disabled(viewModel.isPreparingPDF)
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    viewModel.isDeleteAlertPresented = true
+                }
+            } label: {
+                if viewModel.isPreparingPDF {
+                    ProgressView()
+                } else {
+                    Image(systemName: "ellipsis")
+                }
+            }
+            .accessibilityLabel("More")
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var bottomToolbar: some ToolbarContent {
+        ToolbarSpacer(placement: .bottomBar)
+
+        if editingNode == nil && (isEditing || viewModel.selectedTab == 0) {
+            ToolbarItem(placement: .bottomBar) {
+                floatingButton
+            }
+        } else if !isEditing && viewModel.selectedTab == 1 {
+            ToolbarItem(placement: .bottomBar) {
+                Menu {
+                    Button("Take Photo", systemImage: "camera") { showCamera = true }
+                    Button("Choose from Library", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
+                } label: {
+                    AccentCircleLabel(title: "Add Reference", systemImage: "plus")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var floatingButton: some View {
+        if isEditing {
+            Button {
+                isAddingNode = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(DesignTokens.accentPrimary)
+        } else {
+            Button {
+                withAnimation {
+                    viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+                }
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(DesignTokens.accentPrimary)
+        }
+    }
+
+    /// Draws the diagram into an image for the PDF, then lets the view model make the file (A10-99).
+    private func shareTapped() {
+        let base = PDFLayout.diagramCanvasSize
+        let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
+        let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true)
+            .frame(width: canvas.width, height: canvas.height)
+            // Paper is light, whatever the phone's appearance.
+            .environment(\.colorScheme, .light)
+        let renderer = ImageRenderer(content: diagram)
+        // A bigger canvas gets a lower scale, so the image keeps about the same pixel size.
+        renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
+        viewModel.shareTapped(diagram: renderer.uiImage)
     }
 
     /// R11: glass circle icon, title and Sketch copy.

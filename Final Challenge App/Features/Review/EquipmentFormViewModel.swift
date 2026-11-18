@@ -36,7 +36,7 @@ final class EquipmentFormViewModel {
     var accessories: String = ""
     var notes: String = ""
     
-    let editingNodeId: UUID?
+    var editingNodeId: UUID?
     private unowned let reviewViewModel: ReviewViewModel
     
     var isEditing: Bool { editingNodeId != nil }
@@ -48,6 +48,11 @@ final class EquipmentFormViewModel {
     init(editingNodeId: UUID?, reviewViewModel: ReviewViewModel) {
         self.editingNodeId = editingNodeId
         self.reviewViewModel = reviewViewModel
+        loadData()
+    }
+    
+    func switchToNode(id: UUID?) {
+        self.editingNodeId = id
         loadData()
     }
     

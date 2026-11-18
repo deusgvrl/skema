@@ -13,7 +13,6 @@ struct NodeView: View {
     var zoomScale: CGFloat = 1.0
     
     var onTap: () -> Void
-    var onLongPress: () -> Void
     var onGestureStart: () -> Void
     var onGestureEnd: () -> Void
     
@@ -110,7 +109,7 @@ struct NodeView: View {
                     .offset(x: 60, y: -15)
             }
         }
-        .frame(width: 44, height: 44) // Locks 44x44 center 1:1 with node.position
+        .frame(width: 44, height: 44)
         .background {
             if node.category == .light {
                 Circle()
@@ -133,7 +132,6 @@ struct NodeView: View {
                     }
             }
         )
-        // 2. Hang Text Label below without altering the 44x44 icon's geometric center
         .overlay(alignment: .bottom) {
             Text(node.displayName)
                 .font(.caption)
@@ -148,18 +146,17 @@ struct NodeView: View {
             x: subjectCenter.x + node.position.x,
             y: subjectCenter.y + node.position.y
         )
+        // Single tap selects, opens form sheet & reveals rotation button
         .highPriorityGesture(
             TapGesture().onEnded {
                 if !isRotating { onTap() }
             }
         )
-        .onLongPressGesture(minimumDuration: 0.5) {
-            if !isRotating { onLongPress() }
-        }
+        // Drag gesture moves node directly
         .gesture(
             DragGesture(coordinateSpace: .global)
                 .onChanged { value in
-                    guard isSelected, !isRotating else { return }
+                    guard !isRotating else { return }
                     
                     if !isDragging {
                         isDragging = true
@@ -236,7 +233,6 @@ struct NodeView: View {
         }
     }
 }
-
 // MARK: - 1. Custom Shapes for Top-View Rendering
 
 struct Trapezoid: Shape {

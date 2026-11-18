@@ -4,8 +4,6 @@ import SwiftUI
 /// Opens in view mode (Next, pencil); the pencil enters edit mode (undo/redo, ✓, +). Moving items
 /// keeps the long-press-then-drag gesture and only works in edit mode.
 struct ReviewView: View {
-    /// True when opened right after a scan (a new draft), false when opened from a saved setup.
-    /// The name is kept from when a processing screen came first; Finish Scan now opens the diagram directly.
     let isFromLoadingScreen: Bool
     @Bindable var viewModel: ReviewViewModel
     var onDismissToSetups: (() -> Void)?
@@ -14,11 +12,14 @@ struct ReviewView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var editingNode: Equipment?
+    @State private var activeNode: Equipment?
+    @State private var selectedNodeId: UUID? = nil // 👈 State synced with selection
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
     @State private var showsSaveSetupAlert = false
     @State private var showsDiscardChangesAlert = false
     @State private var isShowingSubjectSheet = false
+    @State private var selectedDetent: PresentationDetent = .height(76)
 
     init(
         isFromLoadingScreen: Bool,
@@ -34,8 +35,23 @@ struct ReviewView: View {
         ReviewDiagramContentView(
             viewModel: viewModel,
             undoManager: undoManager,
-            onNodeTap: { node in editingNode = node },
-            onSubjectTap: { isShowingSubjectSheet = true }
+            selectedNodeId: $selectedNodeId,
+            onNodeTap: { node in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    selectedDetent = .height(76)
+                }
+                selectedNodeId = node.id
+                activeNode = node
+                editingNode = node
+            },
+            onSubjectTap: { isShowingSubjectSheet = true },
+            onEmptyTap: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedNodeId = nil
+                    editingNode = nil // 👈 Dismisses the bottom sheet
+                    selectedDetent = .height(76)
+                }
+            }
         )
         .ignoresSafeArea(edges: .bottom)
         .navigationBarBackButtonHidden(true)
@@ -44,16 +60,12 @@ struct ReviewView: View {
             toolbarContent
         }
         .onAppear {
-            // From a saved setup the pencil was already tapped (Edit Diagram), so start in edit mode.
             if !isFromLoadingScreen && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
             }
         }
-        // R04x
         .alert("Save This Setup?", isPresented: $showsSaveSetupAlert) {
-            Button("Save Setup") {
-                navigateToR07 = true
-            }
+            Button("Save Setup") { navigateToR07 = true }
             .keyboardShortcut(.defaultAction)
             Button("Discard", role: .destructive) {
                 viewModel.discardSetup()
@@ -63,14 +75,11 @@ struct ReviewView: View {
         } message: {
             Text("If you leave now, this scan and its diagram will be lost.")
         }
-        // R04mx
         .alert("Discard Changes?", isPresented: $showsDiscardChangesAlert) {
             Button("Keep Editing", role: .cancel) { }
             Button("Discard", role: .destructive) {
                 viewModel.discardEdits(undoManager: undoManager)
-                if !isFromLoadingScreen {
-                    dismiss()
-                }
+                if !isFromLoadingScreen { dismiss() }
             }
         } message: {
             Text("Your changes to this diagram won’t be saved.")
@@ -82,15 +91,40 @@ struct ReviewView: View {
                 onDismissToSetups: onDismissToSetups
             )
         }
-        .sheet(item: $editingNode) { node in
-            // View mode shows the details read-only; editing needs the pencil first (A10-101).
-            EquipmentFormView(
-                viewModel: viewModel,
-                editingNodeId: node.id,
-                undoManager: viewModel.isEditingDiagram ? undoManager : nil,
-                isReadOnly: !viewModel.isEditingDiagram
-            )
+        // 👈 Sheet presentation with clean reset on dismiss
+        .sheet(isPresented: Binding(
+            get: { editingNode != nil },
+            set: { isPresented in
+                if !isPresented {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedNodeId = nil
+                        editingNode = nil
+                        selectedDetent = .height(76)
+                    }
+                }
+            }
+        ), onDismiss: {
+            selectedNodeId = nil
+            editingNode = nil
+            activeNode = nil
+            selectedDetent = .height(76)
+        }) {
+            if let node = editingNode ?? activeNode {
+                EquipmentFormView(
+                    viewModel: viewModel,
+                    editingNodeId: node.id,
+                    undoManager: viewModel.isEditingDiagram ? undoManager : nil,
+                    isReadOnly: !viewModel.isEditingDiagram,
+                    selectedDetent: $selectedDetent
+                )
+                .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
+                .interactiveDismissDisabled(true)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(DesignTokens.sheetBackground)
+            }
         }
+
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
         }
@@ -103,14 +137,15 @@ struct ReviewView: View {
         }
     }
 
-    // MARK: - Toolbar
-
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        
         ToolbarSpacer(placement: .bottomBar)
-        ToolbarItem(placement: .bottomBar) {
-            floatingButton
+        
+        // 👈 Hide floating button when sheet is present (editingNode != nil)
+        if editingNode == nil {
+            ToolbarItem(placement: .bottomBar) {
+                floatingButton
+            }
         }
         
         ToolbarItem(placement: .cancellationAction) {
@@ -136,7 +171,6 @@ struct ReviewView: View {
         }
 
         if viewModel.isEditingDiagram {
-            // One item, so the bar draws undo and redo in a single glass capsule (Sketch R04m).
             ToolbarItem(placement: .confirmationAction) {
                 HStack(spacing: 4) {
                     Button("Undo", systemImage: "arrow.uturn.backward") {
@@ -158,9 +192,7 @@ struct ReviewView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save Changes", systemImage: "checkmark") {
                     viewModel.confirmEdits(undoManager: undoManager)
-                    if !isFromLoadingScreen {
-                        dismiss()
-                    }
+                    if !isFromLoadingScreen { dismiss() }
                 }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
@@ -168,17 +200,13 @@ struct ReviewView: View {
             }
         } else {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Next", systemImage: "chevron.right") {
-                    navigateToR07 = true
-                }
+                Button("Next", systemImage: "chevron.right") { navigateToR07 = true }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
             }
         }
     }
     
-    
-    /// Pencil in view mode (red), + in edit mode (glass) — Sketch R04 / R04m.
     @ViewBuilder
     private var floatingButton: some View {
         if viewModel.isEditingDiagram {
@@ -191,7 +219,6 @@ struct ReviewView: View {
             }
             .buttonStyle(.glassProminent)
             .tint(DesignTokens.accentPrimary)
-            
         } else {
             Button {
                 viewModel.beginEditing(undoManager: undoManager)
@@ -205,7 +232,6 @@ struct ReviewView: View {
         }
     }
 
-    /// X in view mode (R04 → R04x). A fresh scan is unsaved until Add Details, so always ask.
     private func closeReview() {
         if isFromLoadingScreen {
             showsSaveSetupAlert = true
@@ -214,15 +240,12 @@ struct ReviewView: View {
         }
     }
 
-    /// X in edit mode (R04m → R04mx when something changed, else back to view mode).
     private func closeEditMode() {
         if viewModel.hasPendingEdits {
             showsDiscardChangesAlert = true
         } else {
             viewModel.discardEdits(undoManager: undoManager)
-            if !isFromLoadingScreen {
-                dismiss()
-            }
+            if !isFromLoadingScreen { dismiss() }
         }
     }
 

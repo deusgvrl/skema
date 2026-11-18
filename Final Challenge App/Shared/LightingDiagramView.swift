@@ -5,11 +5,15 @@ struct LightingDiagramView: View {
     var isReadOnly: Bool = false
     var isExportedToPdf: Bool = false
     var undoManager: UndoManager? = nil
+    
+    // 👈 1. Converted to Binding so parent controls selection lifecycle
+    @Binding var selectedNodeId: UUID?
+    
     var onNodeTap: ((Equipment) -> Void)? = nil
     var onSubjectTap: (() -> Void)? = nil
+    var onEmptyTap: (() -> Void)? = nil
     
     @State private var nodesSnapshot: [Equipment] = []
-    @State private var selectedNodeId: UUID? = nil
     
     // Smooth Zoom & Pan States
     @State private var zoomScale: CGFloat = 1.0
@@ -22,27 +26,31 @@ struct LightingDiagramView: View {
         isReadOnly: Bool = false,
         isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
-        initialZoomScale: CGFloat = 1.0, // Default 1.0x = 50 cm scale
+        selectedNodeId: Binding<UUID?> = .constant(nil), 
+        initialZoomScale: CGFloat = 1.0,
         onNodeTap: ((Equipment) -> Void)? = nil,
-        onSubjectTap: (() -> Void)? = nil
+        onSubjectTap: (() -> Void)? = nil,
+        onEmptyTap: (() -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
         self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
+        self._selectedNodeId = selectedNodeId
         self._zoomScale = State(initialValue: initialZoomScale)
         self.onNodeTap = onNodeTap
         self.onSubjectTap = onSubjectTap
+        self.onEmptyTap = onEmptyTap
     }
     
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            let currentScale = zoomScale * magnifyBy // Unified active zoom factor
-            let gridConfig = GridConfig.config(for: currentScale) // Dynamic grid resolution
+            let currentScale = zoomScale * magnifyBy
+            let gridConfig = GridConfig.config(for: currentScale)
             
             ZStack {
-                // Background Grid (Adapts step automatically)
+                // Background Grid
                 GridPattern(step: gridConfig.stepInPoints)
                     .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
                     .frame(width: 6000, height: 6000)
@@ -60,7 +68,7 @@ struct LightingDiagramView: View {
                     style: StrokeStyle(lineWidth: 1 / currentScale, dash: [4 / currentScale, 3 / currentScale])
                 )
                  
-                // Subject card, under the distance labels so short distances stay readable
+                // Subject Card
                 DiagramEntity(
                     title: "Subject",
                     icon: "person.fill",
@@ -70,21 +78,15 @@ struct LightingDiagramView: View {
                     onSubjectTap?()
                 }
                  
-                // MARK: - Distance Labels Loop
-
-                // At initial 1.0x scale (50 cm grid), only show equipment >= 1.5 meters away.
-                // Zooming in (higher currentScale) lowers the threshold, revealing closer equipment.
+                // Distance Labels
                 let minDistanceThreshold = 1.5 / currentScale
 
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
-                    // Extract numeric distance value (handling Double, Float, or String model types)
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
                     
-                    // Only render label if node meets the minimum distance for the current zoom scale
                     if isExportedToPdf || distanceValue >= minDistanceThreshold {
                         let dx = node.position.x
-                        let dy = node.position.y                        
-                        // Midpoint calculation (50%)
+                        let dy = node.position.y
                         let posX = subjectCenter.x + dx * 0.5
                         let posY = subjectCenter.y + dy * 0.5
                         
@@ -111,7 +113,7 @@ struct LightingDiagramView: View {
                             .rotationEffect(.degrees(angle))
                             .scaleEffect(1 / currentScale)
                             .position(x: posX, y: posY)
-                            .transition(.opacity) // Smooth fade in/out during pinch zoom
+                            .transition(.opacity)
                     }
                 }
                 
@@ -123,18 +125,19 @@ struct LightingDiagramView: View {
                         isSelected: !isReadOnly && selectedNodeId == node.id,
                         zoomScale: currentScale,
                         onTap: {
-                            onNodeTap?(node)
-                        },
-                        onLongPress: {
                             if !isReadOnly {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     selectedNodeId = node.id
                                 }
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             }
+                            onNodeTap?(node)
                         },
                         onGestureStart: {
                             if !isReadOnly {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedNodeId = node.id
+                                }
                                 nodesSnapshot = viewModel.nodes.map { $0.clone() }
                             }
                         },
@@ -153,11 +156,10 @@ struct LightingDiagramView: View {
             .scaleEffect(currentScale)
             .background(DesignTokens.pageBackground)
             .onTapGesture {
-                if !isReadOnly {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedNodeId = nil
-                    }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedNodeId = nil
                 }
+                onEmptyTap?()
             }
             .gesture(
                 DragGesture()
@@ -184,11 +186,10 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
-        .overlay(alignment: .bottomLeading) {
+        .overlay(alignment: .topLeading) {
             let activeScale = zoomScale * magnifyBy
             let activeConfig = GridConfig.config(for: activeScale)
             
-            // Scale bar width matches 1 grid square on screen
             ScaleMeterView(
                 labelText: activeConfig.labelText,
                 barWidth: activeConfig.stepInPoints * activeScale

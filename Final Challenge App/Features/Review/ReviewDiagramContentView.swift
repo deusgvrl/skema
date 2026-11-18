@@ -13,9 +13,11 @@ import TipKit
 struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
     var undoManager: UndoManager?
+    @Binding var selectedNodeId: UUID? // 👈 Pass binding through
 
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
+    var onEmptyTap: (() -> Void)? = nil
 
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
@@ -27,14 +29,12 @@ struct ReviewDiagramContentView: View {
                     viewModel: viewModel,
                     isReadOnly: !viewModel.isEditingDiagram,
                     undoManager: undoManager,
+                    selectedNodeId: $selectedNodeId, 
                     onNodeTap: onNodeTap,
-                    onSubjectTap: onSubjectTap
+                    onSubjectTap: onSubjectTap,
+                    onEmptyTap: onEmptyTap
                 )
-//                .overlay(alignment: .bottomTrailing) {
-//                    floatingButton
-//                        .padding(16)
-//                }
-
+                
                 if !viewModel.nodes.isEmpty {
                     Group {
                         if viewModel.isEditingDiagram {
@@ -102,13 +102,13 @@ struct ReviewEditModeTip: Tip {
 }
 
 #Preview {
-    ReviewDiagramContentView(
-        viewModel: ReviewViewModel(),
-        onNodeTap: { _ in },
-        onSubjectTap: {}
-    )
-    .task {
-        try? Tips.resetDatastore()
-        try? Tips.configure([.displayFrequency(.immediate)])
-    }
+//    ReviewDiagramContentView(
+//        viewModel: ReviewViewModel(),
+//        selectedNodeId: UUID(), onNodeTap: { _ in },
+//        onSubjectTap: {}
+//    )
+//    .task {
+//        try? Tips.resetDatastore()
+//        try? Tips.configure([.displayFrequency(.immediate)])
+//    }
 }
