@@ -335,7 +335,7 @@ struct SetupDetailView: View {
         }
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
-                ProjectDetailsView(setup: viewModel.setup)
+                ProjectDetailsView(setup: viewModel.setup, isPresentedModally: true)
             }
         }
         .alert("Discard Unsaved Changes?", isPresented: $showDiscardAlert) {
