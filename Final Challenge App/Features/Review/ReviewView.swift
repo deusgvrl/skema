@@ -84,13 +84,23 @@ struct ReviewView: View {
             )
         }
         .sheet(item: $editingNode) { node in
-            EquipmentFormView(viewModel: viewModel, editingNodeId: node.id, undoManager: undoManager)
+            // View mode shows the details read-only; editing needs the pencil first (A10-101).
+            EquipmentFormView(
+                viewModel: viewModel,
+                editingNodeId: node.id,
+                undoManager: viewModel.isEditingDiagram ? undoManager : nil,
+                isReadOnly: !viewModel.isEditingDiagram
+            )
         }
         .sheet(isPresented: $isAddingNode) {
-            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager)
+            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
         }
         .sheet(isPresented: $isShowingSubjectSheet) {
-            SubjectFormView(viewModel: viewModel, undoManager: undoManager)
+            SubjectFormView(
+                viewModel: viewModel,
+                undoManager: viewModel.isEditingDiagram ? undoManager : nil,
+                isReadOnly: !viewModel.isEditingDiagram
+            )
         }
     }
 
