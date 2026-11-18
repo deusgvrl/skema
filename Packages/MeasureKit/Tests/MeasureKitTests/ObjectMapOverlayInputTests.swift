@@ -8,11 +8,13 @@ import simd
 private func lookTime(_ index: Int) -> TimeInterval { TimeInterval(index) / 10 }
 
 private func lightAt(_ x: Float) -> Sighting {
-    Sighting(label: "studio lighting", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50)
+    Sighting(label: "studio lighting", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50,
+             box: cube(at: SIMD3(x, 0, 0)))
 }
 
 private func cameraAt(_ x: Float) -> Sighting {
-    Sighting(label: "Camera", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50)
+    Sighting(label: "Camera", confidence: 0.6, position: SIMD3(x, 0, 0), axis: nil, pointCount: 50,
+             box: cube(at: SIMD3(x, 0, 0)))
 }
 
 @Suite struct ObjectMapOverlayInputTests {

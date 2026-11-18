@@ -6,7 +6,7 @@ final class CSVExporterMapTests: XCTestCase {
     private func measurement(id: Int, label: String, subject: Bool, distance: Float?, height: Float?,
                              tilt: Float?, aim: Float?) -> MapMeasurement {
         let o = MappedObject(id: id, label: label, sightingCount: 7, position: SIMD3(1, 2, 3),
-                             axis: nil, confidence: 0.876)
+                             axis: nil, confidence: 0.876, box: cube(at: SIMD3(1, 2, 3)))
         return MapMeasurement(object: o, isSubject: subject, distanceToSubject: distance,
                               heightAboveFloor: height, tiltDegrees: tilt, aimOffsetDegrees: aim)
     }

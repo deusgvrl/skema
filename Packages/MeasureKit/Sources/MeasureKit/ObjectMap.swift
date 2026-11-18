@@ -8,6 +8,8 @@ public struct MappedObject: Equatable, Sendable, Identifiable {
     public let position: SIMD3<Float>    // per-axis median of the kept sightings' positions
     public let axis: SIMD3<Float>?       // mean of kept axes after flipping each to agree (dot >= 0) with the newest; unit; nil if none
     public let confidence: Float         // highest confidence seen
+    /// The big box: the union of the small boxes of the kept sightings (A10-90 rule E, Cases D27–D29).
+    public let box: WorldBox
 }
 
 /// Where an item is in A10-61's tracking: pending ("Detecting…") until seen for 1 second, then accepted.
@@ -50,7 +52,8 @@ public struct MapMeasurement: Equatable, Sendable {
 }
 
 public struct ObjectMap: Sendable {
-    public static let mergeRadius: Float = 0.2     // metres
+    /// A sighting joins an item when its box is at least this much inside the item's big box (A10-90 rule E).
+    public static let minShare: Float = 0.35
     public static let maxKeptSightings = 30        // newest kept per object
 
     private struct Entry: Sendable {
@@ -61,6 +64,7 @@ public struct ObjectMap: Sendable {
         var confidence: Float = 0
         var position: SIMD3<Float> = .zero
         var axis: SIMD3<Float>?
+        var box = WorldBox(min: .zero, max: .zero)   // big box; set by the first merge
         // Tracking (A10-61)
         var status = ItemStatus.pending
         var number: Int?
@@ -92,6 +96,7 @@ public struct ObjectMap: Sendable {
             kept.append(s)
             if kept.count > ObjectMap.maxKeptSightings { kept.removeFirst(kept.count - ObjectMap.maxKeptSightings) }
             position = Geometry.medianPoint(kept.map(\.position)) ?? s.position
+            box = kept.dropFirst().reduce(kept[0].box) { $0.union($1.box) }
             axis = Entry.meanAxis(kept.compactMap(\.axis))
         }
 
@@ -105,7 +110,7 @@ public struct ObjectMap: Sendable {
 
         var mapped: MappedObject {
             MappedObject(id: id, label: label, sightingCount: sightingCount, position: position,
-                         axis: axis, confidence: confidence)
+                         axis: axis, confidence: confidence, box: box)
         }
     }
 
@@ -116,13 +121,14 @@ public struct ObjectMap: Sendable {
 
     public var objects: [MappedObject] { entries.map(\.mapped) }      // creation order
 
-    /// Sightings are processed in order. Each merges into the nearest object with the SAME label whose
-    /// current position is within `mergeRadius`; otherwise it starts a new object.
+    /// Sightings are processed in order. Each merges into the object with the SAME label whose big box holds
+    /// the most of it (share inside, at least `minShare`); otherwise it starts a new object (Cases D30–D35).
+    /// A weak sighting only joins an accepted object and never starts one (Cases D21, D22, D36).
     public mutating func add(_ sightings: [Sighting]) {
         for s in sightings {
-            if let i = nearestIndex(for: s) {
+            if let i = bestIndex(for: s) {
                 entries[i].merge(s)
-            } else {
+            } else if !s.isWeak {
                 var entry = Entry(id: nextID, label: s.label)
                 nextID += 1
                 entry.merge(s)
@@ -135,13 +141,19 @@ public struct ObjectMap: Sendable {
         entries.removeAll()
     }
 
-    /// The nearest object with the same label within `mergeRadius`, or nil.
-    private func nearestIndex(for s: Sighting) -> Int? {
-        entries.indices
-            .filter { entries[$0].label == s.label }
-            .map { ($0, simd_distance(entries[$0].position, s.position)) }
-            .filter { $0.1 <= ObjectMap.mergeRadius }
-            .min { $0.1 < $1.1 }?.0
+    /// The object with the same label whose big box holds the largest share of the sighting's box, if that
+    /// share is at least `minShare`. A weak sighting may only match an accepted object, even when a pending
+    /// one fits it better (Case D36).
+    private func bestIndex(for s: Sighting) -> Int? {
+        var best: (index: Int, share: Float)?
+        for index in entries.indices where entries[index].label == s.label
+            && (!s.isWeak || entries[index].status == .accepted) {
+            let share = entries[index].box.shareInside(s.box)
+            if share >= ObjectMap.minShare && share > (best?.share ?? -1) {
+                best = (index, share)
+            }
+        }
+        return best?.index
     }
 
     // MARK: - Tracking (A10-61)
@@ -168,19 +180,22 @@ public struct ObjectMap: Sendable {
     /// One look of the detector at `time` (seconds, from the frame's timestamp). Call it for EVERY look,
     /// also when nothing was found, so gaps are measured. Sightings merge as in `add`; new ones start pending.
     /// Returns the id of the item each sighting joined, in the same order as `sightings`,
-    /// so a caller can match each detection's mask to its item (A10-62).
+    /// so a caller can match each detection's mask to its item (A10-62). A weak sighting that fits no
+    /// accepted item makes no item and gets nil (Cases D21, D22, D36).
     @discardableResult
-    public mutating func update(_ sightings: [Sighting], at time: Double) -> [Int] {
+    public mutating func update(_ sightings: [Sighting], at time: Double) -> [Int?] {
         let wait = lastLook.map { time - $0 } ?? 0
         lastLook = time
         var seen = Set<Int>()
         var created = Set<Int>()
-        var joined: [Int] = []
+        var joined: [Int?] = []
         for s in sightings {
-            if let i = nearestIndex(for: s) {
+            if let i = bestIndex(for: s) {
                 entries[i].merge(s)
                 seen.insert(entries[i].id)
                 joined.append(entries[i].id)
+            } else if s.isWeak {
+                joined.append(nil)
             } else {
                 var entry = Entry(id: nextID, label: s.label)
                 nextID += 1

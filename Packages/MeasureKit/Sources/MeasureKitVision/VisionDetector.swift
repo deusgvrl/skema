@@ -44,7 +44,7 @@ public struct VisionDetector: ObjectDetector {
 
     /// Step 2. `region` (a saliency box) is used directly as `regionOfInterest`: both are normalized,
     /// lower-left origin, in the oriented image.
-    static func classify(_ image: CVPixelBuffer, orientation: ImageOrientation, region: CGRect) throws -> [(identifier: String, confidence: Float)] {
+    public static func classify(_ image: CVPixelBuffer, orientation: ImageOrientation, region: CGRect) throws -> [(identifier: String, confidence: Float)] {
         let request = VNClassifyImageRequest()
         request.regionOfInterest = region
         let handler = VNImageRequestHandler(cvPixelBuffer: image, orientation: orientation.cgOrientation, options: [:])
