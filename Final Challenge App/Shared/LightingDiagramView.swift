@@ -169,7 +169,7 @@ struct LightingDiagramView: View {
                     }
                     .onEnded { value in
                         zoomScale *= value.magnification
-                        zoomScale = max(0.3, min(zoomScale, 4.0))
+                        zoomScale = max(0.3, min(zoomScale, 8.0))
                     }
             )
         }

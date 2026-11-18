@@ -34,14 +34,20 @@ struct GridConfig {
         // Target model distance that maps to roughly 50–70 screen pixels
         let targetMeters = 0.5 / scale
         
-        if targetMeters <= 0.35 {
-            // Zoomed In (scale >= 1.4x) -> 25 cm per tile (1.50m = 6 tiles)
+        if targetMeters <= 0.08 {
+            // Very Deep Zoom (scale >= 6.25x) -> 5 cm per tile
+            return GridConfig(stepInPoints: 5, labelText: "5 cm")
+        } else if targetMeters <= 0.18 {
+            // Zoomed In High (2.78x <= scale < 6.25x) -> 10 cm per tile
+            return GridConfig(stepInPoints: 10, labelText: "10 cm")
+        } else if targetMeters <= 0.35 {
+            // Zoomed In Medium (1.43x <= scale < 2.78x) -> 25 cm per tile
             return GridConfig(stepInPoints: 25, labelText: "25 cm")
         } else if targetMeters <= 0.75 {
-            // Standard View (0.67x <= scale < 1.4x) -> 50 cm per tile (1.50m = 3 tiles)
+            // Standard View (0.67x <= scale < 1.43x) -> 50 cm per tile
             return GridConfig(stepInPoints: 50, labelText: "50 cm")
         } else if targetMeters <= 1.5 {
-            // Zoomed Out (0.33x <= scale < 0.67x) -> 1 meter per tile (1.50m = 1.5 tiles)
+            // Zoomed Out (0.33x <= scale < 0.67x) -> 1 meter per tile
             return GridConfig(stepInPoints: 100, labelText: "1 m")
         } else {
             // Far Zoomed Out (scale < 0.33x) -> 2 meters per tile
@@ -49,4 +55,3 @@ struct GridConfig {
         }
     }
 }
-
