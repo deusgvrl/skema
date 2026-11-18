@@ -3,6 +3,7 @@ import SwiftUI
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
+    var isExportedToPdf: Bool = false
     var undoManager: UndoManager? = nil
     var onNodeTap: ((Equipment) -> Void)? = nil
     var onSubjectTap: (() -> Void)? = nil
@@ -19,6 +20,7 @@ struct LightingDiagramView: View {
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
+        isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
         initialZoomScale: CGFloat = 1.0, // Default 1.0x = 50 cm scale
         onNodeTap: ((Equipment) -> Void)? = nil,
@@ -26,6 +28,7 @@ struct LightingDiagramView: View {
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
+        self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
         self._zoomScale = State(initialValue: initialZoomScale)
         self.onNodeTap = onNodeTap
@@ -78,11 +81,9 @@ struct LightingDiagramView: View {
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
                     
                     // Only render label if node meets the minimum distance for the current zoom scale
-                    if distanceValue >= minDistanceThreshold {
+                    if isExportedToPdf || distanceValue >= minDistanceThreshold {
                         let dx = node.position.x
-                        let dy = node.position.y
-                        let length = max(1.0, hypot(dx, dy))
-                        
+                        let dy = node.position.y                        
                         // Midpoint calculation (50%)
                         let posX = subjectCenter.x + dx * 0.5
                         let posY = subjectCenter.y + dy * 0.5
