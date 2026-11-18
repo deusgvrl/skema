@@ -10,6 +10,8 @@ enum DesignTokens {
     /// Red text (links, the category value in equipment sheets). Light is AccentPrimary; dark is lighter
     /// than Sketch's #FF5A4A, which is only 3.5:1 on the form rows.
     static let accentText = Color("AccentText")
+    /// "Captured" green: Sketch R03's #30D158 in dark; a deeper green in light so it clears 3:1.
+    static let detectedGreen = Color("DetectedGreen")
     /// Opaque sheet surface (Sketch R02 "Sheet chrome").
     static let sheetBackground = Color("SheetBackground")
     /// Grouped row surface inside sheets (Sketch R06 rows).

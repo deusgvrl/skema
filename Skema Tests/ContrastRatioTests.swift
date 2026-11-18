@@ -90,6 +90,13 @@ struct ContrastRatioTests {
         #expect(contrastRatio(DesignTokens.accentText, DesignTokens.formRowBackground, style: style) >= 4.5)
     }
 
+    @Test("Detected green (tutorial ticks, captured items) clears 3:1 on the sheet and the canvas",
+          arguments: [UIUserInterfaceStyle.light, .dark])
+    func detectedGreenContrast(style: UIUserInterfaceStyle) {
+        #expect(contrastRatio(DesignTokens.detectedGreen, DesignTokens.sheetBackground, style: style) >= 3.0)
+        #expect(contrastRatio(DesignTokens.detectedGreen, DesignTokens.pageBackground, style: style) >= 3.0)
+    }
+
     @Test("NodeDetailFill clears the 3:1 UI-component floor against the canvas and the node body")
     func nodeDetailFillContrast() {
         let systemBackground = Color(uiColor: .systemBackground)
