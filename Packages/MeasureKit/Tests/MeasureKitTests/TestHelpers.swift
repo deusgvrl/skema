@@ -73,3 +73,20 @@ func measuredCentres(baseX: Float, baseZ: Float, topY: Float = 180) -> Equipment
 func notMeasuredCentres() -> EquipmentCentres {
     EquipmentCentres(status: .tooFewPoints, baseCentre: nil, topCentre: nil)
 }
+
+/// A box with equal sides around `center`, for tests that only care where a sighting is (A10-90).
+func cube(at center: SIMD3<Float>, side: Float = 0.3) -> WorldBox {
+    WorldBox(min: center - SIMD3(repeating: side / 2), max: center + SIMD3(repeating: side / 2))
+}
+
+/// A box from centimetre ranges on each axis (the written A10-90 cases use whole centimetres).
+func boxCm(x: ClosedRange<Float>, y: ClosedRange<Float>, z: ClosedRange<Float>) -> WorldBox {
+    WorldBox(min: SIMD3(cm(x.lowerBound), cm(y.lowerBound), cm(z.lowerBound)),
+             max: SIMD3(cm(x.upperBound), cm(y.upperBound), cm(z.upperBound)))
+}
+
+/// A sighting seen inside `box`; its middle point is the box's middle.
+func sighting(_ label: String, in box: WorldBox, confidence: Float = 0.6, weak: Bool = false) -> Sighting {
+    Sighting(label: label, confidence: confidence, position: (box.min + box.max) / 2, axis: nil, pointCount: 50,
+             box: box, isWeak: weak)
+}

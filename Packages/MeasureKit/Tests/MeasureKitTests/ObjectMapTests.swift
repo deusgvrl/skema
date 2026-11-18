@@ -9,11 +9,13 @@ private func sighting(_ x: Float, _ y: Float = 0, _ z: Float = 0,
 
 private func sighting(_ label: String, _ x: Float, _ y: Float = 0, _ z: Float = 0,
                       axis: SIMD3<Float>? = nil, confidence: Float = 0.5) -> Sighting {
-    Sighting(label: label, confidence: confidence, position: SIMD3(x, y, z), axis: axis, pointCount: 50)
+    Sighting(label: label, confidence: confidence, position: SIMD3(x, y, z), axis: axis, pointCount: 50,
+             box: cube(at: SIMD3(x, y, z)))
 }
 
 final class ObjectMapTests: XCTestCase {
-    func testSightingsTenCentimetresApartMergeIntoOne() {
+    // 30 cm boxes, 10 cm apart: 67% of the new box is inside the first, so they are one object (rule E).
+    func testSightingsWhoseBoxesMostlyOverlapMergeIntoOne() {
         var map = ObjectMap()
         map.add([sighting(0), sighting(0.1)])
         XCTAssertEqual(map.objects.count, 1)
@@ -21,7 +23,8 @@ final class ObjectMapTests: XCTestCase {
         XCTAssertTrue(near(map.objects[0].position, SIMD3(0.05, 0, 0)))
     }
 
-    func testSightingsThirtyCentimetresApartMakeTwoObjects() {
+    // 30 cm boxes, 30 cm apart: they only touch (share 0%), so they are two objects (rule E).
+    func testSightingsWhoseBoxesDoNotOverlapMakeTwoObjects() {
         var map = ObjectMap()
         map.add([sighting(0), sighting(0.3)])
         XCTAssertEqual(map.objects.map(\.id), [0, 1])
@@ -33,10 +36,10 @@ final class ObjectMapTests: XCTestCase {
         XCTAssertEqual(map.objects.map(\.label), ["light", "chair"])
     }
 
-    func testSightingMergesIntoNearestSameLabelObject() {
+    func testSightingMergesIntoTheSameLabelObjectHoldingMostOfIt() {
         var map = ObjectMap()
         map.add([sighting(0), sighting(0.3)])           // two objects at x 0 and 0.3
-        map.add([sighting(0.17)])                       // within range of both; 0.13 from the second
+        map.add([sighting(0.17)])                       // 43% inside the first, 57% inside the second
         XCTAssertEqual(map.objects.map(\.sightingCount), [1, 2])
     }
 

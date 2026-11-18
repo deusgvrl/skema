@@ -42,7 +42,7 @@ func collect<Element>(_ stream: AsyncStream<Element>) async -> [Element] {
     return values
 }
 
-func makeScanFrame(timestamp: TimeInterval) throws -> ScanFrame {
+func makeScanFrame(timestamp: TimeInterval, depth: DepthFrame? = nil) throws -> ScanFrame {
     let image = try makePixelBuffer(
         width: 2, height: 2, format: kCVPixelFormatType_32BGRA, values: [UInt32](repeating: 0, count: 4)
     )
@@ -55,7 +55,7 @@ func makeScanFrame(timestamp: TimeInterval) throws -> ScanFrame {
             imageResolution: SIMD2(2, 2),
             cameraToWorld: matrix_identity_float4x4
         ),
-        depth: nil,
+        depth: depth,
         tracking: .normal,
         ambientIntensity: nil,
         planes: []
