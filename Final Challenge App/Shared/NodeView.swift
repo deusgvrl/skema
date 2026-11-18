@@ -10,6 +10,7 @@ struct NodeView: View {
     @Binding var node: Equipment
     let subjectCenter: CGPoint
     let isSelected: Bool
+    var isReadOnly: Bool = false
     var zoomScale: CGFloat = 1.0
     
     var onTap: () -> Void
@@ -44,7 +45,7 @@ struct NodeView: View {
                 }
                 
                 // Rotation Handle Button
-                if isSelected {
+                if isSelected && !isReadOnly {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(DesignTokens.accentPrimary)
@@ -152,11 +153,12 @@ struct NodeView: View {
                 if !isRotating { onTap() }
             }
         )
-        // Drag gesture moves node directly
+        // Drag gesture moves node directly (only when not read-only)
         .gesture(
+            isReadOnly ? nil :
             DragGesture(coordinateSpace: .global)
                 .onChanged { value in
-                    guard !isRotating else { return }
+                    guard !isReadOnly, !isRotating else { return }
                     
                     if !isDragging {
                         isDragging = true
@@ -177,6 +179,7 @@ struct NodeView: View {
                     node.syncDistanceFromPosition()
                 }
                 .onEnded { _ in
+                    guard !isReadOnly else { return }
                     if isDragging {
                         isDragging = false
                         lastCardinalSnap = nil

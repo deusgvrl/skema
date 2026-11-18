@@ -122,15 +122,14 @@ struct LightingDiagramView: View {
                     NodeView(
                         node: $node,
                         subjectCenter: subjectCenter,
-                        isSelected: !isReadOnly && selectedNodeId == node.id,
+                        isSelected: selectedNodeId == node.id,
+                        isReadOnly: isReadOnly,
                         zoomScale: currentScale,
                         onTap: {
-                            if !isReadOnly {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    selectedNodeId = node.id
-                                }
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedNodeId = node.id
                             }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onNodeTap?(node)
                         },
                         onGestureStart: {
