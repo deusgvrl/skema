@@ -8,6 +8,8 @@ struct SetupsView: View {
     @ScaledMetric(relativeTo: .title2) private var newSetupButtonSize: CGFloat = 48
     /// How long the "Setup deleted" toast stays before it goes away on its own.
     private let undoToastSeconds = 5
+    /// How long the "Setup saved" toast stays.
+    private let savedToastSeconds = 3
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -98,7 +100,16 @@ struct SetupsView: View {
                 .overlay(alignment: .bottom) {
                     if viewModel.lastDeleted != nil {
                         undoToast
+                    } else if viewModel.showsSavedToast {
+                        ToastBar(message: "Setup saved")
+                            // Sits above the + button so the two never overlap.
+                            .padding(.bottom, newSetupButtonSize + 32)
                     }
+                }
+                .task(id: viewModel.showsSavedToast) {
+                    guard viewModel.showsSavedToast else { return }
+                    try? await Task.sleep(for: .seconds(savedToastSeconds))
+                    viewModel.dismissSavedToast()
                 }
                 .task(id: viewModel.lastDeleted?.id) {
                     guard viewModel.lastDeleted != nil else { return }
@@ -122,6 +133,7 @@ struct SetupsView: View {
                 viewModel.fetchSetups()
             }
         }
+        .environment(\.setupSavedAction) { viewModel.setupSaved() }
         .sheet(isPresented: $viewModel.isShowingScanGuide) {
             viewModel.scanGuideDismissed()
         } content: {
@@ -166,17 +178,9 @@ struct SetupsView: View {
     }
 
     private var undoToast: some View {
-        HStack {
-            Text("Setup deleted")
-            Spacer()
-            Button("Undo") { viewModel.undoDelete() }
-                .bold()
-        }
-        .padding()
-        .background(.regularMaterial, in: .capsule)
-        .padding(.horizontal)
-        // Sits above the + button so the two never overlap.
-        .padding(.bottom, newSetupButtonSize + 32)
+        ToastBar(message: "Setup deleted", actionTitle: "Undo") { viewModel.undoDelete() }
+            // Sits above the + button so the two never overlap.
+            .padding(.bottom, newSetupButtonSize + 32)
     }
 
     private var emptyState: some View {

@@ -100,13 +100,18 @@ final class StorageController {
         save()
     }
         
-    func save() {
+    /// Saves when there are changes and tells the caller if it fails.
+    func trySave() throws {
         if context.hasChanges {
-            do {
-                try context.save()
-            } catch {
-                print("Failed to save context: \(error.localizedDescription)")
-            }
+            try context.save()
+        }
+    }
+
+    func save() {
+        do {
+            try trySave()
+        } catch {
+            print("Failed to save context: \(error.localizedDescription)")
         }
     }
 }

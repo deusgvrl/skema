@@ -8,17 +8,33 @@ struct ProjectDetailsView: View {
     @Bindable var setup: Setup
     var isPresentedModally: Bool = false
     var onDismissToSetups: (() -> Void)? = nil
-    var viewModel: ProjectDetailsViewModel = ProjectDetailsViewModel()
-    
+    @State private var viewModel: ProjectDetailsViewModel
+    /// Last Save result; changing it plays the haptic.
+    @State private var lastOutcome: ProjectDetailsViewModel.SaveOutcome?
+    @State private var saveCount = 0
+
     @Environment(\.dismiss) private var dismiss
-    
-    private var isFormValid: Bool {
-        !setup.setupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    @Environment(\.setupSavedAction) private var setupSavedAction
+
+    init(setup: Setup,
+         isPresentedModally: Bool = false,
+         onDismissToSetups: (() -> Void)? = nil,
+         viewModel: ProjectDetailsViewModel = ProjectDetailsViewModel()) {
+        self.setup = setup
+        self.isPresentedModally = isPresentedModally
+        self.onDismissToSetups = onDismissToSetups
+        _viewModel = State(initialValue: viewModel)
     }
-    
+
     var body: some View {
+        @Bindable var viewModel = viewModel
         Form {
-            Section(header: Text("Setup")) {
+            Section(
+                header: Text("Setup"),
+                footer: viewModel.showsNameRequired
+                    ? Text("Add a name to save this setup.").foregroundStyle(.red)
+                    : nil
+            ) {
                 HStack {
                     Text("Name")
                     Spacer()
@@ -64,8 +80,11 @@ struct ProjectDetailsView: View {
             
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done", systemImage: "checkmark") {
-                    viewModel.handleClose(for: setup)
-                    
+                    let outcome = viewModel.saveTapped(for: setup)
+                    lastOutcome = outcome
+                    saveCount += 1
+                    guard outcome == .saved else { return }
+                    setupSavedAction?()
                     if let onDismissToSetups {
                         onDismissToSetups()
                     } else {
@@ -73,8 +92,18 @@ struct ProjectDetailsView: View {
                     }
                 }
                 .fontWeight(.semibold)
-                .disabled(!isFormValid)
             }
+        }
+        .onChange(of: setup.setupName) { _, newName in
+            viewModel.nameChanged(newName)
+        }
+        .sensoryFeedback(trigger: saveCount) { _, _ in
+            lastOutcome == .saved ? .success : .error
+        }
+        .alert("Save Failed", isPresented: $viewModel.isSaveFailedAlertPresented) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Your setup could not be saved. Please try again.")
         }
     }
 }

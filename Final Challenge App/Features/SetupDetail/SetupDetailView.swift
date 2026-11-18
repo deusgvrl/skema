@@ -296,6 +296,8 @@ struct SetupDetailView: View {
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
                 ProjectDetailsView(setup: viewModel.setup)
+                    // The list is hidden behind this screen, so no "Setup saved" toast here.
+                    .environment(\.setupSavedAction, nil)
             }
         }
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {

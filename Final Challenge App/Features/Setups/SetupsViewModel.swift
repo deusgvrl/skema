@@ -15,6 +15,8 @@ final class SetupsViewModel {
     var setupPendingDelete: Setup?
     /// The setup just moved to Recently Deleted, so the View can offer Undo. Drafts never set it.
     var lastDeleted: Setup?
+    /// Whether the "Setup saved" toast shows.
+    private(set) var showsSavedToast = false
     /// Whether to show the Recently Deleted row.
     private(set) var hasRecentlyDeleted = false
     var grouping: SetupsGrouping = .recent
@@ -100,6 +102,14 @@ final class SetupsViewModel {
         storageController.recover(setup)
         lastDeleted = nil
         fetchSetups()
+    }
+
+    func setupSaved() {
+        showsSavedToast = true
+    }
+
+    func dismissSavedToast() {
+        showsSavedToast = false
     }
 
     func dismissUndo() {
