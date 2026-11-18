@@ -12,6 +12,7 @@ final class SetupDetailViewModel {
     let reviewViewModel: ReviewViewModel
     @ObservationIgnored private let storageController: StorageController
     @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let pdfRenderer: PDFRenderer
     
     // Tab Navigation
     var selectedTab: Int = 0 // 0 = Diagram, 1 = References
@@ -22,6 +23,12 @@ final class SetupDetailViewModel {
     var selectedEquipment: Equipment? = nil
     var isDeleteAlertPresented: Bool = false
     var isShowSubjectSheet: Bool = false
+
+    // PDF Share State (A10-99)
+    private(set) var isPreparingPDF = false
+    /// Setting this shows the QuickLook preview, which has the system share button.
+    var pdfURL: URL?
+    var isPDFFailedAlertPresented = false
     
     // References Tab State
     var isSelectionMode: Bool = false
@@ -32,7 +39,13 @@ final class SetupDetailViewModel {
         setup.referenceImages.sorted(by: { $0.createdAt < $1.createdAt })
     }
     
-    init(setup: Setup, storageController: StorageController? = nil, now: @escaping () -> Date = { Date() }) {
+    init(
+        setup: Setup,
+        storageController: StorageController? = nil,
+        now: @escaping () -> Date = { Date() },
+        pdfRenderer: PDFRenderer = PDFRenderer()
+    ) {
+        self.pdfRenderer = pdfRenderer
         let storage = storageController ?? StorageController.shared
         self.now = now
         self.setup = setup
@@ -67,6 +80,37 @@ final class SetupDetailViewModel {
         completion()
     }
     
+    private static let pdfFallbackName = "Untitled Setup"
+    private static let pdfExtension = "pdf"
+
+    /// The file name the share sheet shows. Slash and colon are not safe in file names, so they become "-".
+    static func pdfFileName(for setupName: String) -> String {
+        let cleaned = setupName
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        return "\(cleaned.isEmpty ? pdfFallbackName : cleaned).\(pdfExtension)"
+    }
+
+    /// Makes the PDF, saves it in the temporary folder and sets `pdfURL` to open the preview.
+    /// `diagram` is drawn by the view, because the renderer service must not use SwiftUI.
+    func shareTapped(diagram: UIImage?) {
+        isPreparingPDF = true
+        defer { isPreparingPDF = false }
+
+        let data = pdfRenderer.makePDF(for: setup, diagram: diagram)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(Self.pdfFileName(for: setup.setupName))
+        do {
+            guard !data.isEmpty else { throw CocoaError(.fileWriteUnknown) }
+            // .atomic replaces an older file with the same name.
+            try data.write(to: url, options: .atomic)
+            pdfURL = url
+        } catch {
+            isPDFFailedAlertPresented = true
+        }
+    }
+
     /// Loads existing ReferenceImage data into UIImages sorted by createdAt
     func loadReferenceImages() {
         self.referenceImages = sortedReferenceImages.compactMap { ref in

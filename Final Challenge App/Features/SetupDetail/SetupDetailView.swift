@@ -1,10 +1,14 @@
 import SwiftUI
 import PhotosUI
+import QuickLook
 
 /// One saved setup with Diagram and References tabs (Sketch R08 · A10-13).
 struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: SetupDetailViewModel
+
+    /// 3x keeps the diagram sharp when the PDF is printed.
+    private static let diagramImageScale: CGFloat = 3
 
     // Photo Pickers State
     @State private var showCamera = false
@@ -174,13 +178,20 @@ struct SetupDetailView: View {
                         Button("Edit Project Details", systemImage: "pencil") {
                             viewModel.isEditingProjectDetails = true
                         }
-                        Button("Share", systemImage: "square.and.arrow.up") { }
+                        Button("Share", systemImage: "square.and.arrow.up") {
+                            shareTapped()
+                        }
+                        .disabled(viewModel.isPreparingPDF)
                         Divider()
                         Button("Delete Setup", systemImage: "trash", role: .destructive) {
                             viewModel.isDeleteAlertPresented = true
                         }
                     } label: {
-                        Image(systemName: "ellipsis")
+                        if viewModel.isPreparingPDF {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "ellipsis")
+                        }
                     }
                 } else {
                     if viewModel.isSelectionMode {
@@ -303,6 +314,15 @@ struct SetupDetailView: View {
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {
             SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
         }
+        .quickLookPreview($viewModel.pdfURL)
+        .alert("PDF Failed", isPresented: $viewModel.isPDFFailedAlertPresented) {
+            Button("Try Again") {
+                shareTapped()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("The PDF could not be made.")
+        }
         .alert("Delete This Setup?", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -313,6 +333,19 @@ struct SetupDetailView: View {
         } message: {
             Text(viewModel.deleteMessage)
         }
+    }
+
+    /// Draws the diagram into an image for the PDF, then lets the view model make the file.
+    private func shareTapped() {
+        let base = PDFLayout.diagramCanvasSize
+        let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
+        let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true)
+            .frame(width: canvas.width, height: canvas.height)
+            .background(Color.white)
+        let renderer = ImageRenderer(content: diagram)
+        // A bigger canvas gets a lower scale, so the image keeps about the same pixel size.
+        renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
+        viewModel.shareTapped(diagram: renderer.uiImage)
     }
 
     private func deleteSelectedImages() {
