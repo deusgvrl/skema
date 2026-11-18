@@ -49,12 +49,6 @@ struct ReviewDiagramContentView: View {
                     .padding(.top, 8)
                 }
             }
-
-            EquipmentCarousel(
-                viewModel: viewModel,
-                isReadOnly: false,
-                onNodeTap: onNodeTap
-            )
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
     }
