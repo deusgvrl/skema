@@ -21,7 +21,7 @@ struct ScanTutorialIllustration: View {
             switch step {
             case .tapSubject: TapSubjectDrawing(animates: !reduceMotion)
             case .showFloor: ShowFloorDrawing(animates: !reduceMotion)
-            case .turnToEachItem: TurnToItemsDrawing(animates: !reduceMotion)
+            case .walkToEachItem: WalkToItemsDrawing(animates: !reduceMotion)
             case .finish: FinishDrawing(animates: !reduceMotion)
             }
         }
@@ -168,46 +168,63 @@ private struct ViewCone: Shape {
     }
 }
 
-// MARK: - 3. Turn to each light and camera
+// MARK: - 3. Walk up to each light and camera
 
-private struct TurnToItemsDrawing: View {
+/// Top-down: the phone walks up close to one item after another, staying in front of the set
+/// (it never goes around the back of the subject), and each item turns green once it's close.
+private struct WalkToItemsDrawing: View {
     let animates: Bool
 
-    /// Angle from the phone to each item, and where the item sits.
-    private let items: [(angle: Double, offset: CGSize, isCamera: Bool)] = [
-        (-50, CGSize(width: -90, height: -60), false),
-        (0, CGSize(width: 0, height: -95), false),
-        (50, CGSize(width: 90, height: -60), true)
+    private struct Item {
+        let position: CGPoint
+        let isCamera: Bool
+        /// Where the phone stands to measure it, and which way it faces (0 = up).
+        let stop: CGPoint
+        let facing: Double
+    }
+
+    private let items: [Item] = [
+        Item(position: CGPoint(x: -120, y: 95), isCamera: true, stop: CGPoint(x: -62, y: 95), facing: -90),
+        Item(position: CGPoint(x: -110, y: -25), isCamera: false, stop: CGPoint(x: -110, y: 35), facing: 0),
+        Item(position: CGPoint(x: 110, y: -40), isCamera: false, stop: CGPoint(x: 110, y: 20), facing: 0)
     ]
+    private let start = CGPoint(x: 40, y: 125)
 
     var body: some View {
         Looping(phases: [0, 1, 2, 3], animates: animates) { phase in
             ZStack {
+                SubjectCard()
+                    .scaleEffect(0.8)
+                    .offset(y: -95)
                 ForEach(items.indices, id: \.self) { index in
-                    let captured = phase > index
-                    item(isCamera: items[index].isCamera, captured: captured)
-                        .offset(items[index].offset)
-                        .offset(y: 30)
+                    item(items[index], captured: phase > index)
+                        .offset(x: items[index].position.x, y: items[index].position.y)
                 }
-                // The phone stays in one spot and turns.
-                ZStack {
-                    ViewCone()
-                        .fill(DesignTokens.accentPrimary.opacity(0.15))
-                        .frame(width: 90, height: 50)
-                        .offset(x: 45)
-                        .rotationEffect(.degrees(-90))
-                    PhoneShape()
-                }
-                .rotationEffect(.degrees(items[min(phase, items.count - 1)].angle))
-                .offset(y: 60)
+                phone(at: phase)
             }
         }
     }
 
-    private func item(isCamera: Bool, captured: Bool) -> some View {
+    private func phone(at phase: Int) -> some View {
+        let target = phase == 0 ? nil : items[phase - 1]
+        let position = target?.stop ?? start
+        return ZStack {
+            ViewCone()
+                .fill(DesignTokens.accentPrimary.opacity(0.15))
+                .frame(width: 50, height: 36)
+                .offset(x: 25)
+                .rotationEffect(.degrees(-90))
+            PhoneShape()
+                .scaleEffect(0.8)
+        }
+        .rotationEffect(.degrees(target?.facing ?? -20))
+        .offset(x: position.x, y: position.y)
+    }
+
+    private func item(_ item: Item, captured: Bool) -> some View {
         let color = captured ? DesignTokens.detectedGreen : DesignTokens.diagramStroke
         return Group {
-            if isCamera {
+            if item.isCamera {
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(color, lineWidth: 2)
                     .frame(width: 30, height: 22)
