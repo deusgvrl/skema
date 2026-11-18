@@ -55,7 +55,7 @@ struct SetupsView: View {
                 onStartScanning: { viewModel.startScanningTapped() },
                 onDontShowAgain: { viewModel.dontShowAgainTapped() }
             )
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
         }
     }
 
