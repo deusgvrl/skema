@@ -48,9 +48,9 @@ struct NodeView: View {
                 if isSelected {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.blue)
+                        .foregroundColor(DesignTokens.accentPrimary)
                         .frame(width: 28, height: 28)
-                        .background(Circle().fill(Color(uiColor: .systemBackground)).shadow(color: .black.opacity(0.15), radius: 2, y: 1))
+                        .background(Circle().fill(DesignTokens.diagramNodeFill).shadow(color: .black.opacity(0.15), radius: 2, y: 1))
                         .offset(y: -44)
                         .transition(.scale.combined(with: .opacity))
                         .highPriorityGesture(
@@ -106,11 +106,21 @@ struct NodeView: View {
                     .fixedSize()
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                    .background(Capsule().fill(DesignTokens.toastBackground))
                     .offset(x: 60, y: -15)
             }
         }
         .frame(width: 44, height: 44) // Locks 44x44 center 1:1 with node.position
+        .background {
+            if node.category == .light {
+                Circle()
+                    .fill(RadialGradient(colors: [DesignTokens.diagramGlow, .clear], center: .center,
+                                         startRadius: 0, endRadius: 55))
+                    .frame(width: 110, height: 110)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .background(
             GeometryReader { geo in
                 Color.clear
@@ -125,10 +135,10 @@ struct NodeView: View {
         )
         // 2. Hang Text Label below without altering the 44x44 icon's geometric center
         .overlay(alignment: .bottom) {
-            Text(node.role.isEmpty ? node.name : "\(node.label) \(node.role)")
-                .font(.caption2)
+            Text(node.displayName)
+                .font(.caption)
                 .fontWeight(isSelected ? .bold : .regular)
-                .foregroundColor(isSelected ? .blue : .primary)
+                .foregroundStyle(DesignTokens.textPrimary)
                 .lineLimit(1)
                 .fixedSize()
                 .offset(y: 20)
@@ -184,9 +194,9 @@ struct NodeView: View {
     private func applyCardinalSnap(to rawPosition: CGPoint) -> CGPoint {
         let dx = rawPosition.x
         let dy = rawPosition.y
-        let r = hypot(dx, dy)
-        
-        guard r > 15 else {
+        let radius = hypot(dx, dy)
+
+        guard radius > 15 else {
             lastCardinalSnap = nil
             return rawPosition
         }
@@ -214,10 +224,10 @@ struct NodeView: View {
             }
             
             switch cardinal {
-            case 0:   return CGPoint(x: r, y: 0)
-            case 90:  return CGPoint(x: 0, y: r)
-            case 180: return CGPoint(x: -r, y: 0)
-            case 270: return CGPoint(x: 0, y: -r)
+            case 0:   return CGPoint(x: radius, y: 0)
+            case 90:  return CGPoint(x: 0, y: radius)
+            case 180: return CGPoint(x: -radius, y: 0)
+            case 270: return CGPoint(x: 0, y: -radius)
             default:  return rawPosition
             }
         } else {
@@ -253,21 +263,28 @@ struct TopViewCameraShapeView: View {
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 5)
-                .fill(Color(uiColor: .systemGray5))
+                .fill(DesignTokens.diagramNodeFill)
                 .frame(width: 38, height: 26)
                 .overlay(
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.8), lineWidth: isSelected ? 2.0 : 1.5)
+                        .stroke(
+                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                            lineWidth: isSelected ? 2.0 : 1.5
+                        )
                 )
-                .shadow(color: isSelected ? .blue.opacity(0.4) : .black.opacity(0.12), radius: isSelected ? 5 : 2, y: 2)
+                .shadow(
+                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                    radius: isSelected ? 5 : 2,
+                    y: 2
+                )
                 .offset(y: 12)
-            
+
             RoundedRectangle(cornerRadius: 3)
-                .fill(isSelected ? Color.blue : Color(uiColor: .darkGray))
+                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke)
                 .frame(width: 18, height: 14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
-                        .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 1)
+                        .stroke(isSelected ? DesignTokens.accentPrimary : Color.clear, lineWidth: 1)
                 )
                 .offset(y: 0)
         }
@@ -281,22 +298,29 @@ struct TopViewLightShapeView: View {
     var body: some View {
         ZStack(alignment: .top) {
             Trapezoid()
-                .fill(Color(uiColor: .systemGray5))
+                .fill(DesignTokens.diagramNodeFill)
                 .frame(width: 38, height: 22)
                 .overlay(
                     Trapezoid()
-                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.8), lineWidth: isSelected ? 2.0 : 1.5)
+                        .stroke(
+                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                            lineWidth: isSelected ? 2.0 : 1.5
+                        )
                 )
-                .shadow(color: isSelected ? .blue.opacity(0.4) : .black.opacity(0.12), radius: isSelected ? 5 : 2, y: 2)
+                .shadow(
+                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                    radius: isSelected ? 5 : 2,
+                    y: 2
+                )
                 .offset(y: 2)
-            
+
             Rectangle()
-                .fill(isSelected ? Color.blue : Color(uiColor: .darkGray))
+                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke)
                 .frame(width: 38, height: 3)
                 .offset(y: 2)
-            
+
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color(uiColor: .darkGray))
+                .fill(DesignTokens.diagramStroke)
                 .frame(width: 18, height: 14)
                 .offset(y: 22)
         }
@@ -310,17 +334,24 @@ struct TopViewAccessoryShapeView: View {
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color(uiColor: .systemGray5))
+                .fill(DesignTokens.diagramNodeFill)
                 .frame(width: 50, height: 11)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.8), lineWidth: isSelected ? 2.0 : 1.5)
+                        .stroke(
+                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                            lineWidth: isSelected ? 2.0 : 1.5
+                        )
                 )
-                .shadow(color: isSelected ? .blue.opacity(0.4) : .black.opacity(0.12), radius: isSelected ? 5 : 2, y: 2)
+                .shadow(
+                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                    radius: isSelected ? 5 : 2,
+                    y: 2
+                )
                 .offset(y: 11)
-            
+
             Rectangle()
-                .fill(isSelected ? Color.blue : Color(uiColor: .darkGray))
+                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke)
                 .frame(width: 14, height: 4)
                 .cornerRadius(1)
                 .offset(y: 8)

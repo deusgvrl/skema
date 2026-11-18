@@ -5,6 +5,8 @@ struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
+    /// The system appearance, read before this view forces dark for the camera screens.
+    @Environment(\.colorScheme) private var systemColorScheme
     @State private var viewModel: ScanViewModel
     @State private var reviewViewModel: ReviewViewModel?
     @State private var showsLeaveAlert = false
@@ -20,8 +22,7 @@ struct ScanView: View {
 
     var body: some View {
         ZStack {
-            Color.black
-                .ignoresSafeArea()
+            background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
                     RoomScanView(session: session)
@@ -58,7 +59,7 @@ struct ScanView: View {
                     }
                     .animation(.default, value: viewModel.guidance)
                 }
-        .environment(\.colorScheme, .dark)
+        .environment(\.colorScheme, usesCameraAppearance ? .dark : systemColorScheme)
         .fullScreenCover(item: $reviewViewModel) { vm in
             NavigationStack {
                 ReviewView(
@@ -92,13 +93,31 @@ struct ScanView: View {
                 } message: {
                     Text("Everything detected so far will be lost.")
                 }
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarColorScheme(usesCameraAppearance ? .dark : nil, for: .navigationBar)
         .task {
             await viewModel.start()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await viewModel.appBecameActive() }
+        }
+    }
+
+    private var usesCameraAppearance: Bool {
+        viewModel.screen.usesCameraAppearance
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if usesCameraAppearance {
+            Color.black
+                .ignoresSafeArea()
+        } else {
+            ZStack {
+                DesignTokens.pageBackground
+                DesignTokens.scrimGradient
+            }
+            .ignoresSafeArea()
         }
     }
 
@@ -153,76 +172,127 @@ struct ScanView: View {
         case .lidarUnsupported:
             lidarUnsupported
         case .failed(let message):
-            ContentUnavailableView("Scan Stopped", systemImage: "exclamationmark.triangle", description: Text(message))
+            ScanMessageView(
+                title: "Scan Stopped",
+                systemImage: "exclamationmark.triangle",
+                message: Text(verbatim: message)
+            )
         }
     }
 
     private var cameraDenied: some View {
-        VStack(spacing: 32) {
-            unavailable(
-                "Camera Access Is Off",
-                systemImage: "video.slash",
-                message: """
-                    Skema Photo needs the camera to scan your set. \
-                    Turn it on in Settings, or add your equipment by hand.
-                    """
-            )
-
-            VStack(spacing: 16) {
-                Button {
-                    if let settings = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(settings)
-                    }
-                } label: {
-                    Text("Open Settings")
-                        .frame(maxWidth: .infinity)
+        ScanMessageView(
+            title: "Camera Access Is Off",
+            systemImage: "video.slash",
+            message: Text("""
+                Lighting Memory needs the camera to scan your set. \
+                Turn it on in Settings, or add your equipment by hand.
+                """)
+        ) {
+            ScanPrimaryButton(title: "Open Settings") {
+                if let settings = URL(string: UIApplication.openSettingsURLString) {
+                    openURL(settings)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-
-                Button("Add Equipment Manually") {
-                    addEquipmentManually()
-                }
-                .fontWeight(.semibold)
             }
+
+            Button("Add Equipment Manually") {
+                addEquipmentManually()
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(DesignTokens.accentText)
         }
     }
 
     private var lidarUnsupported: some View {
-        VStack(spacing: 32) {
-            unavailable(
-                "LiDAR Not Available",
-                systemImage: "iphone.slash",
-                message: """
-                    Scanning needs an iPhone with LiDAR, such as an iPhone Pro. \
-                    You can still add your equipment by hand.
-                    """
-            )
-
-            Button {
+        ScanMessageView(
+            title: "LiDAR Not Available",
+            systemImage: "iphone.slash",
+            message: Text("""
+                Scanning needs an iPhone with LiDAR, such as an iPhone Pro. \
+                You can still add your equipment by hand.
+                """)
+        ) {
+            ScanPrimaryButton(title: "Add Equipment Manually") {
                 addEquipmentManually()
-            } label: {
-                Text("Add Equipment Manually")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
+        }
+    }
+}
+
+/// A full-screen message instead of the camera: glass icon circle, title, body, actions (Sketch R02c).
+private struct ScanMessageView<Actions: View>: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let message: Text
+    @ViewBuilder let actions: () -> Actions
+
+    @ScaledMetric(relativeTo: .largeTitle) private var iconCircleSize: CGFloat = 80
+
+    var body: some View {
+        // Scrolls only when large Dynamic Type no longer fits on screen.
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView {
+                content
+                    .padding(.vertical, 24)
+            }
+            .scrollIndicators(.hidden)
         }
     }
 
-    private func unavailable(
-        _ title: LocalizedStringKey,
-        systemImage: String,
-        message: LocalizedStringKey
-    ) -> some View {
-        ContentUnavailableView {
-            Label(title, systemImage: systemImage)
-        } description: {
-            Text(message)
+    private var content: some View {
+        VStack(spacing: 0) {
+            Image(systemName: systemImage)
+                .font(.system(size: 32, weight: .regular))
+                .foregroundStyle(DesignTokens.textPrimary)
+                .frame(width: iconCircleSize, height: iconCircleSize)
+                .glassEffect(.regular.tint(DesignTokens.glassControlFill), in: .circle)
+                .accessibilityHidden(true)
+
+            Text(title)
+                .font(.title2.bold())
+                .foregroundStyle(DesignTokens.textPrimary)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, 8)
+
+            message
+                .font(.subheadline)
+                .foregroundStyle(DesignTokens.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+
+            VStack(spacing: 14) {
+                actions()
+            }
+            .padding(.top, 62)
         }
-        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+extension ScanMessageView where Actions == EmptyView {
+    init(title: LocalizedStringKey, systemImage: String, message: Text) {
+        self.init(title: title, systemImage: systemImage, message: message) { EmptyView() }
+    }
+}
+
+/// Red capsule with a white label (Sketch R02c "Open Settings").
+private struct ScanPrimaryButton: View {
+    let title: LocalizedStringKey
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(DesignTokens.accentPrimary, in: .capsule)
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
     }
 }
 

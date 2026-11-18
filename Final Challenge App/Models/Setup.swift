@@ -2,6 +2,20 @@ import SwiftUI
 import SwiftData
 import Foundation
 
+extension Setup {
+    /// The earliest reference photo, the same one the setup's detail screen shows first.
+    var coverImage: ReferenceImage? {
+        referenceImages.min { $0.createdAt < $1.createdAt }
+    }
+
+    /// "SS" for "Skincare / soft daylight": shown instead of a cover photo when there is none.
+    var initials: String {
+        let words = setupName.split(whereSeparator: { $0 == " " || $0 == "/" }).prefix(2)
+        let letters = words.compactMap(\.first).map { String($0).uppercased() }
+        return letters.isEmpty ? "?" : letters.joined()
+    }
+}
+
 /// A saved lighting setup. Fields are added with A10-13.
 @Model
 final class Setup {

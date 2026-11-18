@@ -41,7 +41,7 @@ struct LightingDiagramView: View {
             ZStack {
                 // Background Grid (Adapts step automatically)
                 GridPattern(step: gridConfig.stepInPoints)
-                    .stroke(Color.gray.opacity(0.15), lineWidth: 1 / currentScale)
+                    .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
                     .frame(width: 6000, height: 6000)
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
                  
@@ -53,9 +53,19 @@ struct LightingDiagramView: View {
                     }
                 }
                 .stroke(
-                    Color.secondary,
-                    style: StrokeStyle(lineWidth: 1.5 / currentScale, dash: [5 / currentScale])
+                    DesignTokens.diagramGuide,
+                    style: StrokeStyle(lineWidth: 1 / currentScale, dash: [4 / currentScale, 3 / currentScale])
                 )
+                 
+                // Subject card, under the distance labels so short distances stay readable
+                DiagramEntity(
+                    title: "Subject",
+                    icon: "person.fill",
+                    position: subjectCenter,
+                    currentScale: currentScale
+                ) {
+                    onSubjectTap?()
+                }
                  
                 // Distance Labels
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
@@ -87,29 +97,14 @@ struct LightingDiagramView: View {
                     )
                     
                     Text("\(node.distance) m")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(uiColor: .systemBackground).opacity(0.85))
-                                .shadow(color: .black.opacity(0.08), radius: 1, y: 1)
-                        )
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .fixedSize()
                         .rotationEffect(.degrees(angle))
                         .scaleEffect(1 / currentScale)
                         .position(labelPos)
                 }
                 
-                // Subject Icon (Centered on Grid Point)
-                DiagramEntity(
-                    title: "Subject",
-                    icon: "person.fill",
-                    position: subjectCenter,
-                    currentScale: currentScale
-                ) {
-                    onSubjectTap?()
-                }
-                 
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
                     NodeView(
@@ -146,7 +141,7 @@ struct LightingDiagramView: View {
                 y: offset.height + dragOffset.height
             )
             .scaleEffect(currentScale)
-            .background(Color(uiColor: .systemBackground))
+            .background(DesignTokens.pageBackground)
             .onTapGesture {
                 if !isReadOnly {
                     withAnimation(.easeInOut(duration: 0.2)) {

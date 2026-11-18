@@ -13,6 +13,17 @@ enum ScanScreen: Equatable {
     case failed(String)
 }
 
+extension ScanScreen {
+    /// The camera screens are dark-only (Sketch R03); the message screens follow the
+    /// system appearance (Sketch R02c and its Light pair).
+    var usesCameraAppearance: Bool {
+        switch self {
+        case .starting, .scanning: true
+        case .cameraDenied, .lidarUnsupported, .failed: false
+        }
+    }
+}
+
 @Observable
 final class ScanViewModel {
     private(set) var screen = ScanScreen.starting

@@ -20,8 +20,25 @@ final class SetupsViewModel {
     /// Whether to show the Recently Deleted row.
     private(set) var hasRecentlyDeleted = false
     var grouping: SetupsGrouping = .recent
-    var recentSections: [SetupSection] { SetupSections.recent(from: setups) }
-    var clientGroups: [ClientGroup] { SetupSections.byClient(from: setups) }
+    /// The bottom search field (Sketch R01): filters by setup name, client, project and equipment.
+    var searchText = ""
+    var showsNoResults: Bool { !searchText.isEmpty && !setups.isEmpty && searchedSetups.isEmpty }
+    var recentSections: [SetupSection] { SetupSections.recent(from: searchedSetups) }
+    var clientGroups: [ClientGroup] { SetupSections.byClient(from: searchedSetups) }
+
+    /// The setups matching `searchText`, or all of them when it is empty.
+    var searchedSetups: [Setup] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return setups }
+        return setups.filter { setup in
+            if setup.setupName.lowercased().contains(query) { return true }
+            if setup.client.lowercased().contains(query) { return true }
+            if setup.project.lowercased().contains(query) { return true }
+            return setup.nodes.contains { node in
+                node.name.lowercased().contains(query) || node.role.lowercased().contains(query)
+            }
+        }
+    }
 
     @ObservationIgnored private let scanGuide: ScanGuideSettings
     @ObservationIgnored private let storageController: StorageController

@@ -15,6 +15,9 @@ struct ZoomableImageView: UIViewRepresentable {
     let isSelected: Bool
     @Binding var isZoomed: Bool
     @Binding var isControlsHidden: Bool
+    /// Space the fitted photo keeps clear of, e.g. the top bar and the thumbnail strip (Sketch R13b).
+    /// Zooming still uses the whole view.
+    var fitInsets: UIEdgeInsets = .zero
 
     func makeUIView(context: Context) -> ZoomableScrollView {
         let scrollView = ZoomableScrollView()
@@ -35,11 +38,13 @@ struct ZoomableImageView: UIViewRepresentable {
                 self.isControlsHidden.toggle()
             }
         }
+        scrollView.fitInsets = fitInsets
         scrollView.setImage(image)
         return scrollView
     }
 
     func updateUIView(_ uiView: ZoomableScrollView, context: Context) {
+        uiView.fitInsets = fitInsets
         uiView.setImage(image)
 
         // Reset zoom when swiping away from this image page
@@ -55,6 +60,30 @@ struct ZoomableImageView: UIViewRepresentable {
         var onSingleTap: (() -> Void)?
 
         private var lastBoundsSize: CGSize = .zero
+
+        var fitInsets: UIEdgeInsets = .zero {
+            didSet {
+                guard fitInsets != oldValue else { return }
+                lastBoundsSize = .zero
+                setNeedsLayout()
+            }
+        }
+
+        /// Where the unzoomed photo may go, in this view's own coordinates (ignoring zoom scrolling).
+        /// `fitInsets` are measured from the screen edges: the paging view may place this page lower
+        /// than the screen top (e.g. under the status bar) while keeping it full height.
+        private var fitArea: CGRect {
+            let ownArea = CGRect(origin: .zero, size: bounds.size)
+            var area = ownArea.inset(by: fitInsets)
+            if let window {
+                // Vertical position only: pages that are swiped off to the side still get the same area.
+                let pageTop = convert(CGPoint(x: bounds.minX, y: bounds.minY), to: window).y
+                let top = max(0, fitInsets.top - pageTop)
+                let bottom = min(bounds.height, window.bounds.height - fitInsets.bottom - pageTop)
+                area = CGRect(x: area.minX, y: top, width: area.width, height: bottom - top)
+            }
+            return area.width > 0 && area.height > 0 ? area : ownArea
+        }
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -125,8 +154,9 @@ struct ZoomableImageView: UIViewRepresentable {
             let imageSize = image.size
             guard imageSize.width > 0 && imageSize.height > 0 else { return }
 
-            let widthRatio = bounds.width / imageSize.width
-            let heightRatio = bounds.height / imageSize.height
+            let area = fitArea
+            let widthRatio = area.width / imageSize.width
+            let heightRatio = area.height / imageSize.height
             let scale = min(widthRatio, heightRatio)
 
             let fittedWidth = imageSize.width * scale
@@ -141,15 +171,21 @@ struct ZoomableImageView: UIViewRepresentable {
         func centerImage() {
             guard imageView.image != nil else { return }
             let boundsSize = bounds.size
+            let area = fitArea
             var frameToCenter = imageView.frame
 
-            if frameToCenter.size.width < boundsSize.width {
+            // Unzoomed: centre in the fit area. Zoomed past it: centre in the whole view, then pin to 0.
+            if frameToCenter.size.width <= area.width {
+                frameToCenter.origin.x = area.minX + (area.width - frameToCenter.size.width) / 2.0
+            } else if frameToCenter.size.width < boundsSize.width {
                 frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2.0
             } else {
                 frameToCenter.origin.x = 0
             }
 
-            if frameToCenter.size.height < boundsSize.height {
+            if frameToCenter.size.height <= area.height {
+                frameToCenter.origin.y = area.minY + (area.height - frameToCenter.size.height) / 2.0
+            } else if frameToCenter.size.height < boundsSize.height {
                 frameToCenter.origin.y = (boundsSize.height - frameToCenter.size.height) / 2.0
             } else {
                 frameToCenter.origin.y = 0
@@ -188,11 +224,14 @@ struct ZoomableImageView: UIViewRepresentable {
             } else {
                 let pointInView = gesture.location(in: imageView)
                 let newZoomScale: CGFloat = 2.5
-                let w = bounds.size.width / newZoomScale
-                let h = bounds.size.height / newZoomScale
-                let x = pointInView.x - (w / 2.0)
-                let y = pointInView.y - (h / 2.0)
-                let rectToZoomTo = CGRect(x: x, y: y, width: w, height: h)
+                let zoomWidth = bounds.size.width / newZoomScale
+                let zoomHeight = bounds.size.height / newZoomScale
+                let rectToZoomTo = CGRect(
+                    x: pointInView.x - (zoomWidth / 2.0),
+                    y: pointInView.y - (zoomHeight / 2.0),
+                    width: zoomWidth,
+                    height: zoomHeight
+                )
                 zoom(to: rectToZoomTo, animated: true)
                 isZoomedBinding?(true)
                 isControlsHiddenBinding?(true)

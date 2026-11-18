@@ -19,7 +19,26 @@ struct FullScreenImageView: View {
     @State private var isDraggingDown: Bool = false
     @State private var scrollPositionID: Int?
 
+    /// Top bar height (status bar + navigation bar), kept at its largest so hiding the controls
+    /// doesn't make the photo jump.
+    @State private var topBarHeight: CGFloat = 0
+
     private let feedbackGenerator = UISelectionFeedbackGenerator()
+
+    // Thumbnail strip: 56pt tall, 80pt above the bottom edge of the screen.
+    private static let stripHeight: CGFloat = 56
+    private static let stripBottomPadding: CGFloat = 80
+    private static let photoGap: CGFloat = 8
+
+    /// Keeps the fitted photo between the top bar and the thumbnail strip (Sketch R13b).
+    private var photoInsets: UIEdgeInsets {
+        UIEdgeInsets(
+            top: topBarHeight + Self.photoGap,
+            left: 0,
+            bottom: Self.stripBottomPadding + Self.stripHeight + Self.photoGap,
+            right: 0
+        )
+    }
 
     // Dynamic background opacity during drag-to-dismiss
     private var backgroundOpacity: Double {
@@ -35,9 +54,19 @@ struct FullScreenImageView: View {
     }
 
     var body: some View {
+        GeometryReader { geometry in
+            content
+                .onAppear { topBarHeight = max(topBarHeight, geometry.safeAreaInsets.top) }
+                .onChange(of: geometry.safeAreaInsets.top) { _, top in
+                    topBarHeight = max(topBarHeight, top)
+                }
+        }
+    }
+
+    private var content: some View {
         ZStack {
             // Layer 1: Background Layer
-            Color(isControlsHidden ? .black : .systemBackground)
+            (isControlsHidden ? Color.black : DesignTokens.pageBackground)
                 .opacity(backgroundOpacity)
                 .ignoresSafeArea()
 
@@ -49,7 +78,8 @@ struct FullScreenImageView: View {
                             image: viewModel.referenceImages[index],
                             isSelected: index == selectedIndex,
                             isZoomed: $isZoomed,
-                            isControlsHidden: $isControlsHidden
+                            isControlsHidden: $isControlsHidden,
+                            fitInsets: photoInsets
                         )
                         .ignoresSafeArea()
                         .tag(index)
@@ -89,7 +119,7 @@ struct FullScreenImageView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: isSelected ? 8 : 4))
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: isSelected ? 8 : 4)
-                                                    .stroke(isSelected ? Color.primary : Color.clear, lineWidth: 2)
+                                                    .stroke(isSelected ? DesignTokens.textPrimary : Color.clear, lineWidth: 2)
                                             )
                                             .opacity(isSelected ? 1.0 : 0.5)
                                             .contentShape(Rectangle())
@@ -125,8 +155,8 @@ struct FullScreenImageView: View {
                             }
                         }
                     }
-                    .frame(height: 56)
-                    .padding(.bottom, 80)
+                    .frame(height: Self.stripHeight)
+                    .padding(.bottom, Self.stripBottomPadding)
                     .opacity(isControlsHidden ? 0 : 1)
                     .allowsHitTesting(!isControlsHidden)
                 }
@@ -137,8 +167,7 @@ struct FullScreenImageView: View {
         .ignoresSafeArea()
         .statusBarHidden(isControlsHidden)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .navigationBar)
-        .toolbar(isControlsHidden ? .hidden : .visible, for: .bottomBar)
-        .toolbarBackground(.hidden, for: .navigationBar, .bottomBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
             scrollPositionID = selectedIndex
             feedbackGenerator.prepare()
@@ -151,7 +180,8 @@ struct FullScreenImageView: View {
                 scrollPositionID = selectedIndex
             }
         }
-        .alert("Delete This Photo", isPresented: $isDeleteAlert) {
+        // R13c
+        .alert("Delete This Photo?", isPresented: $isDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 deleteCurrentImage()
@@ -169,23 +199,22 @@ struct FullScreenImageView: View {
 
                     Text("Reference \(displayIndex)")
                         .font(.headline)
-                        .fontWeight(.bold)
+                        .foregroundStyle(DesignTokens.textPrimary)
 
                     if let currentRefImage {
                         Text("\(displayIndex) of \(viewModel.referenceImages.count) · Added \(currentRefImage.formattedDateString)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.textSecondary)
                     } else {
                         Text("\(displayIndex) of \(viewModel.referenceImages.count)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.textSecondary)
                     }
                 }
             }
             
-            ToolbarSpacer(placement: .bottomBar)
-
-            ToolbarItem(placement: .bottomBar) {
+            // R13b: trash at the top right
+            ToolbarItem(placement: .primaryAction) {
                 Button("Delete", systemImage: "trash") {
                     isDeleteAlert = true
                 }

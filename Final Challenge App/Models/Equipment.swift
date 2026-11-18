@@ -51,7 +51,13 @@ final class Equipment {
     // Relationship back to parent
     var setup: Setup?
     
-    init(id: UUID = UUID(), category: EquipmentCategory = .light, label: String = "", name: String = "", role: String = "", position: CGPoint = .zero, power: String = "", colorTemp: String = "", lens: String = "", iso: String = "", aperture: String = "", shutterSpeed: String = "", whiteBalance: String = "", height: String = "", tilt: String = "", horizontalAim: String = "", distance: String = "", rotationAngle: Double = 0.0, accessories: String = "", notes: String = "") {
+    init(
+        id: UUID = UUID(), category: EquipmentCategory = .light, label: String = "", name: String = "",
+        role: String = "", position: CGPoint = .zero, power: String = "", colorTemp: String = "",
+        lens: String = "", iso: String = "", aperture: String = "", shutterSpeed: String = "",
+        whiteBalance: String = "", height: String = "", tilt: String = "", horizontalAim: String = "",
+        distance: String = "", rotationAngle: Double = 0.0, accessories: String = "", notes: String = ""
+    ) {
         self.id = id
         self.category = category
         self.label = label
@@ -177,4 +183,13 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case accessory = "Accessories"
     
     var id: String { self.rawValue }
+}
+
+extension Equipment {
+    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
+    var displayName: String {
+        let role = role.trimmingCharacters(in: .whitespaces)
+        guard !role.isEmpty else { return name }
+        return label.isEmpty ? role : "\(label) \(role)"
+    }
 }

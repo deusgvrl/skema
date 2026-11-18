@@ -12,6 +12,8 @@ final class ReviewViewModel: Identifiable {
     
     var canUndo = false
     var canRedo = false
+    /// View mode (Next, pencil) vs edit mode (undo/redo, ✓, +) — Sketch R04 / R04m.
+    var isEditingDiagram = false
     
     @ObservationIgnored private let storageController: StorageController
     
@@ -131,5 +133,49 @@ final class ReviewViewModel: Identifiable {
         }
         undoManager?.setActionName("Change Subject Height")
         updateUndoState(undoManager: undoManager)
+    }
+}
+
+// MARK: - View and edit mode (Sketch R04, R04m, R04mx)
+
+extension ReviewViewModel {
+    /// Changes made since edit mode began that ✓ would keep and Discard would roll back.
+    var hasPendingEdits: Bool { canUndo }
+
+    /// Chips under the diagram, in the team's display order (A10-96): lights, accessories, cameras,
+    /// each by label ("L2" before "L10"). SwiftData does not keep relationship order.
+    var chipOrder: [Equipment] {
+        DisplayOrder.equipment(nodes)
+    }
+
+    /// "Estimated layout · 4 lights" under the Review Setup title.
+    var layoutSubtitle: String {
+        let lights = nodes.filter { $0.category == .light }.count
+        return "Estimated layout · \(lights) \(lights == 1 ? "light" : "lights")"
+    }
+
+    /// The pencil. Starts a clean undo history, so Discard only rolls back what happens in edit mode.
+    func beginEditing(undoManager: UndoManager?) {
+        undoManager?.removeAllActions()
+        updateUndoState(undoManager: undoManager)
+        isEditingDiagram = true
+    }
+
+    /// ✓: keep the changes.
+    func confirmEdits(undoManager: UndoManager?) {
+        finalizeAndSaveSetup()
+        undoManager?.removeAllActions()
+        updateUndoState(undoManager: undoManager)
+        isEditingDiagram = false
+    }
+
+    /// Discard in "Discard Changes?": roll back everything since `beginEditing`.
+    func discardEdits(undoManager: UndoManager?) {
+        while undoManager?.canUndo == true {
+            undoManager?.undo()
+        }
+        undoManager?.removeAllActions()
+        updateUndoState(undoManager: undoManager)
+        isEditingDiagram = false
     }
 }

@@ -29,6 +29,20 @@ final class FakeCameraPermission: CameraPermission {
     }
 }
 
+@Suite("Scan screen appearance (Sketch R03 dark-only, R02c light + dark)")
+struct ScanScreenAppearanceTests {
+    @Test("Only the camera screens are forced dark", arguments: [
+        (ScanScreen.starting, true),
+        (.scanning, true),
+        (.cameraDenied, false),
+        (.lidarUnsupported, false),
+        (.failed("Session failed"), false)
+    ])
+    func usesCameraAppearance(screen: ScanScreen, expected: Bool) {
+        #expect(screen.usesCameraAppearance == expected)
+    }
+}
+
 @MainActor
 @Suite("Scan view model: permission and LiDAR")
 struct ScanViewModelTests {

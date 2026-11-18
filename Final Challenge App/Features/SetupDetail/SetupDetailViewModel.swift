@@ -58,9 +58,12 @@ final class SetupDetailViewModel {
         setup.setupName.isEmpty ? "Untitled Setup" : setup.setupName
     }
     
+    /// "Aesop · November catalog" under the title (Sketch R08); empty when neither is set.
     var formattedSubtitle: String {
-        let components = [setup.client, setup.project].filter { !$0.isEmpty }
-        return components.isEmpty ? "No Details" : components.joined(separator: " › ")
+        [setup.client, setup.project]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " · ")
     }
     
     /// The alert text: saved setups can be recovered for 30 days, drafts cannot (A10-95).
