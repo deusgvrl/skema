@@ -16,8 +16,6 @@ struct ReviewDiagramContentView: View {
 
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
-    var onAddNodeTap: () -> Void
-    var onEditTap: () -> Void = {}
 
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
@@ -32,10 +30,10 @@ struct ReviewDiagramContentView: View {
                     onNodeTap: onNodeTap,
                     onSubjectTap: onSubjectTap
                 )
-                .overlay(alignment: .bottomTrailing) {
-                    floatingButton
-                        .padding(16)
-                }
+//                .overlay(alignment: .bottomTrailing) {
+//                    floatingButton
+//                        .padding(16)
+//                }
 
                 if !viewModel.nodes.isEmpty {
                     Group {
@@ -51,24 +49,6 @@ struct ReviewDiagramContentView: View {
             }
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
-    }
-
-    /// Pencil in view mode (red), + in edit mode (glass) — Sketch R04 / R04m.
-    @ViewBuilder
-    private var floatingButton: some View {
-        if viewModel.isEditingDiagram {
-            Button("Add Equipment", systemImage: "plus", action: onAddNodeTap)
-                .labelStyle(.iconOnly)
-                .font(.title3.weight(.medium))
-                .foregroundStyle(DesignTokens.textPrimary)
-                .frame(width: 48, height: 48)
-                .glassEffect(.regular.tint(DesignTokens.glassControlFill).interactive(), in: .circle)
-        } else {
-            Button(action: onEditTap) {
-                AccentCircleLabel(title: "Edit Diagram", systemImage: "pencil")
-            }
-            .buttonStyle(.plain)
-        }
     }
 }
 
@@ -125,8 +105,7 @@ struct ReviewEditModeTip: Tip {
     ReviewDiagramContentView(
         viewModel: ReviewViewModel(),
         onNodeTap: { _ in },
-        onSubjectTap: {},
-        onAddNodeTap: {}
+        onSubjectTap: {}
     )
     .task {
         try? Tips.resetDatastore()

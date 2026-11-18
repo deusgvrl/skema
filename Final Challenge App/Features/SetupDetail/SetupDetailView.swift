@@ -58,12 +58,9 @@ struct SetupDetailView: View {
                     viewModel: viewModel.reviewViewModel,
                     undoManager: undoManager,
                     onNodeTap: { node in editingNode = node },
-                    onSubjectTap: { isShowingSubjectSheet = true },
-                    onAddNodeTap: { isAddingNode = true },
-                    onEditTap: {
-                        withAnimation { viewModel.reviewViewModel.beginEditing(undoManager: undoManager) }
-                    }
+                    onSubjectTap: { isShowingSubjectSheet = true } 
                 )
+                .ignoresSafeArea(edges: .bottom)
 
             } else {
                 // MARK: - References Tab (Sketch R11, R13)
@@ -92,15 +89,6 @@ struct SetupDetailView: View {
                             }
                         }
                     }
-
-                    // R12: + opens Take Photo / Choose from Library
-                    Menu {
-                        Button("Take Photo", systemImage: "camera") { showCamera = true }
-                        Button("Choose from Library", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
-                    } label: {
-                        AccentCircleLabel(title: "Add Reference", systemImage: "plus")
-                    }
-                    .padding(16)
                 }
             }
         }
@@ -108,6 +96,27 @@ struct SetupDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
         .toolbar {
+            ToolbarSpacer(placement: .bottomBar)
+
+            if viewModel.selectedTab == 1 {
+                ToolbarItem(placement: .bottomBar) {
+                    Menu {
+                        Button("Take Photo", systemImage: "camera") {
+                            showCamera = true
+                        }
+                        Button("Choose from Library", systemImage: "photo.on.rectangle") {
+                            showPhotoPicker = true
+                        }
+                    } label: {
+                        Label("Add Image", systemImage: "plus")
+                    }
+                }
+            }
+            
+            ToolbarItem(placement: .bottomBar) {
+                floatingButton
+            }
+            
             if isEditing {
                 editToolbar
             }
@@ -241,6 +250,35 @@ struct SetupDetailView: View {
         // A bigger canvas gets a lower scale, so the image keeps about the same pixel size.
         renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
         viewModel.shareTapped(diagram: renderer.uiImage)
+    }
+    
+   
+    /// Pencil in Diagram view mode, + (Add Node) in Diagram edit mode, and + (Menu) in References tab.
+    @ViewBuilder
+    private var floatingButton: some View {
+        if isEditing || viewModel.selectedTab == 0 {
+            if isEditing {
+                Button {
+                    isAddingNode = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(DesignTokens.accentPrimary)
+            } else {
+                Button {
+                    viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(DesignTokens.accentPrimary)
+            }
+        }
     }
 
     /// Edit mode (Sketch R09): X, undo/redo in one capsule, and a red ✓ once something changed.

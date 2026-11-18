@@ -35,10 +35,9 @@ struct ReviewView: View {
             viewModel: viewModel,
             undoManager: undoManager,
             onNodeTap: { node in editingNode = node },
-            onSubjectTap: { isShowingSubjectSheet = true },
-            onAddNodeTap: { isAddingNode = true },
-            onEditTap: { viewModel.beginEditing(undoManager: undoManager) }
+            onSubjectTap: { isShowingSubjectSheet = true }
         )
+        .ignoresSafeArea(edges: .bottom)
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -108,6 +107,12 @@ struct ReviewView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        
+        ToolbarSpacer(placement: .bottomBar)
+        ToolbarItem(placement: .bottomBar) {
+            floatingButton
+        }
+        
         ToolbarItem(placement: .cancellationAction) {
             Button("Close", systemImage: "xmark") {
                 if viewModel.isEditingDiagram {
@@ -169,6 +174,34 @@ struct ReviewView: View {
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
             }
+        }
+    }
+    
+    
+    /// Pencil in view mode (red), + in edit mode (glass) — Sketch R04 / R04m.
+    @ViewBuilder
+    private var floatingButton: some View {
+        if viewModel.isEditingDiagram {
+            Button {
+                isAddingNode = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(DesignTokens.accentPrimary)
+            
+        } else {
+            Button {
+                viewModel.beginEditing(undoManager: undoManager)
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(DesignTokens.accentPrimary)
         }
     }
 
