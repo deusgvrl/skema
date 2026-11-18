@@ -115,7 +115,7 @@ struct ReviewEditSessionTests {
         #expect(viewModel.layoutSubtitle == expected)
     }
 
-    @Test("Chips list lights, then cameras, then accessories, each by label (Sketch R04)")
+    @Test("Chips follow the team's display order: lights, accessories, cameras, each by label (A10-96)")
     func chipOrder() {
         let setup = Setup(setupName: "Studio A")
         setup.nodes.append(contentsOf: [
@@ -129,7 +129,7 @@ struct ReviewEditSessionTests {
         storage.addSetup(setup)
         let viewModel = ReviewViewModel(setup: setup, storageController: storage)
 
-        #expect(viewModel.chipOrder.map(\.label) == ["L1", "L2", "L10", "C1", "C2", "B1"])
+        #expect(viewModel.chipOrder.map(\.label) == ["L1", "L2", "L10", "B1", "C1", "C2"])
     }
 
     @Test("Display name is label and role, or the name when there is no role", arguments: [

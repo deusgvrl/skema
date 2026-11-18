@@ -15,6 +15,13 @@ struct SetupRowView: View {
         setup.nodes.filter { $0.category == .light }.count
     }
 
+    /// "4 lights · 2 Nov", or just the lights for a draft that was never saved.
+    private var detailLine: String {
+        let lights = "\(lightsCount) \(lightsCount == 1 ? "light" : "lights")"
+        guard let saved = setup.firstSavedDate else { return lights }
+        return "\(lights) · \(saved.formatted(.dateTime.day().month(.abbreviated)))"
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             SetupThumbnail(setup: setup)
@@ -30,7 +37,7 @@ struct SetupRowView: View {
                         .foregroundStyle(DesignTokens.textSecondary)
                         .lineLimit(1)
                 }
-                Text("\(lightsCount) lights · \(setup.createdAt.formatted(.dateTime.day().month(.abbreviated)))")
+                Text(detailLine)
                     .font(.caption)
                     .foregroundStyle(DesignTokens.textSecondary)
             }

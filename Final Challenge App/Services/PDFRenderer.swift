@@ -1,290 +1,286 @@
-//
-//  PDFRenderer.swift
-//  Final Challenge App
-//
-//  Draws the shared A4 PDF of a setup (Sketch R15q page 1, R15q·2 page 2 · A10-13).
-//  Paper is always light, so colors are the design tokens resolved in light.
-//
-
-import SwiftUI
+import Foundation
 import UIKit
+import os
 
-struct PDFRenderer {
-    private typealias Metrics = SetupPDFContent.Metrics
+/// Sizes and spacing of the PDF, in points. One place, so no number is hidden inside the drawing code.
+enum PDFLayout {
+    static let pageSize = CGSize(width: 595, height: 842)
+    static let margin: CGFloat = 36
 
-    /// Builds the PDF. `diagram` is the lighting diagram already rendered (light appearance).
-    func render(_ content: SetupPDFContent, diagram: UIImage?) -> Data {
-        let detailPages = SetupPDFContent.detailPages(rowCount: content.rows.count, photoCount: content.photos.count)
-        let pageCount = 1 + detailPages.count
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: Metrics.pageSize))
-        return renderer.pdfData { context in
-            context.beginPage()
-            drawOverview(content, diagram: diagram, pageCount: pageCount)
-            for (index, page) in detailPages.enumerated() {
-                context.beginPage()
-                drawDetails(content, page: page, isFirst: index == 0, pageNumber: index + 2, pageCount: pageCount)
-            }
-        }
+    /// The smallest text anywhere. Content that does not fit at this size goes on an extra page.
+    static let minimumFontSize: CGFloat = 9
+    static let titleFontSize: CGFloat = 22
+    static let subtitleFontSize: CGFloat = 12
+    static let sectionFontSize: CGFloat = 14
+    static let headingFontSize: CGFloat = 11
+    static let bodyFontSize: CGFloat = 10
+
+    static let spacing: CGFloat = 8
+    static let sectionSpacing: CGFloat = 16
+    static let boxPadding: CGFloat = 8
+    static let cellPadding: CGFloat = 4
+    static let lineWidth: CGFloat = 0.5
+
+    /// The notes box on page 1 takes a quarter of the page; the diagram box gets the rest (Amadeus, 18 Nov).
+    static var notesBoxHeight: CGFloat { pageSize.height / 4 }
+    /// About the shape of the page-1 diagram box. The View draws the diagram at this shape (or bigger, see
+    /// `DiagramCanvas`), and the PDF fits the picture into the real box.
+    static var diagramCanvasSize: CGSize { CGSize(width: contentWidth, height: 400) }
+    static let footerHeight: CGFloat = 28
+
+    /// Table column widths: ID, equipment, accessories, distance, height-tilt-aim, settings.
+    /// They add up to the page width minus both margins (523 pt). Distance fits its header on one line.
+    static let columnWidths: [CGFloat] = [32, 120, 96, 66, 99, 110]
+
+    static let photoColumns = 2
+    static let photoRows = 2
+    static let photosPerPage = photoColumns * photoRows
+    static let photoBoxHeight: CGFloat = 150
+    static let photoLabelHeight: CGFloat = 14
+
+    static var contentWidth: CGFloat { pageSize.width - 2 * margin }
+    /// Where content must stop so the footer keeps its space.
+    static var contentBottom: CGFloat { pageSize.height - margin - footerHeight }
+}
+
+/// Builds the templated A4 PDF of a setup (A10-13). Notes, equipment and photos can add pages (A10-98).
+final class PDFRenderer {
+    private static let signposter = OSSignposter(subsystem: "Skema", category: "PDFExport")
+    private static let emptyValue = "—"
+    private static let separator = " · "
+
+    private let calendar: Calendar
+
+    init(calendar: Calendar = .current) {
+        self.calendar = calendar
     }
 
-    /// Writes the PDF to a fresh temporary folder under `name`, ready for the share sheet.
-    func writeFile(_ data: Data, named name: String) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("SharedPDF", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent(name)
-        try data.write(to: url, options: .atomic)
-        return url
+    /// Makes the PDF. `diagram` is a ready image (A10-99 makes it); nil leaves an empty box.
+    func makePDF(for setup: Setup, diagram: UIImage?) -> Data {
+        let signpostID = Self.signposter.makeSignpostID()
+        let state = Self.signposter.beginInterval("makePDF", id: signpostID)
+        defer { Self.signposter.endInterval("makePDF", state) }
+
+        // The footer says "Page N of M", so the first pass only counts pages and the second one draws them.
+        let pageCount = render(setup: setup, diagram: diagram, totalPages: 0).pageCount
+        return render(setup: setup, diagram: diagram, totalPages: pageCount).data
     }
 
-    // MARK: - Page 1: diagram and notes
-
-    private func drawOverview(_ content: SetupPDFContent, diagram: UIImage?, pageCount: Int) {
-        let margin = Metrics.margin
-        let width = Metrics.pageSize.width - margin * 2
-        Draw.text(content.title, at: CGPoint(x: margin, y: margin), width: width - 120, font: .bold(20))
-        Draw.text(content.savedLine, at: CGPoint(x: margin, y: margin + 6), width: width,
-                  font: .regular(8), color: Palette.secondary, alignment: .right)
-        if !content.subtitle.isEmpty {
-            Draw.text(content.subtitle, at: CGPoint(x: margin, y: margin + 28), width: width,
-                      font: .regular(9), color: Palette.secondary)
+    private func render(setup: Setup, diagram: UIImage?, totalPages: Int) -> (data: Data, pageCount: Int) {
+        let bounds = CGRect(origin: .zero, size: PDFLayout.pageSize)
+        var pageCount = 0
+        let data = UIGraphicsPDFRenderer(bounds: bounds).pdfData { context in
+            let pages = PageWriter(context: context, totalPages: totalPages)
+            drawFirstPage(setup: setup, diagram: diagram, pages: pages)
+            drawEquipment(setup: setup, pages: pages)
+            drawReferences(setup: setup, pages: pages)
+            pages.finish()
+            pageCount = pages.pageNumber
         }
+        return (data, pageCount)
+    }
 
-        Draw.sectionLabel("LIGHTING DIAGRAM", at: CGPoint(x: margin, y: 96))
-        let diagramBox = CGRect(x: margin, y: 110, width: width, height: 380)
-        Draw.box(diagramBox, fill: Palette.canvas)
+    // MARK: - Page 1 and notes
+
+    private func drawFirstPage(setup: Setup, diagram: UIImage?, pages: PageWriter) {
+        pages.startPage()
+        pages.drawText(setup.setupName, font: .boldSystemFont(ofSize: PDFLayout.titleFontSize))
+
+        let subtitle = [setup.client, setup.project]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: Self.separator)
+        if !subtitle.isEmpty {
+            pages.drawText(subtitle, font: .systemFont(ofSize: PDFLayout.subtitleFontSize), color: .darkGray)
+        }
+        if let saved = setup.firstSavedDate {
+            let font = UIFont.systemFont(ofSize: PDFLayout.minimumFontSize)
+            pages.drawText("Saved \(savedDateText(saved))", font: font, color: .darkGray)
+        }
+        pages.advance(PDFLayout.sectionSpacing)
+
+        pages.drawHeading("LIGHTING DIAGRAM")
+        // The diagram fills page 1 down to where the notes heading and the quarter-page notes box start.
+        let headingFont = UIFont.boldSystemFont(ofSize: PDFLayout.headingFontSize)
+        let notesHeading = PageWriter.height(of: "NOTES", font: headingFont, width: PDFLayout.contentWidth)
+            + PDFLayout.spacing / 2
+        let notesSpace = PDFLayout.sectionSpacing + notesHeading + PDFLayout.notesBoxHeight
+        let diagramBox = pages.takeBox(height: PDFLayout.contentBottom - pages.cursorY - notesSpace)
+        pages.strokeBox(diagramBox)
         if let diagram {
-            Draw.image(diagram, in: diagramBox.insetBy(dx: 1, dy: 1), fill: false)
+            let inner = diagramBox.insetBy(dx: PDFLayout.boxPadding, dy: PDFLayout.boxPadding)
+            diagram.draw(in: PageWriter.aspectFit(diagram.size, in: inner))
         }
+        pages.advance(PDFLayout.sectionSpacing)
 
-        if !content.notes.isEmpty {
-            Draw.sectionLabel("NOTES", at: CGPoint(x: margin, y: diagramBox.maxY + 18))
-            let textWidth = width - 24
-            let textHeight = Draw.height(of: content.notes, width: textWidth, font: .regular(9))
-            let maxHeight = Metrics.pageSize.height - 70 - (diagramBox.maxY + 32)
-            let notesBox = CGRect(x: margin, y: diagramBox.maxY + 32, width: width,
-                                  height: min(maxHeight, max(56, textHeight + 24)))
-            Draw.box(notesBox, fill: Palette.canvas)
-            Draw.text(content.notes, in: notesBox.insetBy(dx: 12, dy: 12), font: .regular(9))
-        }
-
-        drawFooter(left: "Lighting Memory · \(content.title)", pageNumber: 1, pageCount: pageCount)
+        pages.drawHeading("NOTES")
+        drawNotes(setup.notes, pages: pages)
     }
 
-    // MARK: - Page 2+: equipment and references
-
-    private func drawDetails(_ content: SetupPDFContent, page: SetupPDFContent.DetailPage,
-                             isFirst: Bool, pageNumber: Int, pageCount: Int) {
-        let margin = Metrics.margin
-        let width = Metrics.pageSize.width - margin * 2
-        var cursor = margin
-        Draw.text(content.title, at: CGPoint(x: margin, y: cursor), width: width, font: .regular(8), color: Palette.secondary)
-        if isFirst {
-            Draw.text("Equipment Details", at: CGPoint(x: margin, y: cursor + 14), width: width, font: .bold(18))
-            Draw.text(content.summary, at: CGPoint(x: margin, y: cursor + 40), width: width,
-                      font: .regular(9), color: Palette.secondary)
-            cursor += Metrics.firstDetailsHeader
-        } else {
-            cursor += Metrics.continuedHeader
-        }
-
-        if !page.rows.isEmpty {
-            cursor = EquipmentTable.draw(Array(content.rows[page.rows]), top: cursor, left: margin, width: width)
-        }
-        if !page.photos.isEmpty {
-            let isFirstPhotoPage = page.photos.lowerBound == 0
-            if isFirstPhotoPage {
-                Draw.sectionLabel("REFERENCES · \(content.photos.count) \(content.photos.count == 1 ? "PHOTO" : "PHOTOS")",
-                                  at: CGPoint(x: margin, y: cursor + 8))
-            }
-            cursor += Metrics.referencesHeader
-            drawPhotos(Array(content.photos[page.photos]), top: cursor, left: margin, width: width)
-        }
-
-        drawFooter(
-            left: "Lighting Memory · Height, tilt and aim are relative to the subject. Values from the scan are estimates.",
-            pageNumber: pageNumber,
-            pageCount: pageCount
+    /// Fills the box on the current page; whatever does not fit continues on following pages.
+    private func drawNotes(_ notes: String, pages: PageWriter) {
+        var remaining = NSAttributedString(
+            string: notes,
+            attributes: [.font: UIFont.systemFont(ofSize: PDFLayout.bodyFontSize), .foregroundColor: UIColor.black]
         )
+        while true {
+            let box = pages.takeBox(height: PDFLayout.contentBottom - pages.cursorY)
+            pages.strokeBox(box)
+            let inner = box.insetBy(dx: PDFLayout.boxPadding, dy: PDFLayout.boxPadding)
+            let fitted = PageWriter.drawFitting(remaining, in: inner)
+            guard fitted < remaining.length else { return }
+            let rest = NSRange(location: fitted, length: remaining.length - fitted)
+            remaining = remaining.attributedSubstring(from: rest)
+            pages.startPage()
+            pages.drawHeading("Notes (continued)")
+        }
     }
 
-    private func drawPhotos(_ photos: [SetupPDFContent.Photo], top: CGFloat, left: CGFloat, width: CGFloat) {
-        let gap: CGFloat = 16
-        let cellWidth = (width - gap) / 2
-        for (index, photo) in photos.enumerated() {
-            let origin = CGPoint(x: left + CGFloat(index % 2) * (cellWidth + gap),
-                                 y: top + CGFloat(index / 2) * Metrics.photoLine)
-            let imageRect = CGRect(x: origin.x, y: origin.y, width: cellWidth, height: 130)
+    private func savedDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "d MMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    // MARK: - Equipment table
+
+    private func drawEquipment(setup: Setup, pages: PageWriter) {
+        let items = DisplayOrder.equipment(setup.nodes)
+        // Equipment always starts on a new page, after any notes pages.
+        pages.startPage()
+        pages.drawText("Equipment Details", font: .boldSystemFont(ofSize: PDFLayout.sectionFontSize))
+        let summary = equipmentSummary(items)
+        if !summary.isEmpty {
+            pages.drawText(summary, font: .systemFont(ofSize: PDFLayout.bodyFontSize), color: .darkGray)
+        }
+        pages.advance(PDFLayout.spacing)
+
+        drawTableHeader(pages: pages)
+        for item in items {
+            let cells = rowCells(for: item)
+            let height = pages.rowHeight(cells, widths: PDFLayout.columnWidths)
+            if pages.cursorY + height > PDFLayout.contentBottom {
+                pages.startPage()
+                drawTableHeader(pages: pages)
+            }
+            pages.drawRow(cells, widths: PDFLayout.columnWidths, height: height, bold: false)
+        }
+    }
+
+    private func drawTableHeader(pages: PageWriter) {
+        let titles = ["ID", "EQUIPMENT", "ACCESSORIES", "DISTANCE", "HEIGHT · TILT · AIM", "SETTINGS"]
+        let height = pages.rowHeight(titles, widths: PDFLayout.columnWidths, bold: true)
+        pages.drawRow(titles, widths: PDFLayout.columnWidths, height: height, bold: true)
+    }
+
+    /// "2 lights · 1 accessory · 1 camera"; types with no items are left out.
+    private func equipmentSummary(_ items: [Equipment]) -> String {
+        let kinds: [(category: EquipmentCategory, words: [String])] = [
+            (.light, ["light", "lights"]),
+            (.accessory, ["accessory", "accessories"]),
+            (.camera, ["camera", "cameras"])
+        ]
+        return kinds.compactMap { kind in
+            let count = items.filter { $0.category == kind.category }.count
+            guard count > 0 else { return nil }
+            return "\(count) \(kind.words[count == 1 ? 0 : 1])"
+        }.joined(separator: Self.separator)
+    }
+
+    private func rowCells(for item: Equipment) -> [String] {
+        [
+            orDash(item.label),
+            orDash(lines([item.name, item.role] + (item.category == .camera ? [item.lens] : []))),
+            orDash(item.accessories),
+            orDash(item.distance),
+            orDash(joined([item.height, item.tilt, item.horizontalAim])),
+            orDash(settings(for: item))
+        ]
+    }
+
+    /// Lights: power and colour temperature. Cameras: ISO, aperture and shutter. Accessories have none.
+    private func settings(for item: Equipment) -> String {
+        switch item.category {
+        case .light:
+            return joined([item.power, item.colorTemp])
+        case .camera:
+            let exposure = joined([item.iso, item.aperture])
+            return [exposure, item.shutterSpeed]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: ", ")
+        case .accessory:
+            return ""
+        }
+    }
+
+    private func joined(_ parts: [String]) -> String {
+        nonEmpty(parts).joined(separator: Self.separator)
+    }
+
+    private func lines(_ parts: [String]) -> String {
+        nonEmpty(parts).joined(separator: "\n")
+    }
+
+    private func nonEmpty(_ parts: [String]) -> [String] {
+        parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
+    private func orDash(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? Self.emptyValue : trimmed
+    }
+
+    // MARK: - References
+
+    private func drawReferences(setup: Setup, pages: PageWriter) {
+        let photos = DisplayOrder.photos(setup.referenceImages)
+        guard !photos.isEmpty else { return }
+
+        // The whole 2 x 2 block goes under the table only if it fits there; otherwise it gets a new page.
+        let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.photoLabelHeight + PDFLayout.spacing
+        let blockHeight = CGFloat(PDFLayout.photoRows) * cellHeight
+        let headingHeight = PDFLayout.sectionFontSize + PDFLayout.sectionSpacing
+        pages.advance(PDFLayout.sectionSpacing)
+        if pages.cursorY + headingHeight + blockHeight > PDFLayout.contentBottom {
+            pages.startPage()
+        }
+        let heading = "References · \(photos.count) \(photos.count == 1 ? "photo" : "photos")"
+        pages.drawText(heading, font: .boldSystemFont(ofSize: PDFLayout.sectionFontSize))
+        pages.advance(PDFLayout.spacing)
+
+        for start in stride(from: 0, to: photos.count, by: PDFLayout.photosPerPage) {
+            if start > 0 { pages.startPage() }
+            let group = photos[start..<min(start + PDFLayout.photosPerPage, photos.count)]
+            drawPhotoGrid(Array(group), firstNumber: start + 1, pages: pages)
+        }
+    }
+
+    private func drawPhotoGrid(_ group: [ReferenceImage], firstNumber: Int, pages: PageWriter) {
+        let columnWidth = (PDFLayout.contentWidth - PDFLayout.spacing) / CGFloat(PDFLayout.photoColumns)
+        let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.photoLabelHeight + PDFLayout.spacing
+        let top = pages.cursorY
+        for (offset, photo) in group.enumerated() {
+            let column = offset % PDFLayout.photoColumns
+            let row = offset / PDFLayout.photoColumns
+            let origin = CGPoint(
+                x: PDFLayout.margin + CGFloat(column) * (columnWidth + PDFLayout.spacing),
+                y: top + CGFloat(row) * cellHeight
+            )
+            let box = CGRect(x: origin.x, y: origin.y, width: columnWidth, height: PDFLayout.photoBoxHeight)
+            pages.strokeBox(box)
             if let image = UIImage(data: photo.imageData) {
-                Draw.image(image, in: imageRect, fill: true)
-            } else {
-                Draw.box(imageRect, fill: Palette.canvas)
+                let inner = box.insetBy(dx: PDFLayout.boxPadding, dy: PDFLayout.boxPadding)
+                image.draw(in: PageWriter.aspectFit(image.size, in: inner))
             }
-            Draw.text(photo.caption, at: CGPoint(x: origin.x, y: imageRect.maxY + 4), width: cellWidth, font: .semibold(8))
-            Draw.text(photo.detail, at: CGPoint(x: origin.x, y: imageRect.maxY + 15), width: cellWidth,
-                      font: .regular(7), color: Palette.secondary)
+            let labelRect = CGRect(x: origin.x, y: box.maxY + 1, width: columnWidth, height: PDFLayout.photoLabelHeight)
+            let label = "Reference \(firstNumber + offset)"
+            PageWriter.draw(label, font: .systemFont(ofSize: PDFLayout.bodyFontSize), color: .black, in: labelRect)
         }
-    }
-
-    private func drawFooter(left: String, pageNumber: Int, pageCount: Int) {
-        let margin = Metrics.margin
-        let width = Metrics.pageSize.width - margin * 2
-        let lineY = Metrics.pageSize.height - 46
-        Draw.line(from: CGPoint(x: margin, y: lineY), to: CGPoint(x: margin + width, y: lineY))
-        Draw.text(left, at: CGPoint(x: margin, y: lineY + 8), width: width - 70, font: .regular(7), color: Palette.secondary)
-        Draw.text("Page \(pageNumber) of \(pageCount)", at: CGPoint(x: margin, y: lineY + 8), width: width,
-                  font: .regular(7), color: Palette.secondary, alignment: .right)
-    }
-}
-
-// MARK: - Equipment table
-
-private enum EquipmentTable {
-    /// Column titles and widths (sum 515 = A4 width minus margins).
-    static let columns: [(title: String, width: CGFloat, alignment: NSTextAlignment)] = [
-        ("ID", 30, .left), ("EQUIPMENT", 128, .left), ("ACCESSORIES", 95, .left),
-        ("DISTANCE", 50, .left), ("HEIGHT · TILT · AIM", 110, .left), ("SETTINGS", 102, .right)
-    ]
-
-    /// Draws the header and rows; returns the y below the table.
-    static func draw(_ rows: [SetupPDFContent.Row], top: CGFloat, left: CGFloat, width: CGFloat) -> CGFloat {
-        var columnX = left
-        for column in columns {
-            Draw.text(column.title, at: CGPoint(x: columnX, y: top + 6), width: column.width - 4,
-                      font: .semibold(6.5), color: Palette.secondary, alignment: column.alignment)
-            columnX += column.width
-        }
-        var cursor = top + SetupPDFContent.Metrics.tableHeader
-        Draw.line(from: CGPoint(x: left, y: cursor), to: CGPoint(x: left + width, y: cursor))
-        for row in rows {
-            drawRow(row, top: cursor, left: left)
-            cursor += SetupPDFContent.Metrics.row
-            Draw.line(from: CGPoint(x: left, y: cursor), to: CGPoint(x: left + width, y: cursor))
-        }
-        return cursor
-    }
-
-    private static func drawRow(_ row: SetupPDFContent.Row, top: CGFloat, left: CGFloat) {
-        let pill = CGRect(x: left, y: top + 8, width: 20, height: 14)
-        Draw.box(pill, fill: Palette.canvas, radius: 4, stroke: false)
-        Draw.text(row.id, at: CGPoint(x: pill.minX, y: pill.minY + 3), width: pill.width, font: .semibold(6.5),
-                  alignment: .center)
-
-        var columnX = left + columns[0].width
-        Draw.text(row.name, at: CGPoint(x: columnX, y: top + 5), width: columns[1].width - 6, font: .semibold(8.5))
-        if !row.role.isEmpty {
-            Draw.text(row.role, at: CGPoint(x: columnX, y: top + 17), width: columns[1].width - 6,
-                      font: .regular(7), color: Palette.secondary)
-        }
-        columnX += columns[1].width
-        let cells = [row.accessories, row.distance, row.placement, row.settings]
-        for (offset, value) in cells.enumerated() {
-            let column = columns[offset + 2]
-            let cellWidth = column.width - 4
-            // Long values (camera settings) wrap onto a second line instead of being cut off.
-            let lines = Draw.height(of: value, width: cellWidth, font: .regular(8)) > UIFont.regular(8).lineHeight + 2
-            let cell = CGRect(x: columnX, y: top + (lines ? 4 : 10), width: cellWidth, height: 24)
-            Draw.text(value, in: cell, font: .regular(8), alignment: column.alignment)
-            columnX += column.width
-        }
-    }
-}
-
-// MARK: - Drawing helpers
-
-private enum Palette {
-    static let light = UITraitCollection(userInterfaceStyle: .light)
-    static let primary = UIColor(DesignTokens.textPrimary).resolvedColor(with: light)
-    static let secondary = UIColor(DesignTokens.textSecondary).resolvedColor(with: light)
-    static let canvas = UIColor(DesignTokens.pageBackground).resolvedColor(with: light)
-    static let hairline = UIColor(DesignTokens.diagramSubjectBorder).resolvedColor(with: light)
-}
-
-private extension UIFont {
-    static func regular(_ size: CGFloat) -> UIFont { .systemFont(ofSize: size) }
-    static func semibold(_ size: CGFloat) -> UIFont { .systemFont(ofSize: size, weight: .semibold) }
-    static func bold(_ size: CGFloat) -> UIFont { .systemFont(ofSize: size, weight: .bold) }
-}
-
-private enum Draw {
-    static func attributes(_ font: UIFont, _ color: UIColor, _ alignment: NSTextAlignment) -> [NSAttributedString.Key: Any] {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = alignment
-        paragraph.lineBreakMode = .byTruncatingTail
-        return [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
-    }
-
-    /// One line, truncated to `width`.
-    static func text(_ string: String, at point: CGPoint, width: CGFloat, font: UIFont,
-                     color: UIColor = Palette.primary, alignment: NSTextAlignment = .left) {
-        let rect = CGRect(x: point.x, y: point.y, width: width, height: font.lineHeight + 2)
-        (string as NSString).draw(in: rect, withAttributes: attributes(font, color, alignment))
-    }
-
-    /// Wrapped text inside `rect`.
-    static func text(_ string: String, in rect: CGRect, font: UIFont, color: UIColor = Palette.primary,
-                     alignment: NSTextAlignment = .left) {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = alignment
-        paragraph.lineBreakMode = .byWordWrapping
-        paragraph.lineSpacing = 2
-        (string as NSString).draw(with: rect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                                  attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph],
-                                  context: nil)
-    }
-
-    static func height(of string: String, width: CGFloat, font: UIFont) -> CGFloat {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 2
-        let bounds = (string as NSString).boundingRect(
-            with: CGSize(width: width, height: .greatestFiniteMagnitude),
-            options: .usesLineFragmentOrigin,
-            attributes: [.font: font, .paragraphStyle: paragraph],
-            context: nil
-        )
-        return ceil(bounds.height)
-    }
-
-    static func sectionLabel(_ string: String, at point: CGPoint) {
-        var attributes = attributes(.semibold(7), Palette.secondary, .left)
-        attributes[.kern] = 0.6
-        (string as NSString).draw(at: point, withAttributes: attributes)
-    }
-
-    static func box(_ rect: CGRect, fill: UIColor, radius: CGFloat = 10, stroke: Bool = true) {
-        let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
-        fill.setFill()
-        path.fill()
-        if stroke {
-            Palette.hairline.setStroke()
-            path.lineWidth = 0.5
-            path.stroke()
-        }
-    }
-
-    static func line(from start: CGPoint, to end: CGPoint) {
-        let path = UIBezierPath()
-        path.move(to: start)
-        path.addLine(to: end)
-        path.lineWidth = 0.5
-        Palette.hairline.setStroke()
-        path.stroke()
-    }
-
-    /// Draws `image` aspect-fit (`fill == false`) or aspect-fill and clipped (`fill == true`) in `rect`.
-    static func image(_ image: UIImage, in rect: CGRect, fill: Bool) {
-        guard image.size.width > 0, image.size.height > 0 else { return }
-        let scale = fill
-            ? max(rect.width / image.size.width, rect.height / image.size.height)
-            : min(rect.width / image.size.width, rect.height / image.size.height)
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let drawRect = CGRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2,
-                              width: size.width, height: size.height)
-        guard let context = UIGraphicsGetCurrentContext() else { return }
-        context.saveGState()
-        UIBezierPath(roundedRect: rect, cornerRadius: fill ? 6 : 10).addClip()
-        image.draw(in: drawRect)
-        context.restoreGState()
+        let rows = (group.count + PDFLayout.photoColumns - 1) / PDFLayout.photoColumns
+        pages.advance(CGFloat(rows) * cellHeight)
     }
 }

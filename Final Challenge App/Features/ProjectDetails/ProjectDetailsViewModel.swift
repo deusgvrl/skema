@@ -1,79 +1,65 @@
 import Foundation
 import Observation
 
-/// State and actions for ProjectDetailsView (Sketch R07, R07e, R07f).
-/// The fields are a copy of the setup's values, written back only on ✓ (or when going back to the
-/// diagram), so Cancel in "Edit details" leaves the saved setup untouched.
+/// State and actions for ProjectDetailsView.
+/// Reads and writes data only through StorageController, and reloads on appear and after every change.
 @Observable
 final class ProjectDetailsViewModel {
-    static let storageFullMessage =
-        "Your iPhone storage is full. Free up some space and try again. Your details are still here."
-    static let generalFailureMessage =
-        "Something went wrong while saving. Try again. Your details are still here."
-
-    var name: String {
-        didSet { hasEditedName = true }
-    }
-    var client: String
-    var project: String
-    var notes: String
-    /// The message for "Couldn't Save Setup", or nil when the last save worked.
-    private(set) var saveFailure: String?
-
-    @ObservationIgnored private let setup: Setup
+    @ObservationIgnored private let storageController: StorageController
+    /// Injectable so tests can fix the date.
+    @ObservationIgnored private let now: () -> Date
+    /// Injectable so tests can force a failed save.
     @ObservationIgnored private let saveChanges: () throws -> Void
-    private var hasEditedName = false
 
-    init(setup: Setup, saveChanges: (() throws -> Void)? = nil) {
-        self.setup = setup
-        self.name = setup.setupName
-        self.client = setup.client
-        self.project = setup.project
-        self.notes = setup.notes
-        self.saveChanges = saveChanges ?? { try StorageController.shared.saveChanges() }
+    enum SaveOutcome { case saved, nameMissing, failed }
+
+    private(set) var showsNameRequired = false
+    var isSaveFailedAlertPresented = false
+
+    init(storageController: StorageController? = nil,
+         now: @escaping () -> Date = { Date() },
+         saveChanges: (() throws -> Void)? = nil) {
+        self.storageController = storageController ?? StorageController.shared
+        self.now = now
+        let storage = self.storageController
+        self.saveChanges = saveChanges ?? { try storage.trySave() }
     }
 
-    private var trimmedName: String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// A name with only spaces or new lines counts as empty.
+    static func isNameValid(_ name: String) -> Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// ✓ is enabled only with a name.
-    var canSave: Bool { !trimmedName.isEmpty }
-
-    /// "Add a name to save this setup." — only after the user cleared the name, not on arrival (R07e).
-    var showsNameError: Bool { hasEditedName && !canSave }
-
-    /// ✓ / Try Again. Returns true when the setup was saved.
-    @discardableResult
-    func save() -> Bool {
-        guard canSave else { return false }
-        applyWithoutSaving()
+    func saveTapped(for setup: Setup) -> SaveOutcome {
+        guard Self.isNameValid(setup.setupName) else {
+            showsNameRequired = true
+            return .nameMissing
+        }
+        let previousFirstSavedDate = setup.firstSavedDate
+        if setup.firstSavedDate == nil {
+            setup.firstSavedDate = now()
+        }
         do {
             try saveChanges()
-            saveFailure = nil
-            return true
+            return .saved
         } catch {
-            saveFailure = Self.isOutOfSpace(error) ? Self.storageFullMessage : Self.generalFailureMessage
-            return false
+            // The first saved date belongs to the first successful save, so put it back.
+            setup.firstSavedDate = previousFirstSavedDate
+            isSaveFailedAlertPresented = true
+            return .failed
         }
     }
 
-    /// Writes the fields to the setup without saving, e.g. when going back to the diagram.
-    func applyWithoutSaving() {
-        setup.setupName = trimmedName
-        setup.client = client.trimmingCharacters(in: .whitespacesAndNewlines)
-        setup.project = project.trimmingCharacters(in: .whitespacesAndNewlines)
-        setup.notes = notes
+    func nameChanged(_ name: String) {
+        if Self.isNameValid(name) {
+            showsNameRequired = false
+        }
     }
 
-    private static func isOutOfSpace(_ error: Error) -> Bool {
-        let nsError = error as NSError
-        if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteOutOfSpaceError {
-            return true
+    func handleClose(for setup: Setup) {
+        if setup.firstSavedDate == nil {
+            setup.firstSavedDate = now()
         }
-        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
-            return isOutOfSpace(underlying)
-        }
-        return false
+        storageController.save()
     }
 }

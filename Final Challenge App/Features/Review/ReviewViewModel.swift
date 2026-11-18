@@ -142,10 +142,10 @@ extension ReviewViewModel {
     /// Changes made since edit mode began that ✓ would keep and Discard would roll back.
     var hasPendingEdits: Bool { canUndo }
 
-    /// Chips under the diagram: lights, cameras, then accessories, each in label order ("L2" before "L10").
-    /// SwiftData does not keep relationship order, so `nodes` alone would shuffle between launches.
+    /// Chips under the diagram, in the team's display order (A10-96): lights, accessories, cameras,
+    /// each by label ("L2" before "L10"). SwiftData does not keep relationship order.
     var chipOrder: [Equipment] {
-        nodes.inChipOrder
+        DisplayOrder.equipment(nodes)
     }
 
     /// "Estimated layout · 4 lights" under the Review Setup title.

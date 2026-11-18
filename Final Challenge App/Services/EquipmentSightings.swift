@@ -21,7 +21,8 @@ nonisolated enum EquipmentSightings {
                 return nil
             }
             let detection = Detection(label: label, confidence: found.confidence, box: box, mask: found.mask)
-            return Sighting.make(from: detection, depth: depth, camera: camera, maxRange: DepthSampler.maxRange)
+            return Sighting.make(from: detection, depth: depth, camera: camera, maxRange: DepthSampler.maxRange,
+                                 isWeak: found.isWeak)
                 .map { SightedDetection(sighting: $0, mask: found.mask) }
         }
     }

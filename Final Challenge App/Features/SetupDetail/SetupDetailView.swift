@@ -1,11 +1,14 @@
 import SwiftUI
 import PhotosUI
+import QuickLook
 
 /// One saved setup with Diagram and References tabs (Sketch R08 · A10-13).
 struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: SetupDetailViewModel
-    @State private var exportViewModel: ExportViewModel
+
+    /// 3x keeps the diagram sharp when the PDF is printed.
+    private static let diagramImageScale: CGFloat = 3
 
     // Photo Pickers State
     @State private var showCamera = false
@@ -17,7 +20,6 @@ struct SetupDetailView: View {
     @State private var showReferenceDetail: Bool = false
 
     init(setup: Setup, storageController: StorageController? = nil) {
-        self._exportViewModel = State(initialValue: ExportViewModel(setup: setup))
         self._viewModel = State(initialValue: SetupDetailViewModel(
             setup: setup,
             storageController: storageController
@@ -134,13 +136,18 @@ struct SetupDetailView: View {
                         viewModel.isEditingProjectDetails = true
                     }
                     Button("Share", systemImage: "square.and.arrow.up") {
-                        exportViewModel.share()
+                        shareTapped()
                     }
+                    .disabled(viewModel.isPreparingPDF)
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         viewModel.isDeleteAlertPresented = true
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
+                    if viewModel.isPreparingPDF {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "ellipsis")
+                    }
                 }
                 .accessibilityLabel("More")
             }
@@ -186,24 +193,20 @@ struct SetupDetailView: View {
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
                 ProjectDetailsView(setup: viewModel.setup, isPresentedModally: true)
+                    // The list is hidden behind this screen, so no "Setup saved" toast here.
+                    .environment(\.setupSavedAction, nil)
             }
         }
         .sheet(isPresented: $viewModel.isShowSubjectSheet) {
             SubjectFormView(viewModel: viewModel.reviewViewModel, undoManager: nil, isReadOnly: true)
         }
-        // R15: the system share sheet with the setup's PDF
-        .sheet(item: $exportViewModel.sharedPDF) { shared in
-            ExportView(fileURL: shared.url) {
-                exportViewModel.sharedPDF = nil
-            }
-            .presentationDetents([.medium, .large])
-            .ignoresSafeArea()
-        }
+        // A10-99: the PDF opens in Quick Look (R15p), whose share button shows the share sheet (R15).
+        .quickLookPreview($viewModel.pdfURL)
         // R15f
-        .alert("Couldn’t Create PDF", isPresented: $exportViewModel.showsFailure) {
+        .alert("Couldn’t Create PDF", isPresented: $viewModel.isPDFFailedAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Try Again") {
-                exportViewModel.share()
+                shareTapped()
             }
             .keyboardShortcut(.defaultAction)
         } message: {
@@ -217,8 +220,22 @@ struct SetupDetailView: View {
                 }
             }
         } message: {
-            Text("The diagram, equipment and references will move to Recently Deleted for 30 days.")
+            Text(viewModel.deleteMessage)
         }
+    }
+
+    /// Draws the diagram into an image for the PDF, then lets the view model make the file (A10-99).
+    private func shareTapped() {
+        let base = PDFLayout.diagramCanvasSize
+        let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
+        let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true)
+            .frame(width: canvas.width, height: canvas.height)
+            // Paper is light, whatever the phone's appearance.
+            .environment(\.colorScheme, .light)
+        let renderer = ImageRenderer(content: diagram)
+        // A bigger canvas gets a lower scale, so the image keeps about the same pixel size.
+        renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
+        viewModel.shareTapped(diagram: renderer.uiImage)
     }
 
     /// R11: glass circle icon, title and Sketch copy.

@@ -1,22 +1,27 @@
 import SwiftUI
 
-/// Setup name, client, project and notes (Sketch R07, R07e, R07f · A10-11, A10-13).
-/// Pushed from Review after a scan (back chevron), or presented from a saved setup to edit (X).
+/// Setup name, client, project and notes (Sketch R07, R07e, R07f · A10-11, A10-13, A10-93, A10-97).
+/// Pushed from Review after a scan (back chevron), or presented from a saved setup to edit (Cancel).
 struct ProjectDetailsView: View {
-    let setup: Setup
+    @Bindable var setup: Setup
     var isPresentedModally: Bool = false
     var onDismissToSetups: (() -> Void)?
+    @State private var viewModel: ProjectDetailsViewModel
+    /// Last Save result; changing it plays the haptic.
+    @State private var lastOutcome: ProjectDetailsViewModel.SaveOutcome?
+    @State private var saveCount = 0
 
     @Environment(\.dismiss) private var dismiss
-    @State private var viewModel: ProjectDetailsViewModel
-    @State private var didSave = false
-    @State private var showsSaveFailure = false
+    @Environment(\.setupSavedAction) private var setupSavedAction
 
-    init(setup: Setup, isPresentedModally: Bool = false, onDismissToSetups: (() -> Void)? = nil) {
+    init(setup: Setup,
+         isPresentedModally: Bool = false,
+         onDismissToSetups: (() -> Void)? = nil,
+         viewModel: ProjectDetailsViewModel = ProjectDetailsViewModel()) {
         self.setup = setup
         self.isPresentedModally = isPresentedModally
         self.onDismissToSetups = onDismissToSetups
-        _viewModel = State(initialValue: ProjectDetailsViewModel(setup: setup))
+        _viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {
@@ -27,15 +32,16 @@ struct ProjectDetailsView: View {
                 DetailsRow("Name") {
                     TextField(
                         "Name",
-                        text: $viewModel.name,
+                        text: $setup.setupName,
                         prompt: Text("Required")
-                            .foregroundStyle(viewModel.showsNameError ? DesignTokens.accentText : DesignTokens.textSecondary)
+                            .foregroundStyle(viewModel.showsNameRequired ? DesignTokens.accentText : DesignTokens.textSecondary)
                     )
                 }
             } header: {
                 FormSectionHeader("Setup")
             } footer: {
-                if viewModel.showsNameError {
+                // R07e
+                if viewModel.showsNameRequired {
                     Text("Add a name to save this setup.")
                         .font(.footnote)
                         .foregroundStyle(DesignTokens.accentText)
@@ -45,16 +51,16 @@ struct ProjectDetailsView: View {
 
             Section(header: FormSectionHeader("Organization · Optional")) {
                 DetailsRow("Client") {
-                    TextField("Client", text: $viewModel.client, prompt: Text("None"))
+                    TextField("Client", text: $setup.client, prompt: Text("None"))
                 }
                 DetailsRow("Project") {
-                    TextField("Project", text: $viewModel.project, prompt: Text("None"))
+                    TextField("Project", text: $setup.project, prompt: Text("None"))
                 }
             }
             .listRowBackground(DesignTokens.formRowBackground)
 
             Section {
-                TextField("Notes", text: $viewModel.notes, prompt: Text("Add notes"), axis: .vertical)
+                TextField("Notes", text: $setup.notes, prompt: Text("Add notes"), axis: .vertical)
                     .lineLimit(4...10)
                     .foregroundStyle(DesignTokens.textPrimary)
             } header: {
@@ -89,33 +95,32 @@ struct ProjectDetailsView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
-                .disabled(!viewModel.canSave)
             }
         }
+        .onChange(of: setup.setupName) { _, newName in
+            viewModel.nameChanged(newName)
+        }
+        .sensoryFeedback(trigger: saveCount) { _, _ in
+            lastOutcome == .saved ? .success : .error
+        }
         // R07f
-        .alert("Couldn’t Save Setup", isPresented: $showsSaveFailure) {
+        .alert("Couldn’t Save Setup", isPresented: $viewModel.isSaveFailedAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Try Again") {
                 save()
             }
             .keyboardShortcut(.defaultAction)
         } message: {
-            Text(viewModel.saveFailure ?? "")
-        }
-        .onDisappear {
-            // Back to the diagram keeps what was typed; Cancel on the modal does not.
-            if !isPresentedModally && !didSave {
-                viewModel.applyWithoutSaving()
-            }
+            Text("Something went wrong while saving. Try again. Your details are still here.")
         }
     }
 
     private func save() {
-        guard viewModel.save() else {
-            showsSaveFailure = true
-            return
-        }
-        didSave = true
+        let outcome = viewModel.saveTapped(for: setup)
+        lastOutcome = outcome
+        saveCount += 1
+        guard outcome == .saved else { return }
+        setupSavedAction?()
         if let onDismissToSetups {
             onDismissToSetups()
         } else {

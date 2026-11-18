@@ -11,6 +11,8 @@ final class SetupDetailViewModel {
     let setup: Setup
     let reviewViewModel: ReviewViewModel
     @ObservationIgnored private let storageController: StorageController
+    @ObservationIgnored private let now: () -> Date
+    @ObservationIgnored private let pdfRenderer: PDFRenderer
     
     // Tab Navigation
     var selectedTab: Int = 0 // 0 = Diagram, 1 = References
@@ -21,8 +23,15 @@ final class SetupDetailViewModel {
     var selectedEquipment: Equipment? = nil
     var isDeleteAlertPresented: Bool = false
     var isShowSubjectSheet: Bool = false
+
+    // PDF Share State (A10-99)
+    private(set) var isPreparingPDF = false
+    /// Setting this shows the QuickLook preview, which has the system share button.
+    var pdfURL: URL?
+    var isPDFFailedAlertPresented = false
     
     // References Tab State
+    var isSelectionMode: Bool = false
     var referenceImages: [UIImage] = []
     
     /// Deterministically sorted SwiftData models by creation date
@@ -30,8 +39,15 @@ final class SetupDetailViewModel {
         setup.referenceImages.sorted(by: { $0.createdAt < $1.createdAt })
     }
     
-    init(setup: Setup, storageController: StorageController? = nil) {
+    init(
+        setup: Setup,
+        storageController: StorageController? = nil,
+        now: @escaping () -> Date = { Date() },
+        pdfRenderer: PDFRenderer = PDFRenderer()
+    ) {
+        self.pdfRenderer = pdfRenderer
         let storage = storageController ?? StorageController.shared
+        self.now = now
         self.setup = setup
         self.storageController = storage
         self.reviewViewModel = ReviewViewModel(setup: setup, storageController: storage)
@@ -50,11 +66,54 @@ final class SetupDetailViewModel {
             .joined(separator: " · ")
     }
     
+    /// The alert text: saved setups can be recovered for 30 days, drafts cannot (A10-95).
+    var deleteMessage: String {
+        setup.firstSavedDate == nil
+            ? "This draft will be deleted. This can't be undone."
+            : "This setup will move to Recently Deleted for \(RecentlyDeleted.keepDays) days."
+    }
+
     func deleteSetup(completion: () -> Void) {
-        storageController.softDeleteSetup(setup)
+        if setup.firstSavedDate == nil {
+            // A draft was never saved by the user, so it skips Recently Deleted.
+            storageController.deleteSetup(setup)
+        } else {
+            storageController.moveToRecentlyDeleted(setup, at: now())
+        }
         completion()
     }
     
+    private static let pdfFallbackName = "Untitled Setup"
+    private static let pdfExtension = "pdf"
+
+    /// The file name the share sheet shows. Slash and colon are not safe in file names, so they become "-".
+    static func pdfFileName(for setupName: String) -> String {
+        let cleaned = setupName
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        return "\(cleaned.isEmpty ? pdfFallbackName : cleaned).\(pdfExtension)"
+    }
+
+    /// Makes the PDF, saves it in the temporary folder and sets `pdfURL` to open the preview.
+    /// `diagram` is drawn by the view, because the renderer service must not use SwiftUI.
+    func shareTapped(diagram: UIImage?) {
+        isPreparingPDF = true
+        defer { isPreparingPDF = false }
+
+        let data = pdfRenderer.makePDF(for: setup, diagram: diagram)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(Self.pdfFileName(for: setup.setupName))
+        do {
+            guard !data.isEmpty else { throw CocoaError(.fileWriteUnknown) }
+            // .atomic replaces an older file with the same name.
+            try data.write(to: url, options: .atomic)
+            pdfURL = url
+        } catch {
+            isPDFFailedAlertPresented = true
+        }
+    }
+
     /// Loads existing ReferenceImage data into UIImages sorted by createdAt
     func loadReferenceImages() {
         self.referenceImages = sortedReferenceImages.compactMap { ref in
@@ -110,5 +169,22 @@ final class SetupDetailViewModel {
         }
         
         storageController.deleteReferenceImage(refImageToDelete)
+    }
+    
+    /// Batch deletes reference images by a set of indices
+    func deleteReferenceImages(at indices: Set<Int>) {
+        let sorted = sortedReferenceImages
+        let sortedIndices = indices.sorted(by: >)
+        
+        for index in sortedIndices {
+            guard sorted.indices.contains(index) else { continue }
+            let refImageToDelete = sorted[index]
+            
+            if referenceImages.indices.contains(index) {
+                referenceImages.remove(at: index)
+            }
+            
+            storageController.deleteReferenceImage(refImageToDelete)
+        }
     }
 }

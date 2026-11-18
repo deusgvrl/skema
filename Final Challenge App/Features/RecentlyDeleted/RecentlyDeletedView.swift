@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// Setups deleted in the last 30 days, with Recover (Sketch R17 / Light · R17).
+/// Setups deleted in the last 30 days, with Recover (A10-95, Sketch R17 / Light · R17).
 struct RecentlyDeletedView: View {
     @State private var viewModel = RecentlyDeletedViewModel()
+    /// How long the "Setup recovered" toast stays before it goes away on its own.
+    private let recoveredToastSeconds = 3
 
     private var subtitle: String {
-        viewModel.deletedSetups.count == 1 ? "1 setup" : "\(viewModel.deletedSetups.count) setups"
+        viewModel.setups.count == 1 ? "1 setup" : "\(viewModel.setups.count) setups"
     }
 
     var body: some View {
@@ -13,19 +15,19 @@ struct RecentlyDeletedView: View {
             DesignTokens.pageBackground
                 .ignoresSafeArea()
 
-            if viewModel.deletedSetups.isEmpty {
+            if viewModel.showsEmptyState {
                 ContentUnavailableView(
                     "No Recently Deleted Setups",
                     systemImage: "trash",
-                    description: Text("Deleted setups stay here for 30 days.")
+                    description: Text("Deleted setups stay here for \(RecentlyDeleted.keepDays) days.")
                 )
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(viewModel.deletedSetups) { setup in
-                            row(for: setup)
+                        ForEach(viewModel.setups) { setup in
+                            row(setup)
                         }
-                        Text("Setups stay here for 30 days, then they’re permanently deleted.")
+                        Text("Setups stay here for \(RecentlyDeleted.keepDays) days, then they’re permanently deleted.")
                             .font(.footnote)
                             .foregroundStyle(DesignTokens.textSecondary)
                             .padding(.horizontal, 16)
@@ -38,20 +40,34 @@ struct RecentlyDeletedView: View {
         .navigationTitle("Recently Deleted")
         .navigationSubtitle(subtitle)
         .toolbarTitleDisplayMode(.inline)
-        .onAppear {
-            viewModel.fetch()
+        .onAppear { viewModel.load() }
+        .overlay(alignment: .bottom) {
+            if viewModel.lastRecovered != nil {
+                Text("Setup recovered")
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(DesignTokens.toastBackground, in: .capsule)
+                    .padding(.bottom)
+            }
+        }
+        .task(id: viewModel.lastRecovered?.id) {
+            guard viewModel.lastRecovered != nil else { return }
+            try? await Task.sleep(for: .seconds(recoveredToastSeconds))
+            viewModel.dismissRecovered()
         }
     }
 
-    private func row(for setup: Setup) -> some View {
+    private func row(_ setup: Setup) -> some View {
         let details = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " › ")
-        let daysLeft = viewModel.daysLeft(for: setup)
+        let name = setup.setupName.isEmpty ? "Untitled Setup" : setup.setupName
 
         return HStack(spacing: 12) {
             SetupThumbnail(setup: setup)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(setup.setupName)
+                Text(name)
                     .font(.headline)
                     .foregroundStyle(DesignTokens.textPrimary)
                     .lineLimit(1)
@@ -61,7 +77,7 @@ struct RecentlyDeletedView: View {
                         .foregroundStyle(DesignTokens.textSecondary)
                         .lineLimit(1)
                 }
-                Text(daysLeft == 1 ? "1 day left" : "\(daysLeft) days left")
+                Text(viewModel.daysLeftText(for: setup))
                     .font(.caption)
                     .foregroundStyle(DesignTokens.textSecondary)
             }
@@ -69,13 +85,13 @@ struct RecentlyDeletedView: View {
             Spacer(minLength: 0)
 
             Button("Recover") {
-                withAnimation { viewModel.restore(setup) }
+                withAnimation { viewModel.recover(setup) }
             }
             .font(.subheadline.bold())
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .tint(DesignTokens.accentPrimary)
-            .accessibilityLabel("Recover \(setup.setupName)")
+            .accessibilityLabel("Recover \(name)")
         }
         .padding(12)
         .glassCard(cornerRadius: 24)
@@ -83,7 +99,5 @@ struct RecentlyDeletedView: View {
 }
 
 #Preview {
-    NavigationStack {
-        RecentlyDeletedView()
-    }
+    NavigationStack { RecentlyDeletedView() }
 }

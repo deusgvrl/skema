@@ -332,8 +332,10 @@ final class ScanViewModel {
     }
 
     /// Loads the YOLOE model off the main actor, so the screen doesn't freeze. Nil if the model is missing.
+    /// A10-90: YOLOE finds studio lighting and Vision finds cameras, both at every look.
     @concurrent nonisolated private static func loadDetector() async -> (any EquipmentDetecting)? {
-        try? EquipmentDetector()
+        guard let yoloe = try? EquipmentDetector() else { return nil }
+        return CombinedDetector(lights: yoloe, cameras: CameraDetector())
     }
 
     /// An accepted item as a draft equipment (Amadeus, 12 Nov: option A). Label and diagram position

@@ -47,7 +47,21 @@ struct SetupsView: View {
             .onChange(of: isShowingRecentlyDeleted) { _, isShowing in
                 if !isShowing { viewModel.fetchSetups() }
             }
+            .alert(
+                "Delete This Setup?",
+                isPresented: Binding(
+                    get: { viewModel.setupPendingDelete != nil },
+                    set: { isPresented in if !isPresented { viewModel.cancelDelete() } }
+                ),
+                presenting: viewModel.setupPendingDelete
+            ) { _ in
+                Button("Delete", role: .destructive) { withAnimation { viewModel.confirmDelete() } }
+                Button("Cancel", role: .cancel) { viewModel.cancelDelete() }
+            } message: { setup in
+                Text(viewModel.deleteMessage(for: setup))
+            }
         }
+        .environment(\.setupSavedAction) { viewModel.setupSaved() }
         .sheet(isPresented: $viewModel.isShowingScanGuide) {
             viewModel.scanGuideDismissed()
         } content: {
@@ -80,8 +94,15 @@ struct SetupsView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 28) {
-                    ForEach(Array(viewModel.sections.enumerated()), id: \.element.id) { index, section in
-                        sectionView(section, isFirst: index == 0)
+                    switch viewModel.grouping {
+                    case .recent:
+                        ForEach(Array(viewModel.recentSections.enumerated()), id: \.element.id) { index, section in
+                            recentSection(section, isFirst: index == 0)
+                        }
+                    case .byClient:
+                        ForEach(viewModel.clientGroups) { group in
+                            clientGroupView(group)
+                        }
                     }
                 }
                 .padding(.vertical, 8)
@@ -90,40 +111,42 @@ struct SetupsView: View {
         }
     }
 
-    private func sectionView(_ section: SetupSection, isFirst: Bool) -> some View {
+    /// A month (or "Not saved") with its setups as a horizontal row of cards (Sketch R01).
+    private func recentSection(_ section: SetupSection, isFirst: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(section.title)
-                    .font(.title2.bold())
-                    .foregroundStyle(DesignTokens.textPrimary)
-                if let caption = section.caption {
-                    Text(caption)
-                        .font(.footnote)
-                        .foregroundStyle(DesignTokens.textSecondary)
-                }
-            }
-            .padding(.horizontal)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
+            sectionHeader(section.title, caption: isThisMonth(section) ? "This month" : nil)
 
-            switch viewModel.grouping {
-            case .recent:
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 12) {
-                        ForEach(section.setups) { setup in
-                            NavigationLink(value: setup) {
-                                SetupCardView(setup: setup, isProminent: isFirst)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu { deleteButton(for: setup) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(section.setups) { setup in
+                        NavigationLink(value: setup) {
+                            SetupCardView(setup: setup, isProminent: isFirst)
                         }
+                        .buttonStyle(.plain)
+                        .contextMenu { deleteButton(for: setup) }
                     }
-                    .padding(.horizontal)
                 }
-                // Clipping cut the cards' shadow into a grey band across the row.
-                .scrollClipDisabled()
-            case .byClient:
-                VStack(spacing: 8) {
+                .padding(.horizontal)
+            }
+            // Clipping cut the cards' shadow into a grey band across the row.
+            .scrollClipDisabled()
+        }
+    }
+
+    /// A client with its setups as rows, a small month label above each month (Sketch R01b).
+    private func clientGroupView(_ group: ClientGroup) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(group.title, caption: nil)
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(group.sections) { section in
+                    // Drafts have no month, so their label is empty and not shown.
+                    if !section.title.isEmpty {
+                        Text(section.title)
+                            .font(.footnote)
+                            .foregroundStyle(DesignTokens.textSecondary)
+                            .padding(.top, 4)
+                    }
                     ForEach(section.setups) { setup in
                         NavigationLink(value: setup) {
                             SetupRowView(setup: setup)
@@ -132,14 +155,35 @@ struct SetupsView: View {
                         .contextMenu { deleteButton(for: setup) }
                     }
                 }
-                .padding(.horizontal)
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private func sectionHeader(_ title: String, caption: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.title2.bold())
+                .foregroundStyle(DesignTokens.textPrimary)
+            if let caption {
+                Text(caption)
+                    .font(.footnote)
+                    .foregroundStyle(DesignTokens.textSecondary)
             }
         }
+        .padding(.horizontal)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func isThisMonth(_ section: SetupSection) -> Bool {
+        guard let date = section.setups.first?.firstSavedDate else { return false }
+        return Calendar.current.isDate(date, equalTo: Date(), toGranularity: .month)
     }
 
     private func deleteButton(for setup: Setup) -> some View {
         Button(role: .destructive) {
-            withAnimation { viewModel.deleteSetup(setup) }
+            viewModel.deleteTapped(setup)
         } label: {
             Label("Delete", systemImage: "trash")
         }
@@ -196,6 +240,8 @@ struct SetupsView: View {
         VStack(spacing: 8) {
             if viewModel.lastDeleted != nil {
                 deletedToast
+            } else if viewModel.showsSavedToast {
+                savedToast
             }
             HStack(spacing: 12) {
                 searchField
@@ -209,6 +255,7 @@ struct SetupsView: View {
         .padding(.horizontal)
         .padding(.bottom, 8)
         .animation(.default, value: viewModel.lastDeleted != nil)
+        .animation(.default, value: viewModel.showsSavedToast)
     }
 
     private var searchField: some View {
@@ -284,10 +331,26 @@ struct SetupsView: View {
         .background(DesignTokens.toastBackground, in: .capsule)
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .task(id: viewModel.lastDeleted?.id) {
-            try? await Task.sleep(for: .seconds(4))
+            try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled else { return }
-            withAnimation { viewModel.lastDeleted = nil }
+            withAnimation { viewModel.dismissUndo() }
         }
+    }
+
+    /// "Setup saved" after Project Details (A10-97), in the same chip as the delete toast.
+    private var savedToast: some View {
+        Text("Setup saved")
+            .font(.subheadline)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: bottomControlSize, alignment: .leading)
+            .background(DesignTokens.toastBackground, in: .capsule)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .task {
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
+                withAnimation { viewModel.dismissSavedToast() }
+            }
     }
 }
 
@@ -317,4 +380,9 @@ private struct LightStandGlyph: Shape {
 
 #Preview {
     SetupsView()
+}
+
+enum SetupsGrouping {
+    case recent
+    case byClient
 }
