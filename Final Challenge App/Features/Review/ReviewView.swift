@@ -20,6 +20,23 @@ struct ReviewView: View {
     @State private var showsDiscardChangesAlert = false
     @State private var selectedDetent: PresentationDetent = .height(76)
 
+    // Live sheet height state for interactive drag tracking
+    @State private var currentSheetHeight: CGFloat = 76
+
+    // Dynamic Opacity: 1.0 at 76pt -> 0.0 at 176pt (fades out as user drags up)
+    private var quickActionsOpacity: Double {
+        let fadeStartHeight: CGFloat = 76
+        let fadeDistance: CGFloat = 100 // Fades out fully over 100pt of vertical drag
+        let progress = min(max((currentSheetHeight - fadeStartHeight) / fadeDistance, 0.0), 1.0)
+        return 1.0 - progress
+    }
+
+    // Subtle scale effect while fading (1.0 -> 0.9)
+    private var quickActionsScale: CGFloat {
+        let progress = 1.0 - quickActionsOpacity
+        return 1.0 - (progress * 0.1)
+    }
+
     init(
         isFromLoadingScreen: Bool,
         viewModel: ReviewViewModel,
@@ -31,21 +48,35 @@ struct ReviewView: View {
     }
 
     var body: some View {
-        ReviewDiagramContentView(
-            viewModel: viewModel,
-            undoManager: undoManager,
-            selectedNodeId: $selectedNodeId,
-            onNodeTap: { node in
-                handleNodeTap(node)
-            },
-            onSubjectTap: {
-                handleSubjectTap()
-            },
-            onEmptyTap: {
-                handleEmptyTap()
+        ZStack(alignment: .bottom) {
+            // Main Content Layer
+            ReviewDiagramContentView(
+                viewModel: viewModel,
+                undoManager: undoManager,
+                selectedNodeId: $selectedNodeId,
+                onNodeTap: { node in
+                    handleNodeTap(node)
+                },
+                onSubjectTap: {
+                    handleSubjectTap()
+                },
+                onEmptyTap: {
+                    handleEmptyTap()
+                }
+            )
+            .ignoresSafeArea(edges: .bottom)
+
+            // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
+            if viewModel.isEditingDiagram, case .equipment(let nodeId) = activeSheetContent, quickActionsOpacity > 0.01 {
+                nodeQuickActionsToolbar(for: nodeId)
+                    .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
+                    .opacity(quickActionsOpacity)            // Fades out continuously
+                    .scaleEffect(quickActionsScale)
+                    .allowsHitTesting(quickActionsOpacity > 0.5)
+                    .zIndex(1)
             }
-        )
-        .ignoresSafeArea(edges: .bottom)
+        }
+        .background(DesignTokens.pageBackground.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -54,6 +85,16 @@ struct ReviewView: View {
         .onAppear {
             if !isFromLoadingScreen && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+        // Automatically deselect undone nodes when Undo/Redo mutates the nodes array
+        .onChange(of: viewModel.nodes) { _, newNodes in
+            if let selectedId = selectedNodeId, !newNodes.contains(where: { $0.id == selectedId }) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
+                    selectedDetent = .height(76)
+                }
             }
         }
         .alert("Save This Setup?", isPresented: $showsSaveSetupAlert) {
@@ -96,6 +137,72 @@ struct ReviewView: View {
         }
     }
 
+    // MARK: - Floating Node Toolbar Component & Actions
+
+    @ViewBuilder
+    private func nodeQuickActionsToolbar(for nodeId: UUID) -> some View {
+        HStack(spacing: 16) {
+//            Button {
+//                duplicateNode(id: nodeId)
+//            } label: {
+//                Image(systemName: "plus.square.on.square")
+//                    .font(.subheadline.weight(.medium))
+//                    .foregroundStyle(DesignTokens.textPrimary)
+//            }
+//
+//            Divider()
+//                .frame(height: 16)
+
+            Button(role: .destructive) {
+                quickDeleteNode(id: nodeId)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+    }
+
+    private func duplicateNode(id: UUID) {
+        guard let original = viewModel.nodes.first(where: { $0.id == id }) else { return }
+        let oldNodes = viewModel.nodes.map { $0.clone() }
+
+        let duplicate = original.clone()
+        duplicate.id = UUID()
+        duplicate.name = "\(original.name) Copy"
+        duplicate.position = CGPoint(x: original.position.x + 24, y: original.position.y + 24)
+
+        viewModel.nodes.append(duplicate)
+        viewModel.applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedNodeId = duplicate.id
+            activeSheetContent = .equipment(duplicate.id)
+            selectedDetent = .height(76)
+        }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func quickDeleteNode(id: UUID) {
+        guard let index = viewModel.nodes.firstIndex(where: { $0.id == id }) else { return }
+        let oldNodes = viewModel.nodes.map { $0.clone() }
+
+        viewModel.nodes.remove(at: index)
+        viewModel.applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedNodeId = nil
+            activeSheetContent = nil
+            selectedDetent = .height(76)
+        }
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+    }
+
     // MARK: - Unified Sheet
 
     private var unifiedSheetBinding: Binding<Bool> {
@@ -103,7 +210,7 @@ struct ReviewView: View {
             get: { activeSheetContent != nil },
             set: { isPresented in
                 if !isPresented {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         selectedNodeId = nil
                         activeSheetContent = nil
                         selectedDetent = .height(76)
@@ -136,6 +243,14 @@ struct ReviewView: View {
                 EmptyView()
             }
         }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: proxy.size.height, initial: true) { _, newHeight in
+                        currentSheetHeight = newHeight
+                    }
+            }
+        }
         .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
         .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
         .interactiveDismissDisabled(true)
@@ -146,7 +261,7 @@ struct ReviewView: View {
     // MARK: - Tap Handlers
 
     private func handleNodeTap(_ node: Equipment) {
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
         }
         selectedNodeId = node.id
@@ -154,7 +269,7 @@ struct ReviewView: View {
     }
 
     private func handleSubjectTap() {
-        withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
         }
         selectedNodeId = nil
@@ -162,7 +277,7 @@ struct ReviewView: View {
     }
 
     private func handleEmptyTap() {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedNodeId = nil
             activeSheetContent = nil
             selectedDetent = .height(76)
