@@ -3,7 +3,6 @@ import SwiftUI
 /// Saved setups, by month or by client (Sketch R01, R01b, R01f, R01q, R01v, R01z · A10-13).
 struct SetupsView: View {
     @State private var viewModel = SetupsViewModel()
-    @State private var isShowingLiDARScan = false
     @State private var isShowingRecentlyDeleted = false
     @FocusState private var isSearchFocused: Bool
     @ScaledMetric(relativeTo: .title2) private var bottomControlSize: CGFloat = 48
@@ -31,11 +30,6 @@ struct SetupsView: View {
             .navigationDestination(isPresented: $viewModel.isShowingScan) {
                 ScanView(onDismissToSetups: {
                     viewModel.isShowingScan = false
-                })
-            }
-            .navigationDestination(isPresented: $isShowingLiDARScan) {
-                LiDARScanView(onDismissToSetups: {
-                    isShowingLiDARScan = false
                 })
             }
             .navigationDestination(isPresented: $isShowingRecentlyDeleted) {
@@ -307,9 +301,6 @@ struct SetupsView: View {
                 .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1))
         }
         .accessibilityLabel("New Setup")
-        .contextMenu {
-            Button("LiDAR tap scan (test)") { isShowingLiDARScan = true }
-        }
     }
 
     private var deletedToast: some View {

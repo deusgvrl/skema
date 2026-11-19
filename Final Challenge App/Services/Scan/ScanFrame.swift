@@ -5,15 +5,12 @@
 //  Created by Muhammad Dzakki Abdullah on 10/11/26.
 //
 
-import CoreVideo
 import Foundation
 import MeasureKit
 
-nonisolated struct ScanFrame: @unchecked Sendable {
+nonisolated struct ScanFrame: Sendable {
 
     let timestamp: TimeInterval
-    let image: CVPixelBuffer
-    let orientation: ImageOrientation
     let camera: CameraModel
     let depth: DepthFrame?
     let tracking: ScanTracking

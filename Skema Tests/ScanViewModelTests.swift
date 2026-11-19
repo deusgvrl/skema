@@ -2,7 +2,8 @@
 //  ScanViewModelTests.swift
 //  Skema Tests
 //
-//  Created by Muhammad Dzakki Abdullah on 10/11/26.
+//  The scan screen's session: camera permission, LiDAR, the ARKit session, the tracking tips and the leave rule
+//  (the taps are in ScanTapTests).
 //
 
 import ARKit
@@ -44,9 +45,10 @@ struct ScanScreenAppearanceTests {
 }
 
 @MainActor
-@Suite("Scan view model: permission and LiDAR")
+@Suite("Scan: permission, LiDAR, tips and leaving")
 struct ScanViewModelTests {
     let arSession = FakeARSession()
+    let storage = StorageController(inMemory: true)
 
     /// Every scan the view model makes, so tests can look at them.
     final class MadeScans {
@@ -65,7 +67,7 @@ struct ScanViewModelTests {
                 return scan
             },
             camera: camera,
-            detector: FakeEquipmentDetector()
+            storageController: storage
         )
     }
 
@@ -76,7 +78,7 @@ struct ScanViewModelTests {
         #expect(viewModel.screen == .starting)
     }
 
-    @Test("Starts with an empty draft setup for the equipment found")
+    @Test("Starts with an empty draft setup for the equipment tapped")
     func draftStartsEmpty() {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
 
@@ -270,6 +272,18 @@ struct ScanViewModelTests {
             #expect(viewModel.guidance == nil)
         }
 
+        @Test("Closing the scan clears the tip")
+        func closeClearsGuidance() async throws {
+            let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
+            await viewModel.start()
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+
+            viewModel.closeTapped()
+
+            #expect(viewModel.guidance == nil)
+        }
+
     @Test("While scanning, ✕ asks first, and asking keeps the same scan running")
         func asksWhileScanning() async throws {
             let made = MadeScans()
@@ -313,6 +327,15 @@ struct ScanViewModelTests {
         #expect(arSession.pauseCount == 0)
     }
 
+    @Test("Add Equipment Manually puts the empty draft setup into storage, for the plan screen")
+    func addManually() throws {
+        let viewModel = makeViewModel(camera: FakeCameraPermission(status: .denied))
+
+        viewModel.insertDraftSetup()
+
+        #expect(storage.fetchAllSetups().map(\.id) == [viewModel.draftSetup.id])
+    }
+
     @Test("The symbols on the scan screens exist", arguments: ["video.slash", "iphone.slash"])
     func symbolsExist(name: String) {
         #expect(UIImage(systemName: name) != nil)
@@ -323,8 +346,6 @@ func makeTrackingFrame(timestamp: TimeInterval, tracking: ScanTracking) throws -
     let frame = try makeScanFrame(timestamp: timestamp)
     return ScanFrame(
         timestamp: timestamp,
-        image: frame.image,
-        orientation: frame.orientation,
         camera: frame.camera,
         depth: makeDepth(width: 8, height: 8, depth: 1),
         tracking: tracking,

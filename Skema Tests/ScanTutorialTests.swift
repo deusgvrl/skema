@@ -17,17 +17,18 @@ struct ScanTutorialTests {
         #expect(ScanTutorialStep.allCases.map(\.title) == [
             "Tap your product",
             "Show the floor",
-            "Walk up to each light and camera",
+            "Tap each light and camera",
             "Tap Finish Scan"
         ])
     }
 
-    @Test("The walking step asks users to get close for LiDAR, but not to circle the whole set")
-    func walkCloseNotAround() {
-        let message = ScanTutorialStep.walkToEachItem.message
-        #expect(message.contains("Get close to each one"))
-        #expect(message.contains("LiDAR"))
-        #expect(message.contains("You don’t have to circle the whole set"))
+    @Test("The item step says to pick Light or Camera and tap each item within LiDAR's range, not to circle the set")
+    func tapEachItem() {
+        let message = ScanTutorialStep.tapEachItem.message
+        #expect(message.contains("Pick Light or Camera"))
+        #expect(message.contains("within 5 m"))
+        #expect(message.contains("Saved"))
+        #expect(!ScanTutorialStep.allCases.contains { $0.message.contains("circle") })
         #expect(!ScanTutorialStep.allCases.contains { $0.message.contains("No need to walk") })
         #expect(!ScanTutorialStep.allCases.contains { $0.message.contains("Stay where you are") })
     }

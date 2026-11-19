@@ -43,13 +43,8 @@ func collect<Element>(_ stream: AsyncStream<Element>) async -> [Element] {
 }
 
 func makeScanFrame(timestamp: TimeInterval, depth: DepthFrame? = nil) throws -> ScanFrame {
-    let image = try makePixelBuffer(
-        width: 2, height: 2, format: kCVPixelFormatType_32BGRA, values: [UInt32](repeating: 0, count: 4)
-    )
-    return ScanFrame(
+    ScanFrame(
         timestamp: timestamp,
-        image: image,
-        orientation: .right,
         camera: CameraModel(
             intrinsics: matrix_identity_float3x3,
             imageResolution: SIMD2(2, 2),
@@ -100,4 +95,28 @@ func makeCamera(size: Float, focal: Float, position: SIMD3<Float> = .zero) -> Ca
         imageResolution: SIMD2(size, size),
         cameraToWorld: cameraToWorld
     )
+}
+
+/// Camera of the measuring frames: 1920 x 1440 picture, fx = fy = 1000, centre (960, 720), looking along -z.
+let measuringCamera: CameraModel = {
+    var intrinsics = matrix_identity_float3x3
+    intrinsics[0][0] = 1000
+    intrinsics[1][1] = 1000
+    intrinsics[2][0] = 960
+    intrinsics[2][1] = 720
+    return CameraModel(intrinsics: intrinsics, imageResolution: SIMD2(1920, 1440),
+                       cameraToWorld: matrix_identity_float4x4)
+}()
+
+/// A frame with a depth map fine enough for a tap (128 x 96), `metres` everywhere (nil: no depth), and the given
+/// planes.
+/// `cameraX` moves the camera along x.
+func measuringFrame(at time: Double, metres: Float?, planes: [ScanPlane] = [], cameraX: Float = 0) throws -> ScanFrame {
+    var pose = matrix_identity_float4x4
+    pose.columns.3 = SIMD4(cameraX, 0, 0, 1)
+    let camera = CameraModel(intrinsics: measuringCamera.intrinsics, imageResolution: measuringCamera.imageResolution,
+                             cameraToWorld: pose)
+    return ScanFrame(timestamp: time, camera: camera,
+                     depth: metres.map { makeDepth(width: 128, height: 96, depth: $0) },
+                     tracking: .normal, ambientIntensity: nil, planes: planes)
 }

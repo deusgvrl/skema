@@ -21,7 +21,7 @@ struct ScanTutorialIllustration: View {
             switch step {
             case .tapSubject: TapSubjectDrawing(animates: !reduceMotion)
             case .showFloor: ShowFloorDrawing(animates: !reduceMotion)
-            case .walkToEachItem: WalkToItemsDrawing(animates: !reduceMotion)
+            case .tapEachItem: WalkToItemsDrawing(animates: !reduceMotion)
             case .finish: FinishDrawing(animates: !reduceMotion)
             }
         }
@@ -168,10 +168,10 @@ private struct ViewCone: Shape {
     }
 }
 
-// MARK: - 3. Walk up to each light and camera
+// MARK: - 3. Tap each light and camera
 
-/// Top-down: the phone walks up close to one item after another, staying in front of the set
-/// (it never goes around the back of the subject), and each item turns green once it's close.
+/// Top-down: the phone comes within range of one item after another, staying in front of the set
+/// (it never goes around the back of the subject), and each item turns green once it's tapped and saved.
 private struct WalkToItemsDrawing: View {
     let animates: Bool
 
