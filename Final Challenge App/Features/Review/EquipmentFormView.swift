@@ -52,7 +52,7 @@ struct EquipmentFormView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .tint(DesignTokens.accentText)
+                    .tint(.primary)
                     .disabled(isReadOnly)
                     
                     HStack {
@@ -112,6 +112,8 @@ struct EquipmentFormView: View {
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
+                            Text("mm")
+                                .foregroundStyle(DesignTokens.textSecondary)
                         }
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
@@ -206,6 +208,8 @@ struct EquipmentFormView: View {
                         
                         HStack {
                             Text("Distance to subject")
+                                .lineLimit(1)
+                                .layoutPriority(1)
                             Spacer()
                             TextField("-", text: $formViewModel.distance)
                                 .multilineTextAlignment(.trailing)
@@ -239,20 +243,20 @@ struct EquipmentFormView: View {
                 }
                 
                 // Delete Button
-                if formViewModel.isEditing && !isReadOnly {
-                    Button(role: .destructive) {
-                        isDeleteAlert = true
-                    } label: {
-                        Text("Delete Equipment")
-                            .foregroundStyle(DesignTokens.accentText)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .overlay(Capsule().strokeBorder(DesignTokens.accentText.opacity(0.6), lineWidth: 1))
-                            .contentShape(.capsule)
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                }
+//                if formViewModel.isEditing && !isReadOnly {
+//                    Button(role: .destructive) {
+//                        isDeleteAlert = true
+//                    } label: {
+//                        Text("Delete Equipment")
+//                            .foregroundStyle(DesignTokens.accentText)
+//                            .frame(maxWidth: .infinity, minHeight: 48)
+//                            .overlay(Capsule().strokeBorder(DesignTokens.accentText.opacity(0.6), lineWidth: 1))
+//                            .contentShape(.capsule)
+//                    }
+//                    .buttonStyle(.plain)
+//                    .listRowBackground(Color.clear)
+//                    .listRowInsets(EdgeInsets())
+//                }
             }
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
