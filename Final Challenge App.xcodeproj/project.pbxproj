@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		4F016F58309CCA040065B9E6 /* MeasureKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4F016F57309CCA040065B9E6 /* MeasureKit */; };
-		4F016F5A309CCA040065B9E6 /* MeasureKitVision in Frameworks */ = {isa = PBXBuildFile; productRef = 4F016F59309CCA040065B9E6 /* MeasureKitVision */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,7 +42,6 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
-				4F016F5A309CCA040065B9E6 /* MeasureKitVision in Frameworks */,
 				4F016F58309CCA040065B9E6 /* MeasureKit in Frameworks */,
 			);
 		};
@@ -92,7 +90,6 @@
 			name = "Final Challenge App";
 			packageProductDependencies = (
 				4F016F57309CCA040065B9E6 /* MeasureKit */,
-				4F016F59309CCA040065B9E6 /* MeasureKitVision */,
 			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* Final Challenge App.app */;
@@ -509,10 +506,6 @@
 		4F016F57309CCA040065B9E6 /* MeasureKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = MeasureKit;
-		};
-		4F016F59309CCA040065B9E6 /* MeasureKitVision */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = MeasureKitVision;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
