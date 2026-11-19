@@ -27,12 +27,10 @@ struct SetupDetailView: View {
     
     @State private var selectedDetent: PresentationDetent = .height(76)
     
-    // 👈 Live sheet height state for interactive drag tracking
     @State private var currentSheetHeight: CGFloat = 76
     
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
     
-    // 👈 Dynamic Opacity: 1.0 at 76pt -> 0.0 at 176pt (fades out as user drags up)
     private var quickActionsOpacity: Double {
         let fadeStartHeight: CGFloat = 76
         let fadeDistance: CGFloat = 100 // Fades out fully over 100pt of vertical drag
@@ -40,7 +38,6 @@ struct SetupDetailView: View {
         return 1.0 - progress
     }
     
-    // 👈 Subtle scale effect while fading (1.0 -> 0.9)
     private var quickActionsScale: CGFloat {
         let progress = 1.0 - quickActionsOpacity
         return 1.0 - (progress * 0.1)
@@ -68,7 +65,6 @@ struct SetupDetailView: View {
                 }
             }
             
-            // 👈 Interactive Floating Toolbar (Tracks touch gesture & fades out live)
             if isEditing, case .equipment(let nodeId) = activeSheetContent, quickActionsOpacity > 0.01 {
                 nodeQuickActionsToolbar(for: nodeId)
                     .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger

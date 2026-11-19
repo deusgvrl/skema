@@ -13,7 +13,7 @@ import TipKit
 struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
     var undoManager: UndoManager?
-    @Binding var selectedNodeId: UUID? // 👈 Pass binding through
+    @Binding var selectedNodeId: UUID? 
 
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void

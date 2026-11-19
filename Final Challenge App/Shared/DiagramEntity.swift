@@ -27,8 +27,11 @@ struct DiagramEntity: View {
                     Circle()
                         .stroke(DesignTokens.diagramSubjectBorder, lineWidth: 1.5)
                 )
-                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-            
+                .overlay(
+                    // Inner outline ring
+                    Circle()
+                        .stroke(Color.primary, lineWidth: 2)
+                )
             // Title text centered inside the circle
             Text(title)
                 .font(.caption)
@@ -36,7 +39,7 @@ struct DiagramEntity: View {
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 8)
         }
         .frame(width: 64, height: 64)
         .contentShape(Circle())
