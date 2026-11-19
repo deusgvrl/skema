@@ -447,7 +447,7 @@ struct SetupDetailView: View {
     private func shareTapped() {
         let base = PDFLayout.diagramCanvasSize
         let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
-        let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true)
+        let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true, isExportedToPdf: true)
             .frame(width: canvas.width, height: canvas.height)
             .environment(\.colorScheme, .light)
         let renderer = ImageRenderer(content: diagram)
