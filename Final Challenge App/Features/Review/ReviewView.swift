@@ -11,14 +11,13 @@ struct ReviewView: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
 
-    @State private var editingNode: Equipment?
-    @State private var activeNode: Equipment?
-    @State private var selectedNodeId: UUID? = nil // 👈 State synced with selection
+    // Unified sheet content: either an equipment node or the subject
+    @State private var activeSheetContent: DiagramSheetContent?
+    @State private var selectedNodeId: UUID? = nil
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
     @State private var showsSaveSetupAlert = false
     @State private var showsDiscardChangesAlert = false
-    @State private var isShowingSubjectSheet = false
     @State private var selectedDetent: PresentationDetent = .height(76)
 
     init(
@@ -37,20 +36,13 @@ struct ReviewView: View {
             undoManager: undoManager,
             selectedNodeId: $selectedNodeId,
             onNodeTap: { node in
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    selectedDetent = .height(76)
-                }
-                selectedNodeId = node.id
-                activeNode = node
-                editingNode = node
+                handleNodeTap(node)
             },
-            onSubjectTap: { isShowingSubjectSheet = true },
+            onSubjectTap: {
+                handleSubjectTap()
+            },
             onEmptyTap: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    selectedNodeId = nil
-                    editingNode = nil // 👈 Dismisses the bottom sheet
-                    selectedDetent = .height(76)
-                }
+                handleEmptyTap()
             }
         )
         .ignoresSafeArea(edges: .bottom)
@@ -82,7 +74,7 @@ struct ReviewView: View {
                 if !isFromLoadingScreen { dismiss() }
             }
         } message: {
-            Text("Your changes to this diagram won’t be saved.")
+            Text("Your changes to this diagram won't be saved.")
         }
         .navigationDestination(isPresented: $navigateToR07) {
             ProjectDetailsView(
@@ -91,63 +83,105 @@ struct ReviewView: View {
                 onDismissToSetups: onDismissToSetups
             )
         }
-        // 👈 Sheet presentation with clean reset on dismiss
-        .sheet(isPresented: Binding(
-            get: { editingNode != nil },
+        // Unified sheet for both equipment and subject
+        .sheet(isPresented: unifiedSheetBinding, onDismiss: {
+            activeSheetContent = nil
+            selectedNodeId = nil
+            selectedDetent = .height(76)
+        }) {
+            unifiedSheetContent
+        }
+        .sheet(isPresented: $isAddingNode) {
+            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
+        }
+    }
+
+    // MARK: - Unified Sheet
+
+    private var unifiedSheetBinding: Binding<Bool> {
+        Binding(
+            get: { activeSheetContent != nil },
             set: { isPresented in
                 if !isPresented {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         selectedNodeId = nil
-                        editingNode = nil
+                        activeSheetContent = nil
                         selectedDetent = .height(76)
                     }
                 }
             }
-        ), onDismiss: {
-            selectedNodeId = nil
-            editingNode = nil
-            activeNode = nil
-            selectedDetent = .height(76)
-        }) {
-            if let node = editingNode ?? activeNode {
+        )
+    }
+
+    @ViewBuilder
+    private var unifiedSheetContent: some View {
+        Group {
+            switch activeSheetContent {
+            case .equipment(let nodeId):
                 EquipmentFormView(
                     viewModel: viewModel,
-                    editingNodeId: node.id,
+                    editingNodeId: nodeId,
                     undoManager: viewModel.isEditingDiagram ? undoManager : nil,
                     isReadOnly: !viewModel.isEditingDiagram,
                     selectedDetent: $selectedDetent
                 )
-                .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
-                .interactiveDismissDisabled(true)
-                .presentationDragIndicator(.visible)
-                .presentationBackground(DesignTokens.sheetBackground)
+            case .subject:
+                SubjectFormView(
+                    viewModel: viewModel,
+                    undoManager: viewModel.isEditingDiagram ? undoManager : nil,
+                    isReadOnly: !viewModel.isEditingDiagram,
+                    selectedDetent: $selectedDetent
+                )
+            case .none:
+                EmptyView()
             }
         }
+        .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
+        .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
+        .interactiveDismissDisabled(true)
+        .presentationDragIndicator(.visible)
+        .presentationBackground(DesignTokens.sheetBackground)
+    }
 
-        .sheet(isPresented: $isAddingNode) {
-            EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
+    // MARK: - Tap Handlers
+
+    private func handleNodeTap(_ node: Equipment) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            selectedDetent = .height(76)
         }
-        .sheet(isPresented: $isShowingSubjectSheet) {
-            SubjectFormView(
-                viewModel: viewModel,
-                undoManager: viewModel.isEditingDiagram ? undoManager : nil,
-                isReadOnly: !viewModel.isEditingDiagram
-            )
+        selectedNodeId = node.id
+        activeSheetContent = .equipment(node.id)
+    }
+
+    private func handleSubjectTap() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            selectedDetent = .height(76)
+        }
+        selectedNodeId = nil
+        activeSheetContent = .subject
+    }
+
+    private func handleEmptyTap() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedNodeId = nil
+            activeSheetContent = nil
+            selectedDetent = .height(76)
         }
     }
+
+    // MARK: - Toolbar
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarSpacer(placement: .bottomBar)
-        
-        // 👈 Hide floating button when sheet is present (editingNode != nil)
-        if editingNode == nil {
+
+        // Hide floating button when sheet is present
+        if activeSheetContent == nil {
             ToolbarItem(placement: .bottomBar) {
                 floatingButton
             }
         }
-        
+
         ToolbarItem(placement: .cancellationAction) {
             Button("Close", systemImage: "xmark") {
                 if viewModel.isEditingDiagram {
@@ -206,7 +240,7 @@ struct ReviewView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var floatingButton: some View {
         if viewModel.isEditingDiagram {
@@ -231,6 +265,8 @@ struct ReviewView: View {
             .tint(DesignTokens.accentPrimary)
         }
     }
+
+    // MARK: - Helpers
 
     private func closeReview() {
         if isFromLoadingScreen {

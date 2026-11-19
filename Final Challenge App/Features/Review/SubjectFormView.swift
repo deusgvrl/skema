@@ -11,10 +11,24 @@ struct SubjectFormView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: ReviewViewModel
     let undoManager: UndoManager?
-    
+
     @State private var initialSubjectHeight: String = ""
     @State private var heightText: String = ""
     var isReadOnly: Bool = false
+
+    @Binding var selectedDetent: PresentationDetent
+
+    init(
+        viewModel: ReviewViewModel,
+        undoManager: UndoManager?,
+        isReadOnly: Bool = false,
+        selectedDetent: Binding<PresentationDetent> = .constant(.height(76))
+    ) {
+        self.viewModel = viewModel
+        self.undoManager = undoManager
+        self.isReadOnly = isReadOnly
+        self._selectedDetent = selectedDetent
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,6 +50,7 @@ struct SubjectFormView: View {
                             .multilineTextAlignment(.trailing)
                             .foregroundStyle(DesignTokens.textSecondary)
                             .frame(width: 80)
+                            .disabled(isReadOnly)
                         Text("m")
                             .foregroundStyle(DesignTokens.textSecondary)
                     }
@@ -49,35 +64,47 @@ struct SubjectFormView: View {
             .navigationTitle("Subject Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(isReadOnly ? "Close" : "Cancel", systemImage: "xmark") {
-                        dismiss()
-                    }
-                }
-                
-                if !isReadOnly {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done", systemImage: "checkmark") {
-                            viewModel.updateSubjectHeight(
-                                oldValue: initialSubjectHeight,
-                                newValue: heightText,
-                                undoManager: undoManager
-                            )
-                            dismiss()
-                        }
-                        .buttonStyle(.glassProminent)
-                        .tint(DesignTokens.accentPrimary)
-                    }
-                }
+                subjectToolbar
             }
             .onAppear {
                 initialSubjectHeight = viewModel.draftSetup.subjectHeight
                 heightText = viewModel.draftSetup.subjectHeight
             }
         }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(DesignTokens.sheetBackground)
+    }
+
+    @ToolbarContentBuilder
+    private var subjectToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button(isReadOnly ? "Close" : "Cancel", systemImage: "xmark") {
+                dismiss()
+            }
+        }
+
+        if !isReadOnly {
+            ToolbarItem(placement: .confirmationAction) {
+                if selectedDetent == .large || selectedDetent == .medium {
+                    Button("Done", systemImage: "checkmark") {
+                        viewModel.updateSubjectHeight(
+                            oldValue: initialSubjectHeight,
+                            newValue: heightText,
+                            undoManager: undoManager
+                        )
+                        dismiss()
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(DesignTokens.accentPrimary)
+                } else {
+                    Button("Edit Details", systemImage: "pencil") {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            selectedDetent = .large
+                        }
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(DesignTokens.accentPrimary)
+                }
+            }
+        }
     }
 }
 
