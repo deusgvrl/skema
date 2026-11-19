@@ -83,7 +83,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Power")
                             Spacer()
-                            TextField("-", text: $formViewModel.power)
+                            TextField("1/16", text: $formViewModel.power)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
@@ -91,7 +91,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Color temperature")
                             Spacer()
-                            TextField("-", text: $formViewModel.colorTemp)
+                            TextField("5600", text: $formViewModel.colorTemp)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.numberPad)
@@ -108,7 +108,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Lens")
                             Spacer()
-                            TextField("-", text: $formViewModel.lens)
+                            TextField("50", text: $formViewModel.lens)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
@@ -122,15 +122,16 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("ISO")
                             Spacer()
-                            TextField("-", text: $formViewModel.iso)
+                            TextField("100", text: $formViewModel.iso)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
+                                .keyboardType(.numberPad)
                                 .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Aperture")
                             Spacer()
-                            TextField("-", text: $formViewModel.aperture)
+                            TextField("f/2.8", text: $formViewModel.aperture)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
@@ -138,7 +139,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Shutter speed")
                             Spacer()
-                            TextField("-", text: $formViewModel.shutterSpeed)
+                            TextField("1/200", text: $formViewModel.shutterSpeed)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
@@ -146,7 +147,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("White balance")
                             Spacer()
-                            TextField("-", text: $formViewModel.whiteBalance)
+                            TextField("5600", text: $formViewModel.whiteBalance)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.numberPad)
@@ -172,7 +173,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Height")
                             Spacer()
-                            TextField("-", text: $formViewModel.height)
+                            TextField("0.0", text: $formViewModel.height)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.decimalPad)
@@ -183,7 +184,7 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Tilt")
                             Spacer()
-                            TextField("-", text: $formViewModel.tilt)
+                            TextField("0", text: $formViewModel.tilt)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.numberPad)
@@ -196,7 +197,7 @@ struct EquipmentFormView: View {
                             HStack {
                                 Text("Horizontal aim")
                                 Spacer()
-                                TextField("-", text: $formViewModel.horizontalAim)
+                                TextField("0", text: $formViewModel.horizontalAim)
                                     .multilineTextAlignment(.trailing)
                                     .foregroundStyle(DesignTokens.textSecondary)
                                     .keyboardType(.numberPad)
@@ -211,7 +212,7 @@ struct EquipmentFormView: View {
                                 .lineLimit(1)
                                 .layoutPriority(1)
                             Spacer()
-                            TextField("-", text: $formViewModel.distance)
+                            TextField("0.0", text: $formViewModel.distance)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.decimalPad)
@@ -241,22 +242,6 @@ struct EquipmentFormView: View {
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
-                
-                // Delete Button
-//                if formViewModel.isEditing && !isReadOnly {
-//                    Button(role: .destructive) {
-//                        isDeleteAlert = true
-//                    } label: {
-//                        Text("Delete Equipment")
-//                            .foregroundStyle(DesignTokens.accentText)
-//                            .frame(maxWidth: .infinity, minHeight: 48)
-//                            .overlay(Capsule().strokeBorder(DesignTokens.accentText.opacity(0.6), lineWidth: 1))
-//                            .contentShape(.capsule)
-//                    }
-//                    .buttonStyle(.plain)
-//                    .listRowBackground(Color.clear)
-//                    .listRowInsets(EdgeInsets())
-//                }
             }
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
