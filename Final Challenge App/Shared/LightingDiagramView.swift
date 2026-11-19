@@ -6,7 +6,7 @@ struct LightingDiagramView: View {
     var isExportedToPdf: Bool = false
     var undoManager: UndoManager? = nil
     
-    // 👈 1. Converted to Binding so parent controls selection lifecycle
+    // Converted to Binding so parent controls selection lifecycle
     @Binding var selectedNodeId: UUID?
     
     var onNodeTap: ((Equipment) -> Void)? = nil
@@ -30,7 +30,7 @@ struct LightingDiagramView: View {
         isReadOnly: Bool = false,
         isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
-        selectedNodeId: Binding<UUID?> = .constant(nil), 
+        selectedNodeId: Binding<UUID?> = .constant(nil),
         initialZoomScale: CGFloat = 1.0,
         onNodeTap: ((Equipment) -> Void)? = nil,
         onSubjectTap: (() -> Void)? = nil,
@@ -54,11 +54,13 @@ struct LightingDiagramView: View {
             let gridConfig = GridConfig.config(for: currentScale)
             
             ZStack {
-                // Background Grid
-                GridPattern(step: gridConfig.stepInPoints)
-                    .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
-                    .frame(width: 6000, height: 6000)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                // Background Grid (Hides when isReadOnly is true)
+                if !isReadOnly {
+                    GridPattern(step: gridConfig.stepInPoints)
+                        .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
+                        .frame(width: 6000, height: 6000)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
                  
                 // Connecting Lines
                 Path { path in
@@ -183,6 +185,7 @@ struct LightingDiagramView: View {
                         state = value.magnification
                     }
                     .onChanged { _ in
+                        guard !isReadOnly else { return }
                         hideScaleMeterTask?.cancel()
                         if !showScaleMeter {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -194,6 +197,7 @@ struct LightingDiagramView: View {
                         zoomScale *= value.magnification
                         zoomScale = max(0.3, min(zoomScale, 8.0))
                         
+                        guard !isReadOnly else { return }
                         hideScaleMeterTask?.cancel()
                         hideScaleMeterTask = Task {
                             try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -209,17 +213,20 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
+        // Scale Meter Overlay (Only visible when isReadOnly is false)
         .overlay(alignment: .topLeading) {
-            let activeScale = zoomScale * magnifyBy
-            let activeConfig = GridConfig.config(for: activeScale)
-            
-            ScaleMeterView(
-                labelText: activeConfig.labelText,
-                barWidth: activeConfig.stepInPoints * activeScale
-            )
-            .padding(16)
-            .opacity(showScaleMeter ? 1.0 : 0.0)
-            .allowsHitTesting(false)
+            if !isReadOnly {
+                let activeScale = zoomScale * magnifyBy
+                let activeConfig = GridConfig.config(for: activeScale)
+                
+                ScaleMeterView(
+                    labelText: activeConfig.labelText,
+                    barWidth: activeConfig.stepInPoints * activeScale
+                )
+                .padding(16)
+                .opacity(showScaleMeter ? 1.0 : 0.0)
+                .allowsHitTesting(false)
+            }
         }
     }
 }
