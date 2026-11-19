@@ -577,26 +577,14 @@ struct SetupDetailView: View {
     }
     
     private var referencesEmptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "photo")
-                .font(.system(size: 30))
-                .foregroundStyle(DesignTokens.textPrimary)
-                .frame(width: 80, height: 80)
-                .glassEffect(.regular.tint(DesignTokens.glassControlFill), in: .circle)
-                .accessibilityHidden(true)
-            Text("No References Yet")
-                .font(.title2.bold())
-                .foregroundStyle(DesignTokens.textPrimary)
+        ContentUnavailableView {
+            Label("No References Yet", systemImage: "photo")
+        } description: {
             Text("""
             Add any photos from the shoot, like the final shot, the product, or the set, \
             so you can match this setup next time. Tap + to add a reference.
             """)
-            .font(.subheadline)
-            .foregroundStyle(DesignTokens.textSecondary)
-            .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
