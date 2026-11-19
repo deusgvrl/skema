@@ -11,40 +11,34 @@ import SwiftUI
 
 struct DiagramEntity: View {
     let title: String
-    /// SF Symbol icon displayed inside the circle (defaults to "person.fill").
-    let icon: String
+    /// Kept to preserve backward compatibility with existing call sites
+    var icon: String = ""
     let position: CGPoint
     var currentScale: CGFloat = 1.0
     var onTap: () -> Void
 
     var body: some View {
         ZStack {
-            // Subject Circle Shape
+            // Subject Circle Shape (enlarged to 64x64)
             Circle()
-                .fill(DesignTokens.diagramSubjectFill)
-                .frame(width: 44, height: 44)
+                .fill(DesignTokens.accentPrimary)
+                .frame(width: 64, height: 64)
                 .overlay(
                     Circle()
                         .stroke(DesignTokens.diagramSubjectBorder, lineWidth: 1.5)
                 )
                 .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-                .overlay(
-                    Image(systemName: icon.isEmpty ? "person.fill" : icon)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(DesignTokens.textPrimary)
-                )
-        }
-        .frame(width: 44, height: 44)
-        // Title text positioned cleanly below the circle
-        .overlay(alignment: .bottom) {
+            
+            // Title text centered inside the circle
             Text(title)
                 .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(DesignTokens.textPrimary)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
                 .lineLimit(1)
-                .fixedSize()
-                .offset(y: 20)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, 6)
         }
+        .frame(width: 64, height: 64)
         .contentShape(Circle())
         .scaleEffect(1 / currentScale)
         .position(position)
@@ -56,6 +50,7 @@ struct DiagramEntity: View {
         .accessibilityAddTraits(.isButton)
     }
 }
+
 #Preview {
     ZStack {
         DesignTokens.pageBackground
