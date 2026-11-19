@@ -21,6 +21,10 @@ struct LightingDiagramView: View {
     @State private var offset: CGSize = .zero
     @GestureState private var dragOffset: CGSize = .zero
     
+    // Scale Meter Visibility State
+    @State private var showScaleMeter: Bool = false
+    @State private var hideScaleMeterTask: Task<Void, Never>? = nil
+    
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
@@ -178,9 +182,29 @@ struct LightingDiagramView: View {
                     .updating($magnifyBy) { value, state, _ in
                         state = value.magnification
                     }
+                    .onChanged { _ in
+                        hideScaleMeterTask?.cancel()
+                        if !showScaleMeter {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showScaleMeter = true
+                            }
+                        }
+                    }
                     .onEnded { value in
                         zoomScale *= value.magnification
                         zoomScale = max(0.3, min(zoomScale, 8.0))
+                        
+                        hideScaleMeterTask?.cancel()
+                        hideScaleMeterTask = Task {
+                            try? await Task.sleep(nanoseconds: 1_200_000_000)
+                            if !Task.isCancelled {
+                                await MainActor.run {
+                                    withAnimation(.easeInOut(duration: 0.4)) {
+                                        showScaleMeter = false
+                                    }
+                                }
+                            }
+                        }
                     }
             )
         }
@@ -194,6 +218,8 @@ struct LightingDiagramView: View {
                 barWidth: activeConfig.stepInPoints * activeScale
             )
             .padding(16)
+            .opacity(showScaleMeter ? 1.0 : 0.0)
+            .allowsHitTesting(false)
         }
     }
 }
