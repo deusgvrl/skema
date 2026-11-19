@@ -31,7 +31,7 @@ struct NodeView: View {
     
     var body: some View {
         ZStack {
-            // 1. Rotating Equipment Shape & Handle
+            // 1. Rotating Equipment Shape, Directional Arrow & Rotate Handle
             ZStack {
                 switch node.category {
                 case .camera:
@@ -44,14 +44,30 @@ struct NodeView: View {
                     TopViewAccessoryShapeView(isSelected: isSelected)
                 }
                 
-                // Rotation Handle Button
+                // Directional Pointer Ray (------->)
+                if isSelected && !isReadOnly {
+                    VStack(spacing: -2) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(DesignTokens.accentPrimary)
+                        
+                        DashedLine()
+                            .stroke(DesignTokens.accentPrimary, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                            .frame(width: 2, height: 48)
+                    }
+                    .shadow(color: DesignTokens.accentPrimary.opacity(0.4), radius: 3)
+                    .offset(y: -44) // Extends forward from the lens/beam opening
+                    .transition(.scale.combined(with: .opacity))
+                }
+                
+                // Rotation Handle Button (Rear of Node)
                 if isSelected && !isReadOnly {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(DesignTokens.accentPrimary)
                         .frame(width: 28, height: 28)
                         .background(Circle().fill(DesignTokens.diagramNodeFill).shadow(color: .black.opacity(0.15), radius: 2, y: 1))
-                        .offset(y: -44)
+                        .offset(y: 75) // Positioned behind the object body
                         .transition(.scale.combined(with: .opacity))
                         .highPriorityGesture(
                             DragGesture(coordinateSpace: .global)
@@ -67,7 +83,8 @@ struct NodeView: View {
                                     let dx = value.location.x - globalCenter.x
                                     let dy = value.location.y - globalCenter.y
                                     
-                                    var visualAngle = (atan2(dy, dx) * 180 / .pi) + 90
+                                    // Angle math for handle placed at +Y (behind object)
+                                    var visualAngle = (atan2(dy, dx) * 180 / .pi) - 90
                                     if visualAngle < 0 { visualAngle += 360 }
                                     
                                     let step = 3.0
@@ -96,19 +113,19 @@ struct NodeView: View {
             .rotationEffect(.degrees(node.rotationAngle))
             
             // Rotation Angle Tooltip
-            if isRotating {
-                let displayAngle = (360 - Int(node.rotationAngle)) % 360
-                
-                Text("\(displayAngle)°")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .fixedSize()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(DesignTokens.toastBackground))
-                    .offset(x: 60, y: -15)
-            }
+//            if isRotating {
+//                let displayAngle = (360 - Int(node.rotationAngle)) % 360
+//                
+//                Text("\(displayAngle)°")
+//                    .font(.caption)
+//                    .fontWeight(.bold)
+//                    .foregroundColor(.white)
+//                    .fixedSize()
+//                    .padding(.horizontal, 10)
+//                    .padding(.vertical, 6)
+//                    .background(Capsule().fill(DesignTokens.toastBackground))
+//                    .offset(x: 60, y: -15)
+//            }
         }
         .frame(width: 44, height: 44)
         .background {
@@ -147,13 +164,11 @@ struct NodeView: View {
             x: subjectCenter.x + node.position.x,
             y: subjectCenter.y + node.position.y
         )
-        // Single tap selects, opens form sheet & reveals rotation button
         .highPriorityGesture(
             TapGesture().onEnded {
                 if !isRotating { onTap() }
             }
         )
-        // Drag gesture moves node directly (only when not read-only)
         .gesture(
             isReadOnly ? nil :
             DragGesture(coordinateSpace: .global)
@@ -236,7 +251,17 @@ struct NodeView: View {
         }
     }
 }
-// MARK: - 1. Custom Shapes for Top-View Rendering
+
+// MARK: - Helper Dashed Line Shape
+
+struct DashedLine: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.minY))
+        return path
+    }
+}// MARK: - 1. Custom Shapes for Top-View Rendering
 
 struct Trapezoid: Shape {
     func path(in rect: CGRect) -> Path {
