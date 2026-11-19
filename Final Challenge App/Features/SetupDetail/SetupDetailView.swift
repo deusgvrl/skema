@@ -345,44 +345,54 @@ struct SetupDetailView: View {
     }
     
     @ViewBuilder
-    private var unifiedSheetContent: some View {
-        Group {
-            switch activeSheetContent {
-            case .equipment(let nodeId):
-                EquipmentFormView(
-                    viewModel: viewModel.reviewViewModel,
-                    editingNodeId: nodeId,
-                    undoManager: isEditing ? undoManager : nil,
-                    isReadOnly: !isEditing,
-                    selectedDetent: $selectedDetent
-                )
-            case .subject:
-                SubjectFormView(
-                    viewModel: viewModel.reviewViewModel,
-                    undoManager: isEditing ? undoManager : nil,
-                    isReadOnly: !isEditing,
-                    selectedDetent: $selectedDetent
-                )
-            case .none:
-                EmptyView()
+        private var unifiedSheetContent: some View {
+            Group {
+                switch activeSheetContent {
+                case .equipment(let nodeId):
+                    EquipmentFormView(
+                        viewModel: viewModel.reviewViewModel,
+                        editingNodeId: nodeId,
+                        undoManager: isEditing ? undoManager : nil,
+                        isReadOnly: !isEditing,
+                        selectedDetent: $selectedDetent
+                    )
+                case .subject:
+                    SubjectFormView(
+                        viewModel: viewModel.reviewViewModel,
+                        undoManager: isEditing ? undoManager : nil,
+                        isReadOnly: !isEditing,
+                        selectedDetent: $selectedDetent
+                    )
+                case .none:
+                    EmptyView()
+                }
             }
-        }
-        // 👈 Tracks live sheet height as the user drags the sheet up or down
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onChange(of: proxy.size.height, initial: true) { _, newHeight in
-                        currentSheetHeight = newHeight
+            // Track live sheet height frame-by-frame for top action buttons
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onChange(of: proxy.size.height, initial: true) { _, newHeight in
+                            currentSheetHeight = newHeight
+                        }
+                }
+            }
+            .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
+            .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
+            .interactiveDismissDisabled(true)
+            .presentationDragIndicator(.visible)
+            .presentationBackground {
+                if selectedDetent == .large {
+                    DesignTokens.sheetBackground
+                } else {
+                    if #available(iOS 26, *) {
+                        Color.clear
+                            .glassEffect(.clear, in: .rect)
+                    } else {
+                        Rectangle().fill(.regularMaterial)
                     }
+                }
             }
         }
-        .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
-        .interactiveDismissDisabled(true)
-        .presentationDragIndicator(.visible)
-        .presentationBackground(DesignTokens.sheetBackground)
-    }
-    
     // MARK: - Tap Handlers
     
     private func handleNodeTap(_ node: Equipment) {

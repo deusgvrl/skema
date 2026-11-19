@@ -142,17 +142,6 @@ struct ReviewView: View {
     @ViewBuilder
     private func nodeQuickActionsToolbar(for nodeId: UUID) -> some View {
         HStack(spacing: 16) {
-//            Button {
-//                duplicateNode(id: nodeId)
-//            } label: {
-//                Image(systemName: "plus.square.on.square")
-//                    .font(.subheadline.weight(.medium))
-//                    .foregroundStyle(DesignTokens.textPrimary)
-//            }
-//
-//            Divider()
-//                .frame(height: 16)
-
             Button(role: .destructive) {
                 quickDeleteNode(id: nodeId)
             } label: {
@@ -255,7 +244,19 @@ struct ReviewView: View {
         .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
         .interactiveDismissDisabled(true)
         .presentationDragIndicator(.visible)
-        .presentationBackground(DesignTokens.sheetBackground)
+        // Liquid glass effect for 76pt & Medium detents, solid color for Large
+        .presentationBackground {
+            if selectedDetent == .large {
+                DesignTokens.sheetBackground
+            } else {
+                if #available(iOS 26, *) {
+                    Color.clear
+                        .glassEffect(.clear, in: .rect)
+                } else {
+                    Rectangle().fill(.regularMaterial)
+                }
+            }
+        }
     }
 
     // MARK: - Tap Handlers

@@ -256,7 +256,7 @@ struct EquipmentFormView: View {
             }
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
-            .background(DesignTokens.sheetBackground)
+            .background(selectedDetent == .large ? DesignTokens.sheetBackground : Color.clear)
             .navigationTitle(formViewModel.isEditing ? (editingTitle ?? "Equipment Details") : "Add Equipment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

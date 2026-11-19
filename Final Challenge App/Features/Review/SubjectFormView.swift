@@ -58,8 +58,8 @@ struct SubjectFormView: View {
                 .listRowBackground(DesignTokens.formRowBackground)
             }
             .foregroundStyle(DesignTokens.textPrimary)
+            .background(selectedDetent == .large ? DesignTokens.sheetBackground : Color.clear)
             .scrollContentBackground(.hidden)
-            .background(DesignTokens.sheetBackground)
             .disabled(isReadOnly)
             .navigationTitle("Subject Details")
             .navigationBarTitleDisplayMode(.inline)
