@@ -18,8 +18,10 @@ struct SetupDetailView: View {
     @State private var photoPickerSelection: [PhotosPickerItem] = []
 
     // Selection & Preview State
+    @State private var selectedImageIndices: Set<Int> = []
     @State private var selectedPreviewIndex: Int = 0
     @State private var showReferenceDetail: Bool = false
+    @State private var showDeleteConfirmation: Bool = false
 
     // Diagram view / edit state
     @State private var editingNode: Equipment?
@@ -201,20 +203,42 @@ struct SetupDetailView: View {
                 ScrollView {
                     let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
                     LazyVGrid(columns: columns, spacing: 2) {
-                        ForEach(viewModel.referenceImages.indices, id: \.self) { index in
-                            Image(uiImage: viewModel.referenceImages[index])
-                                .resizable()
-                                .scaledToFill()
-                                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                                .aspectRatio(1, contentMode: .fit)
-                                .clipped()
+                        ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
+                            if viewModel.referenceImages.indices.contains(index) {
+                                let isSelected = selectedImageIndices.contains(index)
+                                
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: viewModel.referenceImages[index])
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .clipped()
+                                        .opacity(viewModel.isSelectionMode && isSelected ? 0.75 : 1.0)
+
+                                    // Selection Checkmark Badge
+                                    if viewModel.isSelectionMode {
+                                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3.weight(.semibold))
+                                            .foregroundStyle(isSelected ? Color.accentColor : .white)
+                                            .shadow(color: .black.opacity(0.3), radius: 2)
+                                            .padding(6)
+                                    }
+                                }
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    selectedPreviewIndex = index
-                                    showReferenceDetail = true
+                                    if viewModel.isSelectionMode {
+                                        if isSelected {
+                                            selectedImageIndices.remove(index)
+                                        } else {
+                                            selectedImageIndices.insert(index)
+                                        }
+                                    } else {
+                                        selectedPreviewIndex = index
+                                        showReferenceDetail = true
+                                    }
                                 }
-                                .accessibilityLabel("Reference \(index + 1)")
-                                .accessibilityAddTraits(.isButton)
+                            }
                         }
                     }
                 }
