@@ -1,29 +1,38 @@
-//
-//  EquipmentFormView.swift
-//  Final Challenge App
-//
-//  Created by Satriya Handha Wibowo on 11/11/26.
-//
-
 import SwiftUI
 
 struct EquipmentFormView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var formViewModel: EquipmentFormViewModel
     
+    @Binding var selectedDetent: PresentationDetent
+    
+    let viewModel: ReviewViewModel
+    let editingNodeId: UUID?
     let undoManager: UndoManager?
     var isReadOnly: Bool = false
     
+    // State management for dirty tracking and confirmation alerts
     @State private var isDeleteAlert: Bool = false
     @State private var isDiscardAlertPresented: Bool = false
     @State private var isDirty: Bool = false
-    /// "L1 Key" for an existing item (Sketch R06a), nil when adding.
-    private let editingTitle: String?
+    @State private var isSwitchingNode: Bool = false
     
-    init(viewModel: ReviewViewModel, editingNodeId: UUID?, undoManager: UndoManager?, isReadOnly: Bool = false) {
+    private var editingTitle: String? {
+        viewModel.nodes.first { $0.id == editingNodeId }?.displayName
+    }
+    
+    init(
+        viewModel: ReviewViewModel,
+        editingNodeId: UUID?,
+        undoManager: UndoManager?,
+        isReadOnly: Bool = false,
+        selectedDetent: Binding<PresentationDetent> = .constant(.height(76))
+    ) {
+        self.viewModel = viewModel
+        self.editingNodeId = editingNodeId
         self.undoManager = undoManager
         self.isReadOnly = isReadOnly
-        self.editingTitle = viewModel.nodes.first { $0.id == editingNodeId }?.displayName
+        self._selectedDetent = selectedDetent
         self._formViewModel = State(initialValue: EquipmentFormViewModel(
             editingNodeId: editingNodeId,
             reviewViewModel: viewModel
@@ -35,7 +44,7 @@ struct EquipmentFormView: View {
         
         NavigationStack {
             Form {
-                // MARK: 1. Equipment Section
+                // 1. Equipment Section
                 Section(header: FormSectionHeader("Equipment")) {
                     Picker("Category", selection: $formViewModel.category) {
                         ForEach(EquipmentCategory.allCases) { cat in
@@ -43,7 +52,7 @@ struct EquipmentFormView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .tint(DesignTokens.accentText)
+                    .tint(.primary)
                     .disabled(isReadOnly)
                     
                     HStack {
@@ -62,32 +71,29 @@ struct EquipmentFormView: View {
                             TextField(formViewModel.category == .light ? "e.g. Accent light" : "e.g. Second camera", text: $formViewModel.role)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
                         }
                     }
                 }
                 .listRowBackground(DesignTokens.formRowBackground)
                 
-                // MARK: 2. Category-Specific Settings
+                // 2. Category-Specific Settings
                 if formViewModel.category == .light {
                     Section(header: FormSectionHeader("Light Settings")) {
                         HStack {
                             Text("Power")
                             Spacer()
-                            TextField("-", text: $formViewModel.power)
+                            TextField("1/16", text: $formViewModel.power)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Color temperature")
                             Spacer()
-                            TextField("-", text: $formViewModel.colorTemp)
+                            TextField("5600", text: $formViewModel.colorTemp)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.numberPad)
                                 .disabled(isReadOnly)
                             Text("K")
@@ -102,11 +108,12 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Lens")
                             Spacer()
-                            TextField("-", text: $formViewModel.lens)
+                            TextField("50", text: $formViewModel.lens)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
+                            Text("mm")
+                                .foregroundStyle(DesignTokens.textSecondary)
                         }
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
@@ -115,37 +122,34 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("ISO")
                             Spacer()
-                            TextField("-", text: $formViewModel.iso)
+                            TextField("100", text: $formViewModel.iso)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
+                                .keyboardType(.numberPad)
                                 .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Aperture")
                             Spacer()
-                            TextField("-", text: $formViewModel.aperture)
+                            TextField("f/2.8", text: $formViewModel.aperture)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
                         }
                         HStack {
                             Text("Shutter speed")
                             Spacer()
-                            TextField("-", text: $formViewModel.shutterSpeed)
+                            TextField("1/200", text: $formViewModel.shutterSpeed)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .disabled(isReadOnly)
                         }
                         HStack {
                             Text("White balance")
                             Spacer()
-                            TextField("-", text: $formViewModel.whiteBalance)
+                            TextField("5600", text: $formViewModel.whiteBalance)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.numberPad)
                                 .disabled(isReadOnly)
                             Text("K")
@@ -155,7 +159,7 @@ struct EquipmentFormView: View {
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
                 
-                // MARK: 3. Position & Direction
+                // 3. Position & Direction
                 if formViewModel.category != .accessory {
                     Section(
                         header: FormSectionHeader("Position & Direction"),
@@ -169,10 +173,9 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Height")
                             Spacer()
-                            TextField("-", text: $formViewModel.height)
+                            TextField("0.0", text: $formViewModel.height)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.decimalPad)
                                 .disabled(isReadOnly)
                             Text("m")
@@ -181,10 +184,9 @@ struct EquipmentFormView: View {
                         HStack {
                             Text("Tilt")
                             Spacer()
-                            TextField("-", text: $formViewModel.tilt)
+                            TextField("0", text: $formViewModel.tilt)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.numberPad)
                                 .disabled(isReadOnly)
                             Text("°")
@@ -195,10 +197,9 @@ struct EquipmentFormView: View {
                             HStack {
                                 Text("Horizontal aim")
                                 Spacer()
-                                TextField("-", text: $formViewModel.horizontalAim)
+                                TextField("0", text: $formViewModel.horizontalAim)
                                     .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
+                                    .foregroundStyle(DesignTokens.textSecondary)
                                     .keyboardType(.numberPad)
                                     .disabled(isReadOnly)
                                 Text("°")
@@ -208,11 +209,12 @@ struct EquipmentFormView: View {
                         
                         HStack {
                             Text("Distance to subject")
+                                .lineLimit(1)
+                                .layoutPriority(1)
                             Spacer()
-                            TextField("-", text: $formViewModel.distance)
+                            TextField("0.0", text: $formViewModel.distance)
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(DesignTokens.textSecondary)
-                            .foregroundStyle(DesignTokens.textSecondary)
                                 .keyboardType(.decimalPad)
                                 .disabled(isReadOnly)
                             Text("m")
@@ -222,7 +224,7 @@ struct EquipmentFormView: View {
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
                 
-                // MARK: 4. Bottom Text Area
+                // 4. Notes & Accessories
                 if formViewModel.category == .accessory {
                     Section(header: FormSectionHeader("Notes")) {
                         TextField("Add notes", text: $formViewModel.notes, axis: .vertical)
@@ -240,27 +242,10 @@ struct EquipmentFormView: View {
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
-                
-                // Delete Button: outlined red capsule (Sketch R06)
-                if formViewModel.isEditing && !isReadOnly {
-                    Button(role: .destructive) {
-                        isDeleteAlert = true
-                    } label: {
-                        Text("Delete Equipment")
-                            .foregroundStyle(DesignTokens.accentText)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .overlay(Capsule().strokeBorder(DesignTokens.accentText.opacity(0.6), lineWidth: 1))
-                            .contentShape(.capsule)
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                }
             }
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
-            .background(DesignTokens.sheetBackground)
-            // REMOVED: .disabled(isReadOnly) here so the Form scroll view remains interactive!
+            .background(selectedDetent == .large ? DesignTokens.sheetBackground : Color.clear)
             .navigationTitle(formViewModel.isEditing ? (editingTitle ?? "Equipment Details") : "Add Equipment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -276,49 +261,79 @@ struct EquipmentFormView: View {
                 
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Done", systemImage: "checkmark") {
-                            formViewModel.saveNode(undoManager: undoManager) {
-                                dismiss()
+                        if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
+                            // Fullscreen / Expanded Mode: Show Checkmark to Save
+                            Button("Done", systemImage: "checkmark") {
+                                formViewModel.saveNode(undoManager: undoManager) {
+                                    dismiss()
+                                }
                             }
+                            .buttonStyle(.glassProminent)
+                            .tint(DesignTokens.accentPrimary)
+                            .disabled(!formViewModel.isFormValid)
+                        } else {
+                            // Compact / Medium Mode: Show Pencil to Expand Fullscreen
+                            Button("Edit Details", systemImage: "pencil") {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .large
+                                }
+                            }
+                            .buttonStyle(.glassProminent)
+                            .tint(DesignTokens.accentPrimary)
                         }
-                        .buttonStyle(.glassProminent)
-                        .tint(DesignTokens.accentPrimary)
-                        .disabled(!formViewModel.isFormValid)
                     }
                 }
-            }
-            .interactiveDismissDisabled(!isReadOnly && isDirty)
-            .onChange(of: formViewModel.name) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.role) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.distance) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.horizontalAim) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.height) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.tilt) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.colorTemp) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.whiteBalance) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.power) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.accessories) { _, _ in isDirty = true }
-            .onChange(of: formViewModel.notes) { _, _ in isDirty = true }
-            
-            .alert("Discard Unsaved Changes?", isPresented: $isDiscardAlertPresented) {
-                Button("Keep Editing", role: .cancel) { }
-                Button("Discard", role: .destructive) { dismiss() }
-            } message: {
-                Text("You have unsaved changes. Are you sure you want to discard them?")
-            }
-            .alert("Delete Equipment", isPresented: $isDeleteAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
-                    formViewModel.deleteNode(undoManager: undoManager) {
-                        dismiss()
-                    }
-                }
-            } message: {
-                Text("Are you sure you want to remove this equipment?")
             }
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(DesignTokens.sheetBackground)
+        // Track form edits to update dirty status
+        .onChange(of: formViewModel.category) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.name) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.role) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.distance) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.horizontalAim) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.height) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.tilt) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.colorTemp) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.whiteBalance) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.power) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.accessories) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onChange(of: formViewModel.notes) { _, _ in if !isSwitchingNode { isDirty = true } }
+        .onAppear {
+            if editingNodeId != nil {
+                selectedDetent = .height(76)
+            }
+        }
+        .onChange(of: editingNodeId) { _, newId in
+            isSwitchingNode = true
+            formViewModel.switchToNode(id: newId)
+            isDirty = false
+            withAnimation(.easeInOut(duration: 0.25)) {
+                selectedDetent = .height(76)
+            }
+            DispatchQueue.main.async {
+                isDirty = false
+                isSwitchingNode = false
+            }
+        }
+        
+        // Unsaved changes confirmation alert
+        .alert("Discard Unsaved Changes?", isPresented: $isDiscardAlertPresented) {
+            Button("Keep Editing", role: .cancel) { }
+            Button("Discard", role: .destructive) { dismiss() }
+        } message: {
+            Text("You have unsaved changes. Are you sure you want to discard them?")
+        }
+        
+        // Delete confirmation alert
+        .alert("Delete Equipment", isPresented: $isDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                formViewModel.deleteNode(undoManager: undoManager) {
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to remove this equipment?")
+        }
     }
 }

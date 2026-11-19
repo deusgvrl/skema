@@ -13,11 +13,11 @@ import TipKit
 struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
     var undoManager: UndoManager?
+    @Binding var selectedNodeId: UUID?
 
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
-    var onAddNodeTap: () -> Void
-    var onEditTap: () -> Void = {}
+    var onEmptyTap: (() -> Void)? = nil
 
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
@@ -29,14 +29,12 @@ struct ReviewDiagramContentView: View {
                     viewModel: viewModel,
                     isReadOnly: !viewModel.isEditingDiagram,
                     undoManager: undoManager,
+                    selectedNodeId: $selectedNodeId,
                     onNodeTap: onNodeTap,
-                    onSubjectTap: onSubjectTap
+                    onSubjectTap: onSubjectTap,
+                    onEmptyTap: onEmptyTap
                 )
-                .overlay(alignment: .bottomTrailing) {
-                    floatingButton
-                        .padding(16)
-                }
-
+                
                 if !viewModel.nodes.isEmpty {
                     Group {
                         if viewModel.isEditingDiagram {
@@ -46,69 +44,68 @@ struct ReviewDiagramContentView: View {
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 12)
                 }
             }
-
-            EquipmentCarousel(
-                viewModel: viewModel,
-                isReadOnly: false,
-                onNodeTap: onNodeTap
-            )
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
     }
-
-    /// Pencil in view mode (red), + in edit mode (glass) — Sketch R04 / R04m.
-    @ViewBuilder
-    private var floatingButton: some View {
-        if viewModel.isEditingDiagram {
-            Button("Add Equipment", systemImage: "plus", action: onAddNodeTap)
-                .labelStyle(.iconOnly)
-                .font(.title3.weight(.medium))
-                .foregroundStyle(DesignTokens.textPrimary)
-                .frame(width: 48, height: 48)
-                .glassEffect(.regular.tint(DesignTokens.glassControlFill).interactive(), in: .circle)
-        } else {
-            Button(action: onEditTap) {
-                AccentCircleLabel(title: "Edit Diagram", systemImage: "pencil")
-            }
-            .buttonStyle(.plain)
-        }
-    }
 }
 
-/// A one-line glass tip with a close button, backed by TipKit so closing it is remembered.
+/// A floating liquid-glass tip pill featuring leading icon and smooth dismissal.
 private struct DiagramTipPill<TipType: Tip>: View {
     let tip: TipType
     @State private var isVisible = false
 
     var body: some View {
-        // A ZStack, not a Group: modifiers on an empty Group never run, so the task would not start.
         ZStack {
             if isVisible {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    // Leading Contextual Icon
+                    Image(systemName: "sparkles")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DesignTokens.accentPrimary)
+
+                    // Tip Title Text
                     tip.title
                         .font(.subheadline)
+                        .fontWeight(.medium)
                         .foregroundStyle(DesignTokens.textPrimary)
+                        .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Button("Close Tip", systemImage: "xmark") {
-                        tip.invalidate(reason: .tipClosed)
+
+                    // Close Target
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            tip.invalidate(reason: .tipClosed)
+                        }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(DesignTokens.textSecondary)
+                            .frame(width: 24, height: 24)
+                            .background(Circle().fill(Color.white.opacity(0.12)))
                     }
-                    .labelStyle(.iconOnly)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(DesignTokens.textSecondary)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss tip")
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, 4)
-                .glassControl(cornerRadius: 24)
-                .transition(.opacity)
+                .padding(.leading, 14)
+                .padding(.trailing, 10)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 4)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .task {
             for await status in tip.statusUpdates {
-                withAnimation { isVisible = status == .available }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isVisible = status == .available
+                }
             }
         }
     }
@@ -116,26 +113,21 @@ private struct DiagramTipPill<TipType: Tip>: View {
 
 struct ReviewViewModeTip: Tip {
     var title: Text {
-        Text("Tap the pencil to move or edit your equipment")
+        Text("Tap the pencil to edit your equipment")
     }
 }
 
-/// Sketch says "Drag to move…"; the app keeps its long-press-then-drag gesture, so the copy says so.
 struct ReviewEditModeTip: Tip {
     var title: Text {
-        Text("Long-press an item to move or rotate it, or tap it to edit")
+        Text("Tap equipment to move, rotate, or edit details")
     }
 }
 
 #Preview {
     ReviewDiagramContentView(
         viewModel: ReviewViewModel(),
+        selectedNodeId: .constant(nil),
         onNodeTap: { _ in },
-        onSubjectTap: {},
-        onAddNodeTap: {}
+        onSubjectTap: {}
     )
-    .task {
-        try? Tips.resetDatastore()
-        try? Tips.configure([.displayFrequency(.immediate)])
-    }
 }

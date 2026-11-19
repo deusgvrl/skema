@@ -213,10 +213,23 @@ struct FullScreenImageView: View {
                 }
             }
             
-            // R13b: trash at the top right
             ToolbarItem(placement: .primaryAction) {
-                Button("Delete", systemImage: "trash") {
-                    isDeleteAlert = true
+                Menu {
+                    Button {
+                        setAsCoverImage()
+                    } label: {
+                        Label("Set as Cover Photo", systemImage: "photo.artframe")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        isDeleteAlert = true
+                    } label: {
+                        Label("Delete Photo", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
                 }
                 .disabled(viewModel.referenceImages.isEmpty)
             }
@@ -271,5 +284,17 @@ struct FullScreenImageView: View {
             viewModel.deleteReferenceImage(at: targetIndex)
             scrollPositionID = selectedIndex
         }
+    }
+    
+    private func setAsCoverImage() {
+        guard viewModel.sortedReferenceImages.indices.contains(selectedIndex) else { return }
+        let selectedRefImage = viewModel.sortedReferenceImages[selectedIndex]
+        
+        // Set createdAt to be earlier than the current earliest ReferenceImage
+        if let earliestDate = viewModel.sortedReferenceImages.map(\.createdAt).min() {
+            selectedRefImage.createdAt = earliestDate.addingTimeInterval(-1)
+        }
+        
+        feedbackGenerator.selectionChanged()
     }
 }

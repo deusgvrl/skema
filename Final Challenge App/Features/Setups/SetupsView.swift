@@ -198,9 +198,7 @@ struct SetupsView: View {
             } icon: {
                 LightStandGlyph()
                     .stroke(DesignTokens.textSecondary, style: StrokeStyle(lineWidth: 2.5, lineJoin: .round))
-                    .frame(width: 30, height: 40)
-                    .frame(width: 80, height: 80)
-                    .glassEffect(.regular, in: .circle)
+                    .frame(width: 40, height: 52)
             }
         } description: {
             Text("""

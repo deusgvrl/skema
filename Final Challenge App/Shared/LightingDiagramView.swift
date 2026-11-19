@@ -3,12 +3,17 @@ import SwiftUI
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
+    var isExportedToPdf: Bool = false
     var undoManager: UndoManager? = nil
+    
+    // Converted to Binding so parent controls selection lifecycle
+    @Binding var selectedNodeId: UUID?
+    
     var onNodeTap: ((Equipment) -> Void)? = nil
     var onSubjectTap: (() -> Void)? = nil
+    var onEmptyTap: (() -> Void)? = nil
     
     @State private var nodesSnapshot: [Equipment] = []
-    @State private var selectedNodeId: UUID? = nil
     
     // Smooth Zoom & Pan States
     @State private var zoomScale: CGFloat = 1.0
@@ -16,34 +21,46 @@ struct LightingDiagramView: View {
     @State private var offset: CGSize = .zero
     @GestureState private var dragOffset: CGSize = .zero
     
+    // Scale Meter Visibility State
+    @State private var showScaleMeter: Bool = false
+    @State private var hideScaleMeterTask: Task<Void, Never>? = nil
+    
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
+        isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
-        initialZoomScale: CGFloat = 1.0, // Default 1.0x = 50 cm scale
+        selectedNodeId: Binding<UUID?> = .constant(nil),
+        initialZoomScale: CGFloat = 1.0,
         onNodeTap: ((Equipment) -> Void)? = nil,
-        onSubjectTap: (() -> Void)? = nil
+        onSubjectTap: (() -> Void)? = nil,
+        onEmptyTap: (() -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
+        self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
+        self._selectedNodeId = selectedNodeId
         self._zoomScale = State(initialValue: initialZoomScale)
         self.onNodeTap = onNodeTap
         self.onSubjectTap = onSubjectTap
+        self.onEmptyTap = onEmptyTap
     }
     
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            let currentScale = zoomScale * magnifyBy // Unified active zoom factor
-            let gridConfig = GridConfig.config(for: currentScale) // Dynamic grid resolution
+            let currentScale = zoomScale * magnifyBy
+            let gridConfig = GridConfig.config(for: currentScale)
             
             ZStack {
-                // Background Grid (Adapts step automatically)
-                GridPattern(step: gridConfig.stepInPoints)
-                    .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
-                    .frame(width: 6000, height: 6000)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                // Background Grid (Hides when isReadOnly is true)
+                if !isReadOnly {
+                    GridPattern(step: gridConfig.stepInPoints)
+                        .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
+                        .frame(width: 6000, height: 6000)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
                  
                 // Connecting Lines
                 Path { path in
@@ -57,7 +74,7 @@ struct LightingDiagramView: View {
                     style: StrokeStyle(lineWidth: 1 / currentScale, dash: [4 / currentScale, 3 / currentScale])
                 )
                  
-                // Subject card, under the distance labels so short distances stay readable
+                // Subject Card
                 DiagramEntity(
                     title: "Subject",
                     icon: "person.fill",
@@ -68,41 +85,42 @@ struct LightingDiagramView: View {
                 }
                  
                 // Distance Labels
+                let minDistanceThreshold = 1.5 / currentScale
+
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
-                    let dx = node.position.x
-                    let dy = node.position.y
-                    let length = max(1.0, hypot(dx, dy))
+                    let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
                     
-                    let ratio: CGFloat = (index % 2 == 0) ? 0.45 : 0.60
-                    let posX = subjectCenter.x + dx * ratio
-                    let posY = subjectCenter.y + dy * ratio
-                    
-                    let angle: Double = {
-                        var rawAngle = atan2(dy, dx) * 180 / .pi
-                        if rawAngle > 90 {
-                            rawAngle -= 180
-                        } else if rawAngle < -90 {
-                            rawAngle += 180
-                        }
-                        return rawAngle
-                    }()
-                    
-                    let normalX = -dy / length
-                    let normalY = dx / length
-                    let offsetDistance: CGFloat = 12 / currentScale
-                    
-                    let labelPos = CGPoint(
-                        x: posX + normalX * offsetDistance,
-                        y: posY + normalY * offsetDistance
-                    )
-                    
-                    Text("\(node.distance) m")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(DesignTokens.textSecondary)
-                        .fixedSize()
-                        .rotationEffect(.degrees(angle))
-                        .scaleEffect(1 / currentScale)
-                        .position(labelPos)
+                    if isExportedToPdf || distanceValue >= minDistanceThreshold {
+                        let dx = node.position.x
+                        let dy = node.position.y
+                        let posX = subjectCenter.x + dx * 0.5
+                        let posY = subjectCenter.y + dy * 0.5
+                        
+                        let angle: Double = {
+                            var rawAngle = atan2(dy, dx) * 180 / .pi
+                            if rawAngle > 90 {
+                                rawAngle -= 180
+                            } else if rawAngle < -90 {
+                                rawAngle += 180
+                            }
+                            return rawAngle
+                        }()
+                        
+                        Text("\(node.distance) m")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(DesignTokens.textSecondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(DesignTokens.pageBackground.opacity(0.9))
+                            )
+                            .fixedSize()
+                            .rotationEffect(.degrees(angle))
+                            .scaleEffect(1 / currentScale)
+                            .position(x: posX, y: posY)
+                            .transition(.opacity)
+                    }
                 }
                 
                 // Draggable Nodes
@@ -110,21 +128,21 @@ struct LightingDiagramView: View {
                     NodeView(
                         node: $node,
                         subjectCenter: subjectCenter,
-                        isSelected: !isReadOnly && selectedNodeId == node.id,
+                        isSelected: selectedNodeId == node.id,
+                        isReadOnly: isReadOnly,
                         zoomScale: currentScale,
                         onTap: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedNodeId = node.id
+                            }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onNodeTap?(node)
                         },
-                        onLongPress: {
+                        onGestureStart: {
                             if !isReadOnly {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     selectedNodeId = node.id
                                 }
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            }
-                        },
-                        onGestureStart: {
-                            if !isReadOnly {
                                 nodesSnapshot = viewModel.nodes.map { $0.clone() }
                             }
                         },
@@ -143,11 +161,10 @@ struct LightingDiagramView: View {
             .scaleEffect(currentScale)
             .background(DesignTokens.pageBackground)
             .onTapGesture {
-                if !isReadOnly {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedNodeId = nil
-                    }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedNodeId = nil
                 }
+                onEmptyTap?()
             }
             .gesture(
                 DragGesture()
@@ -167,23 +184,49 @@ struct LightingDiagramView: View {
                     .updating($magnifyBy) { value, state, _ in
                         state = value.magnification
                     }
+                    .onChanged { _ in
+                        guard !isReadOnly else { return }
+                        hideScaleMeterTask?.cancel()
+                        if !showScaleMeter {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showScaleMeter = true
+                            }
+                        }
+                    }
                     .onEnded { value in
                         zoomScale *= value.magnification
-                        zoomScale = max(0.3, min(zoomScale, 4.0))
+                        zoomScale = max(0.3, min(zoomScale, 8.0))
+                        
+                        guard !isReadOnly else { return }
+                        hideScaleMeterTask?.cancel()
+                        hideScaleMeterTask = Task {
+                            try? await Task.sleep(nanoseconds: 1_200_000_000)
+                            if !Task.isCancelled {
+                                await MainActor.run {
+                                    withAnimation(.easeInOut(duration: 0.4)) {
+                                        showScaleMeter = false
+                                    }
+                                }
+                            }
+                        }
                     }
             )
         }
         .clipped()
-        .overlay(alignment: .bottomLeading) {
-            let activeScale = zoomScale * magnifyBy
-            let activeConfig = GridConfig.config(for: activeScale)
-            
-            // Scale bar width matches 1 grid square on screen
-            ScaleMeterView(
-                labelText: activeConfig.labelText,
-                barWidth: activeConfig.stepInPoints * activeScale
-            )
-            .padding(16)
+        // Scale Meter Overlay (Only visible when isReadOnly is false)
+        .overlay(alignment: .topLeading) {
+            if !isReadOnly {
+                let activeScale = zoomScale * magnifyBy
+                let activeConfig = GridConfig.config(for: activeScale)
+                
+                ScaleMeterView(
+                    labelText: activeConfig.labelText,
+                    barWidth: activeConfig.stepInPoints * activeScale
+                )
+                .padding(16)
+                .opacity(showScaleMeter ? 1.0 : 0.0)
+                .allowsHitTesting(false)
+            }
         }
     }
 }

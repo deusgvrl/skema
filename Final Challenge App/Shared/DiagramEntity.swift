@@ -11,30 +11,38 @@ import SwiftUI
 
 struct DiagramEntity: View {
     let title: String
-    /// Kept for existing call sites; the Sketch card draws a figure instead of an SF Symbol.
-    let icon: String
+    /// Kept to preserve backward compatibility with existing call sites
+    var icon: String = ""
     let position: CGPoint
     var currentScale: CGFloat = 1.0
     var onTap: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(DesignTokens.nodeDetailFill)
-                .frame(width: 16, height: 26)
+        ZStack {
+            // Subject Circle Shape (enlarged to 64x64)
+            Circle()
+                .fill(DesignTokens.accentPrimary)
+                .frame(width: 64, height: 64)
+                .overlay(
+                    Circle()
+                        .stroke(DesignTokens.diagramSubjectBorder, lineWidth: 1.5)
+                )
+                .overlay(
+                    // Inner outline ring
+                    Circle()
+                        .stroke(Color.primary, lineWidth: 2)
+                )
+            // Title text centered inside the circle
             Text(title)
-                .font(.footnote)
-                .foregroundStyle(DesignTokens.textPrimary)
-                .fixedSize()
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, 8)
         }
-        .frame(width: 104, height: 68)
-        .background(DesignTokens.diagramSubjectFill, in: .rect(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(DesignTokens.diagramSubjectBorder, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.18), radius: 10, y: 6)
-        .contentShape(.rect(cornerRadius: 10))
+        .frame(width: 64, height: 64)
+        .contentShape(Circle())
         .scaleEffect(1 / currentScale)
         .position(position)
         .onTapGesture {
