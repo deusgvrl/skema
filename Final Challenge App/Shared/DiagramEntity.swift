@@ -11,30 +11,41 @@ import SwiftUI
 
 struct DiagramEntity: View {
     let title: String
-    /// Kept for existing call sites; the Sketch card draws a figure instead of an SF Symbol.
+    /// SF Symbol icon displayed inside the circle (defaults to "person.fill").
     let icon: String
     let position: CGPoint
     var currentScale: CGFloat = 1.0
     var onTap: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(DesignTokens.nodeDetailFill)
-                .frame(width: 16, height: 26)
-            Text(title)
-                .font(.footnote)
-                .foregroundStyle(DesignTokens.textPrimary)
-                .fixedSize()
+        ZStack {
+            // Subject Circle Shape
+            Circle()
+                .fill(DesignTokens.diagramSubjectFill)
+                .frame(width: 44, height: 44)
+                .overlay(
+                    Circle()
+                        .stroke(DesignTokens.diagramSubjectBorder, lineWidth: 1.5)
+                )
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                .overlay(
+                    Image(systemName: icon.isEmpty ? "person.fill" : icon)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(DesignTokens.textPrimary)
+                )
         }
-        .frame(width: 104, height: 68)
-        .background(DesignTokens.diagramSubjectFill, in: .rect(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(DesignTokens.diagramSubjectBorder, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.18), radius: 10, y: 6)
-        .contentShape(.rect(cornerRadius: 10))
+        .frame(width: 44, height: 44)
+        // Title text positioned cleanly below the circle
+        .overlay(alignment: .bottom) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(DesignTokens.textPrimary)
+                .lineLimit(1)
+                .fixedSize()
+                .offset(y: 20)
+        }
+        .contentShape(Circle())
         .scaleEffect(1 / currentScale)
         .position(position)
         .onTapGesture {
@@ -45,7 +56,6 @@ struct DiagramEntity: View {
         .accessibilityAddTraits(.isButton)
     }
 }
-
 #Preview {
     ZStack {
         DesignTokens.pageBackground
