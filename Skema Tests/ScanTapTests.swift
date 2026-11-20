@@ -1,8 +1,8 @@
 //
-//  LiDARScanTests.swift
+//  ScanTapTests.swift
 //  Skema Tests
 //
-//  The LiDAR-only tap scan (a second scan screen, no object detection): the photographer taps the subject and each
+//  The scan's taps (LiDAR only, no object detection): the photographer taps the subject and each
 //  light or camera, each tap paints a column of LiDAR points (A10-41 painted items, nothing is drawn),
 //  Finish writes the plan values.
 //  Camera: 1920 x 1440 picture, fx = fy = 1000, centre (960, 720), at the origin looking along -z.
@@ -22,13 +22,13 @@ private let middle = CGPoint(x: 720, y: 960)
 private let leftOfMiddle = CGPoint(x: 720, y: 576)
 
 @MainActor
-@Suite("LiDAR tap scan")
-struct LiDARScanTests {
+@Suite("Scan: taps, live results and Finish")
+struct ScanTapTests {
     let arSession = FakeARSession()
     private let floor = [makePlane(worldY: -1, isFloor: true)]
 
-    func makeViewModel(storage: StorageController? = nil) -> LiDARScanViewModel {
-        LiDARScanViewModel(
+    func makeViewModel(storage: StorageController? = nil) -> ScanViewModel {
+        ScanViewModel(
             makeScan: { [arSession] in
                 ScanSession(session: arSession, frameInterval: 1.0 / 15.0, supportsLiDAR: { true })
             },
@@ -36,7 +36,7 @@ struct LiDARScanTests {
             storageController: storage ?? StorageController(inMemory: true))
     }
 
-    private func tap(_ viewModel: LiDARScanViewModel, _ kind: LiDARTapKind, at point: CGPoint = middle,
+    private func tap(_ viewModel: ScanViewModel, _ kind: ScanTapKind, at point: CGPoint = middle,
                      metres: Float = 2, withFloor: Bool = true) throws {
         viewModel.kind = kind
         viewModel.tap(atScreen: point, screenSize: screen,
@@ -167,6 +167,18 @@ struct LiDARScanTests {
         // the wall at 2 m, so its middle is 1.24 m above the floor.
         #expect(abs(height - 1.24) < 0.05)
         #expect(abs(light.position.x) < 2 && abs(light.position.y - 100) < 2)
+    }
+
+    @Test("Finish writes the subject's height above the floor onto the setup")
+    func finishWritesTheSubjectHeight() throws {
+        let viewModel = makeViewModel()
+        try tap(viewModel, .subject, metres: 3)
+
+        viewModel.finishTapped()
+
+        // The subject is a wall 3 m ahead; its column reaches as high as the picture shows it, well above the floor.
+        let height = try #require(Double(viewModel.draftSetup.subjectHeight))
+        #expect(height > 0.5 && height < 3)
     }
 
     @Test("An item seen only farther than 5 m keeps empty values")

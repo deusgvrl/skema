@@ -13,8 +13,6 @@ nonisolated extension ScanFrame {
     init(_ frame: ARFrame, planes: [ScanPlane]) {
         self.init(
             timestamp: frame.timestamp,
-            image: frame.capturedImage,
-            orientation: .right,
             camera: CameraModel(frame.camera),
             depth: frame.sceneDepth.flatMap {
                 DepthCopier.copy(depthMap: $0.depthMap, confidenceMap: $0.confidenceMap)

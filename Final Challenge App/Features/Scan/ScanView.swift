@@ -1,6 +1,9 @@
 import SwiftUI
 
-/// Scan guide, camera permission, live scan, processing, leave alert (Sketch R02–R04x · A10-4, A10-5).
+/// The scan screen (LiDAR only, no object detection): tap the subject, then pick Light or Camera and tap each item;
+/// each tap collects that item's column of LiDAR points (nothing is drawn but the tags). Tips show when the scan goes
+/// badly, ✕ asks before throwing the taps away, and Finish Scan opens the lighting diagram, where everything can still
+/// be edited. Without camera access or LiDAR it shows a message with "Add Equipment Manually" (Sketch R02–R04x).
 struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -12,13 +15,10 @@ struct ScanView: View {
     @State private var showsLeaveAlert = false
     var onDismissToSetups: (() -> Void)?
 
-    init(
-            viewModel: ScanViewModel = ScanViewModel(),
-            onDismissToSetups: (() -> Void)? = nil
-        ) {
-            _viewModel = State(initialValue: viewModel)
-            self.onDismissToSetups = onDismissToSetups
-        }
+    init(viewModel: ScanViewModel = ScanViewModel(), onDismissToSetups: (() -> Void)? = nil) {
+        _viewModel = State(initialValue: viewModel)
+        self.onDismissToSetups = onDismissToSetups
+    }
 
     var body: some View {
         ZStack {
@@ -28,45 +28,35 @@ struct ScanView: View {
                     RoomScanView(session: session)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
-                            viewModel.setSubject(atScreen: tap, screenSize: geometry.size)
+                            viewModel.tap(atScreen: tap, screenSize: geometry.size)
                         }
                         .accessibilityLabel("Camera view")
-                        .accessibilityHint("Tap the product to set it as the subject")
+                        .accessibilityHint("Tap the subject, a light or a camera")
                         .accessibilityAddTraits(.isButton)
                 }
                 .ignoresSafeArea()
-                ScanOverlayView(viewModel: viewModel)
+                ScanTagsView(viewModel: viewModel)
                     .ignoresSafeArea()
-                }
-            content
-                .padding(.horizontal, 24)
+            }
+            content.padding(.horizontal, 24)
         }
         .overlay(alignment: .top) {
             if viewModel.screen == .scanning {
-                ScanChips(viewModel: viewModel)
-                    .padding(.top, 8)
+                topBar
             }
         }
         .overlay(alignment: .bottom) {
-                    VStack(spacing: 16) {
-                        if viewModel.screen == .scanning, let guidance = viewModel.guidance {
-                            ScanGuidanceView(guidance: guidance)
-                                .transition(.opacity)
-                        }
-                        if showsFinishScan {
-                            finishScanButton
-                        }
-                    }
-                    .animation(.default, value: viewModel.guidance)
-                }
+            bottomControls
+                .animation(.default, value: viewModel.guidance)
+        }
         .environment(\.colorScheme, usesCameraAppearance ? .dark : systemColorScheme)
-        .fullScreenCover(item: $reviewViewModel) { vm in
+        .fullScreenCover(item: $reviewViewModel) { reviewModel in
             NavigationStack {
                 ReviewView(
                     isFromLoadingScreen: true,
-                    viewModel: vm,
+                    viewModel: reviewModel,
                     onDismissToSetups: {
-                        reviewViewModel = nil // Dismisses cover
+                        reviewViewModel = nil
                         onDismissToSetups?()
                     }
                 )
@@ -74,29 +64,26 @@ struct ScanView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Close", systemImage: "xmark") {
-                            if viewModel.asksBeforeLeaving {
-                                showsLeaveAlert = true
-                            } else {
-                                leave()
-                            }
-                        }
-                    }
-                }
-
-                .alert("Cancel This Scan?", isPresented: $showsLeaveAlert) {
-                    Button("Continue", role: .cancel) {}
-                    Button("Cancel Scan", role: .destructive) {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close", systemImage: "xmark") {
+                    if viewModel.asksBeforeLeaving {
+                        showsLeaveAlert = true
+                    } else {
                         leave()
                     }
-                } message: {
-                    Text("Everything detected so far will be lost.")
                 }
-        .toolbarColorScheme(usesCameraAppearance ? .dark : nil, for: .navigationBar)
-        .task {
-            await viewModel.start()
+            }
         }
+        .alert("Cancel This Scan?", isPresented: $showsLeaveAlert) {
+            Button("Continue", role: .cancel) {}
+            Button("Cancel Scan", role: .destructive) {
+                leave()
+            }
+        } message: {
+            Text("Everything you tapped so far will be lost.")
+        }
+        .toolbarColorScheme(usesCameraAppearance ? .dark : nil, for: .navigationBar)
+        .task { await viewModel.start() }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await viewModel.appBecameActive() }
@@ -127,37 +114,82 @@ struct ScanView: View {
     }
 
     private func addEquipmentManually() {
-           viewModel.insertDraftSetup()
-           reviewViewModel = ReviewViewModel(
-               setup: viewModel.draftSetup, storageController: viewModel.storageController
-           )
-       }
+        viewModel.insertDraftSetup()
+        reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup, storageController: viewModel.storageController)
+    }
 
+    private var topBar: some View {
+        VStack(spacing: 8) {
+            Text(chipText)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .glassEffect(.regular, in: .capsule)
+            if let message = viewModel.message {
+                Text(message)
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.6), in: .capsule)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    private var chipText: String {
+        let cameras = viewModel.items.filter { $0.kind == .camera }.count
+        let lights = viewModel.items.filter { $0.kind == .light }.count
+        return "Subject \(viewModel.subject == nil ? "–" : "✓") • Camera \(cameras) • Studio Lighting \(lights)"
+    }
+
+    private var bottomControls: some View {
+        VStack(spacing: 12) {
+            if viewModel.screen == .scanning {
+                if let guidance = viewModel.guidance {
+                    ScanGuidanceView(guidance: guidance)
+                        .transition(.opacity)
+                }
+                Picker("Tap sets", selection: $viewModel.kind) {
+                    Text("Subject").tag(ScanTapKind.subject)
+                    Text("Light").tag(ScanTapKind.light)
+                    Text("Camera").tag(ScanTapKind.camera)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 24)
+            }
+            if showsFinishScan {
+                finishScanButton
+            }
+        }
+        .padding(.bottom, 16)
+    }
+
+    /// Finish Scan shows while scanning; in the simulator (no camera) always, to reach the plan.
     private var showsFinishScan: Bool {
-            #if targetEnvironment(simulator)
-            true
-            #else
-            viewModel.screen == .scanning
-            #endif
+        #if targetEnvironment(simulator)
+        true
+        #else
+        viewModel.screen == .scanning
+        #endif
     }
 
     private var finishScanButton: some View {
-            Button {
-                viewModel.finishTapped()
-                reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup, storageController: viewModel.storageController)
-            } label: {
-                HStack(spacing: 10) {
-                    Text("Finish Scan")
-                    Image(systemName: "checkmark")
-                        .accessibilityHidden(true)
-                }
-                .font(.title3)
-                .padding(.horizontal, 24)
+        Button {
+            viewModel.finishTapped()
+            reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup,
+                                              storageController: viewModel.storageController)
+        } label: {
+            HStack(spacing: 10) {
+                Text("Finish Scan")
+                Image(systemName: "checkmark").accessibilityHidden(true)
             }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.capsule)
-            .controlSize(.extraLarge)
-            .padding(.bottom, 16)
+            .font(.title3)
+            .padding(.horizontal, 24)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .controlSize(.extraLarge)
+        .disabled(!viewModel.canFinish)
     }
 
     @ViewBuilder
@@ -219,97 +251,42 @@ struct ScanView: View {
     }
 }
 
-/// A full-screen message instead of the camera: glass icon circle, title, body, actions (Sketch R02c).
-private struct ScanMessageView<Actions: View>: View {
-    let title: LocalizedStringKey
-    let systemImage: String
-    let message: Text
-    @ViewBuilder let actions: () -> Actions
-
-    @ScaledMetric(relativeTo: .largeTitle) private var iconCircleSize: CGFloat = 80
+/// The tags, pinned to each tapped point: "Subject ✓" and, for each item, its name with the live distance and height.
+private struct ScanTagsView: View {
+    let viewModel: ScanViewModel
 
     var body: some View {
-        // Scrolls only when large Dynamic Type no longer fits on screen.
-        ViewThatFits(in: .vertical) {
-            content
-            ScrollView {
-                content
-                    .padding(.vertical, 24)
+        GeometryReader { geometry in
+            ZStack {
+                ForEach(viewModel.items) { item in
+                    if let point = viewModel.tagPosition(of: item.anchor, in: geometry.size) {
+                        tag(viewModel.tagText(for: item), status: viewModel.statusText(for: item),
+                            isSaved: viewModel.isSaved(item)).position(point)
+                    }
+                }
+                if let subject = viewModel.subject,
+                   let point = viewModel.tagPosition(of: subject, in: geometry.size) {
+                    tag("Subject ✓", status: viewModel.subjectStatusText, isSaved: viewModel.subjectIsSaved)
+                        .position(point)
+                }
             }
-            .scrollIndicators(.hidden)
         }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
-    private var content: some View {
-        VStack(spacing: 0) {
-            Image(systemName: systemImage)
-                .font(.system(size: 32, weight: .regular))
-                .foregroundStyle(DesignTokens.textPrimary)
-                .frame(width: iconCircleSize, height: iconCircleSize)
-                .glassEffect(.regular.tint(DesignTokens.glassControlFill), in: .circle)
-                .accessibilityHidden(true)
-
-            Text(title)
-                .font(.title2.bold())
-                .foregroundStyle(DesignTokens.textPrimary)
-                .multilineTextAlignment(.center)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.top, 8)
-
-            message
-                .font(.subheadline)
-                .foregroundStyle(DesignTokens.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-
-            VStack(spacing: 14) {
-                actions()
-            }
-            .padding(.top, 62)
-        }
-    }
-}
-
-extension ScanMessageView where Actions == EmptyView {
-    init(title: LocalizedStringKey, systemImage: String, message: Text) {
-        self.init(title: title, systemImage: systemImage, message: message) { EmptyView() }
-    }
-}
-
-/// Red capsule with a white label (Sketch R02c "Open Settings").
-private struct ScanPrimaryButton: View {
-    let title: LocalizedStringKey
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.headline)
+    private func tag(_ text: String, status: String, isSaved: Bool) -> some View {
+        VStack(spacing: 2) {
+            Text(text)
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(DesignTokens.accentPrimary, in: .capsule)
-                .contentShape(.capsule)
+            Text(status)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(isSaved ? Color.green : Color.orange)
         }
-        .buttonStyle(.plain)
-    }
-}
-
-#Preview("Camera access is off") {
-    NavigationStack {
-        ScanView(viewModel: ScanViewModel(
-            makeScan: { ScanSession(supportsLiDAR: { true }) },
-            camera: FixedCameraPermission(status: .denied)
-        ))
-    }
-}
-
-#Preview("No LiDAR") {
-    NavigationStack {
-        ScanView(viewModel: ScanViewModel(
-            makeScan: { ScanSession(supportsLiDAR: { false }) },
-            camera: FixedCameraPermission(status: .authorized)
-        ))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.black.opacity(0.55), in: .rect(cornerRadius: 12))
+        .fixedSize()
     }
 }

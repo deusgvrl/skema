@@ -13,6 +13,9 @@ private func worstCaseCardBackdrop(style: UIUserInterfaceStyle) -> Color {
     return blended(DesignTokens.glassCardFill, over: scrimOverPhoto, style: style)
 }
 
+/// `@MainActor`: `UIColor(Color)` is not safe to call from parallel test threads;
+/// Xcode Cloud crashed in it (19 Nov 2026).
+@MainActor
 @Suite("WCAG AA contrast on the real token pairs")
 struct ContrastRatioTests {
     @Test("Primary text clears AA on the glass card, composited over the scrim and a worst-case cover photo")

@@ -21,6 +21,9 @@ func resolvedComponents(_ color: Color, style: UIUserInterfaceStyle) -> Resolved
     return ResolvedRGBA(red: Double(red), green: Double(green), blue: Double(blue), alpha: Double(alpha))
 }
 
+/// `@MainActor`: `UIColor(Color)` is not safe to call from parallel test threads;
+/// Xcode Cloud crashed in it (19 Nov 2026).
+@MainActor
 @Suite("Design tokens resolve to the exact extracted Sketch values")
 struct DesignTokensTests {
     @Test("AccentPrimary is identical in light and dark")
