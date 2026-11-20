@@ -90,12 +90,13 @@ struct SetupsView: View {
                 LazyVStack(alignment: .leading, spacing: 28) {
                     switch viewModel.grouping {
                     case .recent:
-                        ForEach(Array(viewModel.recentSections.enumerated()), id: \.element.id) { index, section in
-                            recentSection(section, isFirst: index == 0)
+                        ForEach(viewModel.recentSections) { section in
+                            gridSection(title: section.title, setups: section.setups)
                         }
                     case .byClient:
+                        // One grid per client, its months in order (Sketch UT Review A-S03).
                         ForEach(viewModel.clientGroups) { group in
-                            clientGroupView(group)
+                            gridSection(title: group.title, setups: group.sections.flatMap(\.setups))
                         }
                     }
                 }
@@ -105,75 +106,29 @@ struct SetupsView: View {
         }
     }
 
-    /// A month (or "Not saved") with its setups as a horizontal row of cards (Sketch R01).
-    private func recentSection(_ section: SetupSection, isFirst: Bool) -> some View {
+    /// A heading (a month, "Not saved" or a client) over a 2-column grid of setups (Sketch UT Review A-S02).
+    private func gridSection(title: String, setups: [Setup]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(section.title, caption: isThisMonth(section) ? "This month" : nil)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 12) {
-                    ForEach(section.setups) { setup in
-                        NavigationLink(value: setup) {
-                            SetupCardView(setup: setup, isProminent: isFirst)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu { deleteButton(for: setup) }
-                    }
-                }
+            Text(title)
+                .font(.title2.bold())
+                .foregroundStyle(DesignTokens.textPrimary)
                 .padding(.horizontal)
-            }
-            // Clipping cut the cards' shadow into a grey band across the row.
-            .scrollClipDisabled()
-        }
-    }
+                .accessibilityAddTraits(.isHeader)
 
-    /// A client with its setups as rows, a small month label above each month (Sketch R01b).
-    private func clientGroupView(_ group: ClientGroup) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader(group.title, caption: nil)
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(group.sections) { section in
-                    // Drafts have no month, so their label is empty and not shown.
-                    if !section.title.isEmpty {
-                        Text(section.title)
-                            .font(.footnote)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                            .padding(.top, 4)
+            LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 18) {
+                ForEach(setups) { setup in
+                    NavigationLink(value: setup) {
+                        SetupGridItem(setup: setup)
                     }
-                    ForEach(section.setups) { setup in
-                        NavigationLink(value: setup) {
-                            SetupRowView(setup: setup)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu { deleteButton(for: setup) }
-                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { deleteButton(for: setup) }
                 }
             }
             .padding(.horizontal)
         }
     }
 
-    private func sectionHeader(_ title: String, caption: String?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.title2.bold())
-                .foregroundStyle(DesignTokens.textPrimary)
-            if let caption {
-                Text(caption)
-                    .font(.footnote)
-                    .foregroundStyle(DesignTokens.textSecondary)
-            }
-        }
-        .padding(.horizontal)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    private func isThisMonth(_ section: SetupSection) -> Bool {
-        guard let date = section.setups.first?.firstSavedDate else { return false }
-        return Calendar.current.isDate(date, equalTo: Date(), toGranularity: .month)
-    }
+    private let gridColumns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
     private func deleteButton(for setup: Setup) -> some View {
         Button(role: .destructive) {
@@ -304,20 +259,9 @@ struct SetupsView: View {
     }
 
     private var deletedToast: some View {
-        HStack {
-            Text("Moved to Recently Deleted")
-                .font(.subheadline)
-                .foregroundStyle(.white)
-            Spacer()
-            Button("Undo") {
-                withAnimation { viewModel.undoDelete() }
-            }
-            .font(.subheadline.bold())
-            .foregroundStyle(DesignTokens.accentPrimary)
+        ToastBar(systemImage: "trash", message: "Moved to Recently Deleted", actionTitle: "Undo") {
+            withAnimation { viewModel.undoDelete() }
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: bottomControlSize)
-        .background(DesignTokens.toastBackground, in: .capsule)
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .task(id: viewModel.lastDeleted?.id) {
             try? await Task.sleep(for: .seconds(5))
@@ -326,14 +270,9 @@ struct SetupsView: View {
         }
     }
 
-    /// "Setup saved" after Project Details (A10-97), in the same chip as the delete toast.
+    /// "Setup Saved" after Project Details (A10-97).
     private var savedToast: some View {
-        Text("Setup saved")
-            .font(.subheadline)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: bottomControlSize, alignment: .leading)
-            .background(DesignTokens.toastBackground, in: .capsule)
+        ToastBar(systemImage: "checkmark", message: "Setup Saved")
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .task {
                 try? await Task.sleep(for: .seconds(3))

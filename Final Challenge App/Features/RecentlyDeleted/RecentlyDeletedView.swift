@@ -43,13 +43,9 @@ struct RecentlyDeletedView: View {
         .onAppear { viewModel.load() }
         .overlay(alignment: .bottom) {
             if viewModel.lastRecovered != nil {
-                Text("Setup recovered")
-                    .font(.subheadline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(DesignTokens.toastBackground, in: .capsule)
+                ToastBar(systemImage: "checkmark", message: "Setup Recovered")
                     .padding(.bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .task(id: viewModel.lastRecovered?.id) {
