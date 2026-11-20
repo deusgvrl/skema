@@ -17,14 +17,21 @@ struct NodeView: View {
     var onGestureStart: () -> Void
     var onGestureEnd: () -> Void
     
+    // Rotation & Handle Stretch States
     @State private var isRotating = false
     @State private var isDragging = false
     @State private var globalCenter: CGPoint = .zero
     @State private var dragStartPosition: CGPoint = .zero
     
+    // Dynamic Handle Distance State (Stretches on drag, snaps back on release)
+    private let defaultHandleDistance: CGFloat = 72.0
+    
     // Rotation Haptic State
     @State private var lastHapticAngle: Double = 0.0
     @State private var feedbackGenerator: UISelectionFeedbackGenerator? = nil
+    
+    @State private var currentHandleDistance: CGFloat = 72.0
+    @State private var grabOffset: CGFloat = 0   // NEW
     
     // Cardinal Alignment Drag Haptic State (12, 3, 6, 9 o'clock)
     @State private var lastCardinalSnap: Int? = nil
@@ -44,54 +51,70 @@ struct NodeView: View {
                     TopViewAccessoryShapeView(isSelected: isSelected)
                 }
                 
-                // Directional Pointer Ray (------->)
+                // Directional Pointer Ray & Front Rotate Handle
                 if isSelected && !isReadOnly {
-                    VStack(spacing: -2) {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(DesignTokens.accentPrimary)
-                        
-                        DashedLine()
-                            .stroke(DesignTokens.accentPrimary, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                            .frame(width: 2, height: 48)
-                    }
-                    .shadow(color: DesignTokens.accentPrimary.opacity(0.4), radius: 3)
-                    .offset(y: -44) // Extends forward from the lens/beam opening
-                    .transition(.scale.combined(with: .opacity))
-                }
-                
-                // Rotation Handle Button (Rear of Node)
-                if isSelected && !isReadOnly {
+                    let lineLength = max(10, currentHandleDistance - 48)
+                    
+                    // Dashed Line extending forward from the node
+                    DashedLine()
+                        .stroke(DesignTokens.accentPrimary, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                        .frame(width: 2, height: lineLength)
+                        .offset(y: -(currentHandleDistance + 4) / 2)
+                        .shadow(color: DesignTokens.accentPrimary.opacity(0.3), radius: 2)
+                    
+                    // Directional Chevron Arrowhead (placed right below rotation handle)
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(DesignTokens.accentPrimary)
+                        .offset(y: -currentHandleDistance + 20)
+                        .shadow(color: DesignTokens.accentPrimary.opacity(0.4), radius: 2)
+                    
+                    // Stretchable Rotation Handle Button (positioned at the top tip)
                     Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundColor(DesignTokens.accentPrimary)
                         .frame(width: 28, height: 28)
-                        .background(Circle().fill(DesignTokens.diagramNodeFill).shadow(color: .black.opacity(0.15), radius: 2, y: 1))
-                        .offset(y: 75) // Positioned behind the object body
+                        .background(
+                            Circle()
+                                .fill(DesignTokens.diagramNodeFill)
+                                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(DesignTokens.accentPrimary, lineWidth: 1.5)
+                        )
+                        .offset(y: -currentHandleDistance)
                         .transition(.scale.combined(with: .opacity))
                         .highPriorityGesture(
-                            DragGesture(coordinateSpace: .global)
+                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                 .onChanged { value in
+                                    let dx = value.location.x - globalCenter.x
+                                    let dy = value.location.y - globalCenter.y
+                                    
+                                    // Screen-space distance (node is counter-scaled, so 1 unit == 1 screen point)
+                                    let fingerDistance = hypot(dx, dy)
+                                    
                                     if !isRotating {
                                         isRotating = true
                                         onGestureStart()
+                                        
+                                        // Remember where on the handle the finger grabbed, so there's no jump
+                                        grabOffset = fingerDistance - currentHandleDistance
                                         
                                         feedbackGenerator = UISelectionFeedbackGenerator()
                                         feedbackGenerator?.prepare()
                                         lastHapticAngle = node.rotationAngle
                                     }
-                                    let dx = value.location.x - globalCenter.x
-                                    let dy = value.location.y - globalCenter.y
                                     
-                                    // Angle math for handle placed at +Y (behind object)
-                                    var visualAngle = (atan2(dy, dx) * 180 / .pi) - 90
+                                    // Stretch: same feel at every zoom level
+                                    currentHandleDistance = max(defaultHandleDistance, fingerDistance - grabOffset)
+                                    
+                                    // Angle for front-positioned handle (-Y direction)
+                                    var visualAngle = (atan2(dy, dx) * 180 / .pi) + 90
                                     if visualAngle < 0 { visualAngle += 360 }
                                     
                                     let step = 3.0
-                                    let currentStep = Int(visualAngle / step)
-                                    let lastStep = Int(lastHapticAngle / step)
-                                    
-                                    if currentStep != lastStep {
+                                    if Int(visualAngle / step) != Int(lastHapticAngle / step) {
                                         feedbackGenerator?.selectionChanged()
                                         feedbackGenerator?.prepare()
                                         lastHapticAngle = visualAngle
@@ -101,33 +124,29 @@ struct NodeView: View {
                                     node.syncHorizontalAimFromRotation()
                                 }
                                 .onEnded { _ in
-                                    if isRotating {
-                                        isRotating = false
-                                        onGestureEnd()
-                                        feedbackGenerator = nil
+                                    guard isRotating else { return }
+                                    isRotating = false
+                                    grabOffset = 0
+                                    onGestureEnd()
+                                    feedbackGenerator = nil
+                                    
+                                    // Snap back only after the handle is released
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                        currentHandleDistance = defaultHandleDistance
                                     }
                                 }
                         )
                 }
             }
             .rotationEffect(.degrees(node.rotationAngle))
-            
-            // Rotation Angle Tooltip
-//            if isRotating {
-//                let displayAngle = (360 - Int(node.rotationAngle)) % 360
-//                
-//                Text("\(displayAngle)°")
-//                    .font(.caption)
-//                    .fontWeight(.bold)
-//                    .foregroundColor(.white)
-//                    .fixedSize()
-//                    .padding(.horizontal, 10)
-//                    .padding(.vertical, 6)
-//                    .background(Capsule().fill(DesignTokens.toastBackground))
-//                    .offset(x: 60, y: -15)
-//            }
         }
         .frame(width: 44, height: 44)
+        .onChange(of: isSelected) { _, selected in
+            if !selected {
+                isRotating = false
+                currentHandleDistance = defaultHandleDistance
+            }
+        }
         .background {
             if node.category == .light {
                 Circle()
@@ -261,7 +280,9 @@ struct DashedLine: Shape {
         path.addLine(to: CGPoint(x: rect.midX, y: rect.minY))
         return path
     }
-}// MARK: - 1. Custom Shapes for Top-View Rendering
+}
+
+// MARK: - 1. Custom Shapes for Top-View Rendering
 
 struct Trapezoid: Shape {
     func path(in rect: CGRect) -> Path {

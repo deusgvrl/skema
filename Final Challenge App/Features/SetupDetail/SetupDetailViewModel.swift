@@ -187,4 +187,19 @@ final class SetupDetailViewModel {
             storageController.deleteReferenceImage(refImageToDelete)
         }
     }
+    
+    func setAsCoverImage(at index: Int) {
+        guard sortedReferenceImages.indices.contains(index) else { return }
+        let selectedRefImage = sortedReferenceImages[index]
+        
+        if let earliestDate = sortedReferenceImages.map(\.createdAt).min() {
+            selectedRefImage.createdAt = earliestDate.addingTimeInterval(-1)
+        }
+        
+        let currentRefs = setup.referenceImages
+        setup.referenceImages = currentRefs
+        
+        storageController.save()
+        loadReferenceImages()
+    }
 }
