@@ -5,7 +5,7 @@
 
 import Foundation
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @MainActor
 @Suite("Setup detail view model: subtitle")

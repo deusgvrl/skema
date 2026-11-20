@@ -8,7 +8,7 @@
 
 import Testing
 import UIKit
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @MainActor
 @Suite("Reference viewer: photo stays clear of the bars and thumbnails")

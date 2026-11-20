@@ -8,7 +8,7 @@
 import Foundation
 import MeasureKit
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Scan guidance: tips when the scan goes badly")
 struct ScanGuidanceTests {

@@ -7,7 +7,7 @@
 
 import Testing
 import Foundation
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Project setup")
 struct ProjectSetupTests {

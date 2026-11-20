@@ -7,7 +7,7 @@
 
 import Testing
 import SwiftData
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 import Foundation
 
 @Suite("Storage Controller Tests")

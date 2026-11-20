@@ -1,7 +1,7 @@
 import Testing
 import SwiftData
 import Foundation
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Recently Deleted (A10-95)")
 @MainActor

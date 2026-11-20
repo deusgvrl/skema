@@ -8,7 +8,7 @@
 import CoreVideo
 import MeasureKit
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Depth copier")
 struct DepthCopierTests {
