@@ -12,7 +12,7 @@ import Foundation
 import MeasureKit
 import simd
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 private let screen = CGSize(width: 1440, height: 1920)
 private let middle = CGPoint(x: 720, y: 960)
