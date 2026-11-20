@@ -5,6 +5,8 @@ import QuickLook
 struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var viewModel: SetupDetailViewModel
     
     private static let diagramImageScale: CGFloat = 3
@@ -91,6 +93,11 @@ struct SetupDetailView: View {
                     activeSheetContent = nil
                     selectedDetent = .height(76)
                 }
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                viewModel.reviewViewModel.discardEdits(undoManager: undoManager)
             }
         }
         .toolbar {

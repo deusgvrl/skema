@@ -10,6 +10,7 @@ struct ReviewView: View {
 
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
@@ -87,7 +88,11 @@ struct ReviewView: View {
                 viewModel.beginEditing(undoManager: undoManager)
             }
         }
-        // Automatically deselect undone nodes when Undo/Redo mutates the nodes array
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                viewModel.discardSetup()
+            }
+        }
         .onChange(of: viewModel.nodes) { _, newNodes in
             if let selectedId = selectedNodeId, !newNodes.contains(where: { $0.id == selectedId }) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
