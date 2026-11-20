@@ -22,8 +22,7 @@ struct SetupsSearchTests {
         watch.firstSavedDate = saved
         storage.addSetup(skincare)
         storage.addSetup(watch)
-        return SetupsViewModel(scanGuide: ScanGuideSettings(defaults: UserDefaults(suiteName: UUID().uuidString)!),
-                               storageController: storage)
+        return SetupsViewModel(storageController: storage)
     }
 
     @Test("Matches name, client, project and equipment, ignoring case and outer spaces", arguments: [

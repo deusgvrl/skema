@@ -8,7 +8,6 @@ import Observation
 final class SetupsViewModel {
     
     var setups: [Setup] = []
-    var isShowingScanGuide = false
     var isShowingScan = false
     var showsEmptyState: Bool { setups.isEmpty }
     /// The setup waiting for the user to confirm the delete alert.
@@ -40,46 +39,21 @@ final class SetupsViewModel {
         }
     }
 
-    @ObservationIgnored private let scanGuide: ScanGuideSettings
     @ObservationIgnored private let storageController: StorageController
-    @ObservationIgnored private var scanRequested = false
     @ObservationIgnored private let now: () -> Date
 
-    init(scanGuide: ScanGuideSettings? = nil,
-         storageController: StorageController? = nil,
+    init(storageController: StorageController? = nil,
          now: @escaping () -> Date = { Date() }) {
         self.now = now
-        self.scanGuide = scanGuide ?? ScanGuideSettings()
         self.storageController = storageController ?? StorageController.shared
         self.fetchSetups()
     }
     
+    /// + opens the scan straight away; the tutorial runs inside it (Sketch UT Review T01).
     func newSetupTapped() {
-        guard !isShowingScanGuide, !isShowingScan else { return }
-
-        if scanGuide.isHidden {
-            isShowingScan = true
-        } else {
-            isShowingScanGuide = true
-        }
-    }
-
-    func startScanningTapped() {
-        scanRequested = true
-        isShowingScanGuide = false
-    }
-
-    func dontShowAgainTapped() {
-        scanGuide.isHidden = true
-        startScanningTapped()
-    }
-
-    func scanGuideDismissed() {
-        guard scanRequested else { return }
-        scanRequested = false
         isShowingScan = true
     }
-    
+
     func fetchSetups() {
         self.setups = storageController.fetchAllSetups()
         self.hasRecentlyDeleted = !storageController.fetchRecentlyDeleted().isEmpty

@@ -93,6 +93,12 @@ struct ContrastRatioTests {
         #expect(contrastRatio(DesignTokens.accentText, DesignTokens.formRowBackground, style: style) >= 4.5)
     }
 
+    @Test("Scan tags: black text on the Sketch green clears 4.5:1 (white on it would not)")
+    func scanTagContrast() {
+        #expect(contrastRatio(ScanPalette.onGreen, ScanPalette.green, style: .dark) >= 4.5)
+        #expect(contrastRatio(.white, ScanPalette.green, style: .dark) < 4.5)
+    }
+
     @Test("Detected green (tutorial ticks, captured items) clears 3:1 on the sheet and the canvas",
           arguments: [UIUserInterfaceStyle.light, .dark])
     func detectedGreenContrast(style: UIUserInterfaceStyle) {

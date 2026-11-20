@@ -165,10 +165,7 @@ struct SetupSectionsTests {
     @Test("Case 10: no setups gives no sections, and the empty state")
     func noSetups() {
         // Arrange
-        let settings = ScanGuideSettings(
-            defaults: UserDefaults(suiteName: "SetupSectionsTests.\(UUID().uuidString)")!
-        )
-        let viewModel = SetupsViewModel(scanGuide: settings, storageController: StorageController(inMemory: true))
+        let viewModel = SetupsViewModel(storageController: StorageController(inMemory: true))
 
         // Act
         let recent = SetupSections.recent(from: [], calendar: calendar)

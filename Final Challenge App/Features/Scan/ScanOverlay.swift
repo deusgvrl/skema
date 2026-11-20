@@ -1,4 +1,5 @@
 import CoreGraphics
+import simd
 import MeasureKit
 
 /// Where things go on the scan screen: a 3D spot's tag on the screen, a tap's point in the camera picture, and the
@@ -17,15 +18,43 @@ nonisolated enum ScanOverlay {
     /// The sideways picture (width W, height H) is turned upright: pixel (u, v) becomes (H - v, u).
     /// The upright picture fills the screen from the centre, so its sides may be cut off.
     static func screenPoint(of spot: SIMD3<Float>, camera: CameraModel, screenSize: CGSize) -> CGPoint? {
-        guard let pixel = DepthSampler.project(spot, camera: camera) else { return nil }
+        guard let point = unclippedScreenPoint(of: spot, camera: camera, screenSize: screenSize),
+              point.x >= 0, point.x < screenSize.width, point.y >= 0, point.y < screenSize.height else { return nil }
+        return point
+    }
+
+    /// The outline around a tapped item (Sketch UT Review T04): the screen box holding `points`, cut to the screen.
+    /// Points behind the camera are left out; nil when fewer than two are in front or the box is off the screen.
+    static func screenBox(of points: [SIMD3<Float>], camera: CameraModel, screenSize: CGSize) -> CGRect? {
+        let projected = points.compactMap { unclippedScreenPoint(of: $0, camera: camera, screenSize: screenSize) }
+        guard projected.count >= 2,
+              let minX = projected.map(\.x).min(), let maxX = projected.map(\.x).max(),
+              let minY = projected.map(\.y).min(), let maxY = projected.map(\.y).max() else { return nil }
+        let box = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+            .intersection(CGRect(origin: .zero, size: screenSize))
+        return box.isNull || box.isEmpty ? nil : box
+    }
+
+    /// `screenPoint` without the on-screen check; nil only when the spot is behind the camera.
+    private static func unclippedScreenPoint(of spot: SIMD3<Float>, camera: CameraModel,
+                                             screenSize: CGSize) -> CGPoint? {
+        guard let pixel = unclippedPixel(of: spot, camera: camera) else { return nil }
         let pictureHeight = CGFloat(camera.imageResolution.y)
         let upright = CGPoint(x: pictureHeight - CGFloat(pixel.y), y: CGFloat(pixel.x))
         let uprightSize = CGSize(width: pictureHeight, height: CGFloat(camera.imageResolution.x))
         let scale = max(screenSize.width / uprightSize.width, screenSize.height / uprightSize.height)
-        let point = CGPoint(x: upright.x * scale + (screenSize.width - uprightSize.width * scale) / 2,
-                            y: upright.y * scale + (screenSize.height - uprightSize.height * scale) / 2)
-        guard point.x >= 0, point.x < screenSize.width, point.y >= 0, point.y < screenSize.height else { return nil }
-        return point
+        return CGPoint(x: upright.x * scale + (screenSize.width - uprightSize.width * scale) / 2,
+                       y: upright.y * scale + (screenSize.height - uprightSize.height * scale) / 2)
+    }
+
+    /// `DepthSampler.project` without its picture-bounds check, so a box can reach past the screen's edge.
+    private static func unclippedPixel(of spot: SIMD3<Float>, camera: CameraModel) -> SIMD2<Float>? {
+        let local = camera.cameraToWorld.inverse * SIMD4<Float>(spot, 1)
+        let depth = -local.z
+        guard depth >= DepthSampler.minProjectDepth else { return nil }
+        let intrinsics = camera.intrinsics
+        return SIMD2(intrinsics[0][0] * local.x / depth + intrinsics[2][0],
+                     intrinsics[1][1] * -local.y / depth + intrinsics[2][1])
     }
 
     /// A tap on the screen → the point it touches in the camera picture, as fractions of the picture (0...1, top-left).

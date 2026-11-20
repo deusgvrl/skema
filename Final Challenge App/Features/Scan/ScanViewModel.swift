@@ -5,6 +5,7 @@ import Observation
 
 /// What a tap on the camera view sets.
 enum ScanTapKind: Equatable {
+    case floor
     case subject
     case light
     case camera
@@ -23,14 +24,16 @@ struct ScanItem: Identifiable {
 }
 
 /// The scan (LiDAR only, no object detection: the team chose taps after usability testing, 19 Nov 2026).
-/// The photographer taps the subject and each light or camera. A tap picks a LiDAR point; its vertical column
+/// A guided sequence (Sketch UT Review T01–T10): the photographer taps the floor, the subject, the camera and each light,
+/// and each tap sets the next thing still missing (`ScanStep`); a coaching panel explains each step on the first scan. A tap picks a LiDAR point; its vertical column
 /// (10 cm radius, from 3 cm above the floor to 3 m) is collected on every frame (the A10-41 painted items), and Finish
 /// writes distance, height and plan position onto the draft equipment, ready to edit in the lighting plan. While
 /// scanning, tips say when tracking, light or distance goes badly (A10-69).
 @Observable
 final class ScanViewModel {
     private(set) var screen = ScanScreen.starting
-    var kind = ScanTapKind.subject
+    /// What the next tap sets. It follows `currentStep` after every tap; tests may set it directly.
+    var kind = ScanTapKind.floor
     var draftSetup = Setup(setupName: "")
     private(set) var items: [ScanItem] = []
     /// The subject's anchor, nil until it is tapped.
@@ -42,6 +45,18 @@ final class ScanViewModel {
     private(set) var camera: CameraModel?
     /// The tip shown while scanning ("Move slower", "More light"…), nil when the scan goes well (A10-69).
     private(set) var guidance: ScanGuidance?
+    /// The tapped floor point, nil until the floor is tapped (step 1).
+    private(set) var floorAnchor: SIMD3<Float>?
+    /// The floor's height from the floor tap (`ScanFloor.height`), for the floor grid. Nil until tapped.
+    private(set) var floorHeight: Float?
+    /// The coaching panel (first scan, or after ?); a hint pill shows instead when it is hidden.
+    private(set) var isTutorialVisible: Bool
+    /// The step whose tap just landed, for the panel's short "done" state. The view clears it.
+    private(set) var completedStep: ScanStep?
+    /// Each item's collected points, as a world box, for its green outline.
+    private(set) var itemBounds: [UUID: WorldBox] = [:]
+    /// The subject's collected points, as a world box.
+    private(set) var subjectBounds: WorldBox?
 
     @ObservationIgnored private let makeScan: () -> ScanSession
     @ObservationIgnored private let cameraPermission: any CameraPermission
@@ -54,7 +69,9 @@ final class ScanViewModel {
     @ObservationIgnored private let subjectID = UUID()
     @ObservationIgnored private var kindCounts: [ScanTapKind: Int] = [:]
     @ObservationIgnored private var latestFrame: ScanFrame?
-    @ObservationIgnored private var floorY: Float?
+    /// The floor ARKit found, used until the floor is tapped.
+    @ObservationIgnored private var planeFloorY: Float?
+    @ObservationIgnored private let tutorial: ScanGuideSettings?
     @ObservationIgnored private var lastCollect: Double?
     @ObservationIgnored private var guidanceHold = GuidanceHold()
 
@@ -69,11 +86,49 @@ final class ScanViewModel {
     init(
         makeScan: @escaping () -> ScanSession = { ScanSession() },
         camera: any CameraPermission = SystemCameraPermission(),
-        storageController: StorageController? = nil
+        storageController: StorageController? = nil,
+        tutorial: ScanGuideSettings? = nil
     ) {
         self.makeScan = makeScan
         self.cameraPermission = camera
         self.storageController = storageController ?? StorageController.shared
+        self.tutorial = tutorial
+        self.isTutorialVisible = !(tutorial?.isTutorialDone ?? false)
+    }
+
+    /// The tapped floor, or ARKit's floor until then.
+    private var floorY: Float? { floorHeight ?? planeFloorY }
+
+    var hasFloor: Bool { floorAnchor != nil }
+
+    /// The first thing still missing: floor, subject, camera, light, then Finish.
+    var currentStep: ScanStep {
+        ScanStep.current(hasFloor: hasFloor, hasSubject: subject != nil,
+                         cameras: items.filter { $0.kind == .camera }.count,
+                         lights: items.filter { $0.kind == .light }.count)
+    }
+
+    // MARK: Tutorial
+
+    /// Skip: hides the panel for this and every later scan.
+    func skipTutorial() {
+        isTutorialVisible = false
+        tutorial?.isTutorialDone = true
+    }
+
+    /// ?: shows the panel again, at the current step.
+    func replayTutorial() {
+        isTutorialVisible = true
+    }
+
+    func clearCompletedStep() {
+        completedStep = nil
+    }
+
+    /// After a tap: the next tap sets what is still missing, and reaching Finish counts as doing the tutorial.
+    private func advance() {
+        kind = currentStep.tapKind
+        if currentStep == .finish { tutorial?.isTutorialDone = true }
     }
 
     var arSession: ARSession? { scan?.session as? ARSession }
@@ -100,15 +155,16 @@ final class ScanViewModel {
     func tap(atScreen point: CGPoint, screenSize: CGSize, in frame: ScanFrame) {
         message = nil
         camera = frame.camera
-        floorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? floorY
+        planeFloorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? planeFloorY
         guard let picture = ScanOverlay.picturePoint(fromScreen: point, camera: frame.camera, screenSize: screenSize)
         else { return }
         // A tap on an item's tag spot (in a light or camera mode) removes it.
-        if kind != .subject, let hit = item(atScreen: point, screenSize: screenSize) {
+        if kind == .light || kind == .camera, let hit = item(atScreen: point, screenSize: screenSize) {
             remove(hit)
+            advance()
             return
         }
-        guard floorY != nil else {
+        guard kind == .floor || floorY != nil else {
             message = "Point the phone at the floor first"
             return
         }
@@ -118,12 +174,19 @@ final class ScanViewModel {
             message = "No LiDAR depth there"
             return
         }
-        if kind == .subject {
+        switch kind {
+        case .floor:
+            floorAnchor = anchor
+            floorHeight = ScanFloor.height(tappedY: anchor.y, planes: frame.planes.map(\.horizontalPlane))
+        case .subject:
             measurements.remove(subjectID)
+            subjectBounds = nil
             subject = anchor
-        } else {
+        case .light, .camera:
             addItem(kind, anchor: anchor)
         }
+        completedStep = ScanStep(completing: kind)
+        advance()
         collect(from: frame)
     }
 
@@ -142,6 +205,7 @@ final class ScanViewModel {
         items.removeAll { $0.id == id }
         draftSetup.nodes.removeAll { $0.id == id }
         measurements.remove(id)
+        itemBounds[id] = nil
     }
 
     /// How close (in points) a tap must be to an item's tag spot to count as a tap on it.
@@ -161,7 +225,7 @@ final class ScanViewModel {
     /// Internal so tests can call it.
     func collect(from frame: ScanFrame) {
         camera = frame.camera
-        floorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? floorY
+        planeFloorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? planeFloorY
         guard let depth = frame.depth, let floorY else { return }
         let heights = (floorY + Self.columnFloorGap)...(floorY + Self.columnHeight)
         func paint(around anchor: SIMD3<Float>, for id: UUID) {
@@ -171,9 +235,11 @@ final class ScanViewModel {
         }
         if let subject {
             paint(around: subject, for: subjectID)
+            subjectBounds = measurements.bounds(for: subjectID).map { WorldBox(min: $0.min, max: $0.max) }
         }
         for item in items {
             paint(around: item.anchor, for: item.id)
+            itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
         }
         refreshResults()
     }
@@ -192,6 +258,30 @@ final class ScanViewModel {
     /// Where a tag for `spot` goes on a screen of `size`; nil when the spot is not on the screen.
     func tagPosition(of spot: SIMD3<Float>, in size: CGSize) -> CGPoint? {
         camera.flatMap { ScanOverlay.screenPoint(of: spot, camera: $0, screenSize: size) }
+    }
+
+    /// The green outline around an item on a screen of `size`: its world box's corners, projected. Nil before it has
+    /// points or when it is off the screen.
+    func box(for item: ScanItem, in size: CGSize) -> CGRect? {
+        box(of: itemBounds[item.id], in: size)
+    }
+
+    /// The green outline around the subject.
+    func subjectBox(in size: CGSize) -> CGRect? {
+        box(of: subjectBounds, in: size)
+    }
+
+    private func box(of bounds: WorldBox?, in size: CGSize) -> CGRect? {
+        guard let camera, let bounds else { return nil }
+        return ScanOverlay.screenBox(of: bounds.corners, camera: camera, screenSize: size)
+    }
+
+    /// The tag's title (Sketch T09): "Camera", "Light", numbered only when there is more than one of the kind.
+    func shortTitle(for item: ScanItem) -> String {
+        let base = item.kind == .camera ? "Camera" : "Light"
+        let sameKind = items.filter { $0.kind == item.kind }
+        guard sameKind.count > 1, let index = sameKind.firstIndex(where: { $0.id == item.id }) else { return base }
+        return "\(base) \(index + 1)"
     }
 
     /// "Studio Lighting 1 · 1.52 m · 1.20 m" once measured; just the name before that.
@@ -392,6 +482,19 @@ extension ScanViewModel {
         case .sessionFailed(let description): description
         case .alreadyStarted: "The scan was already started."
         case .cameraDenied, .lidarUnsupported: ""
+        }
+    }
+}
+
+/// An axis-aligned box in world space (metres).
+struct WorldBox: Equatable {
+    let min: SIMD3<Float>
+    let max: SIMD3<Float>
+
+    /// Its eight corners.
+    var corners: [SIMD3<Float>] {
+        (0..<8).map { index in
+            SIMD3(index & 1 == 0 ? min.x : max.x, index & 2 == 0 ? min.y : max.y, index & 4 == 0 ? min.z : max.z)
         }
     }
 }

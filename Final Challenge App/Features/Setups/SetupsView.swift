@@ -56,15 +56,6 @@ struct SetupsView: View {
             }
         }
         .environment(\.setupSavedAction) { viewModel.setupSaved() }
-        .sheet(isPresented: $viewModel.isShowingScanGuide) {
-            viewModel.scanGuideDismissed()
-        } content: {
-            ScanGuideSheet(
-                onStartScanning: { viewModel.startScanningTapped() },
-                onDontShowAgain: { viewModel.dontShowAgainTapped() }
-            )
-            .presentationDetents([.large])
-        }
     }
 
     // MARK: - Background
