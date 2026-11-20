@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4F016F58309CCA040065B9E6 /* MeasureKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4F016F57309CCA040065B9E6 /* MeasureKit */; };
+		4F0F9C8C30B01E2A008B1AE9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4F0F9C8B30B01E2A008B1AE9 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,6 +24,7 @@
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Final Challenge App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Final Challenge App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F016EDA309C7EF70065B9E6 /* Skema Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Skema Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F0F9C8B30B01E2A008B1AE9 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -56,6 +58,7 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				4F0F9C8B30B01E2A008B1AE9 /* AppIcon.icon */,
 				000000000000000000000010 /* Final Challenge App */,
 				4F016EDB309C7EF80065B9E6 /* Skema Tests */,
 				000000000000000000000020 /* Products */,
@@ -162,6 +165,7 @@
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				4F0F9C8C30B01E2A008B1AE9 /* AppIcon.icon in Resources */,
 			);
 		};
 		4F016ED8309C7EF70065B9E6 /* Resources */ = {
