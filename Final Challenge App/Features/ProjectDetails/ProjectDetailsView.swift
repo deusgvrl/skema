@@ -3,16 +3,27 @@ import SwiftUI
 /// Setup name, client, project and notes (Sketch R07, R07e, R07f · A10-11, A10-13, A10-93, A10-97).
 /// Pushed from Review after a scan (back chevron), or presented from a saved setup to edit (Cancel).
 struct ProjectDetailsView: View {
-    @Bindable var setup: Setup
+    var setup: Setup
     var isPresentedModally: Bool = false
     var onDismissToSetups: (() -> Void)?
     @State private var viewModel: ProjectDetailsViewModel
+    
+    // Draft state variables to prevent mutating SwiftData model until user taps Save
+    @State private var draftSetupName: String = ""
+    @State private var draftClient: String = ""
+    @State private var draftProject: String = ""
+    @State private var draftNotes: String = ""
+
     /// Last Save result; changing it plays the haptic.
     @State private var lastOutcome: ProjectDetailsViewModel.SaveOutcome?
     @State private var saveCount = 0
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.setupSavedAction) private var setupSavedAction
+
+    private var isFormValid: Bool {
+        !draftSetupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     init(setup: Setup,
          isPresentedModally: Bool = false,
@@ -32,7 +43,7 @@ struct ProjectDetailsView: View {
                 DetailsRow("Name") {
                     TextField(
                         "Name",
-                        text: $setup.setupName,
+                        text: $draftSetupName,
                         prompt: Text("Required")
                             .foregroundStyle(viewModel.showsNameRequired ? DesignTokens.accentText : DesignTokens.textSecondary)
                     )
@@ -41,7 +52,7 @@ struct ProjectDetailsView: View {
                 FormSectionHeader("Setup")
             } footer: {
                 // R07e
-                if viewModel.showsNameRequired {
+                if viewModel.showsNameRequired || (!isFormValid && draftSetupName.isEmpty) {
                     Text("Add a name to save this setup.")
                         .font(.footnote)
                         .foregroundStyle(DesignTokens.accentText)
@@ -51,16 +62,16 @@ struct ProjectDetailsView: View {
 
             Section(header: FormSectionHeader("Organization · Optional")) {
                 DetailsRow("Client") {
-                    TextField("Client", text: $setup.client, prompt: Text("None"))
+                    TextField("Client", text: $draftClient, prompt: Text("None"))
                 }
                 DetailsRow("Project") {
-                    TextField("Project", text: $setup.project, prompt: Text("None"))
+                    TextField("Project", text: $draftProject, prompt: Text("None"))
                 }
             }
             .listRowBackground(DesignTokens.formRowBackground)
 
             Section {
-                TextField("Notes", text: $setup.notes, prompt: Text("Add notes"), axis: .vertical)
+                TextField("Notes", text: $draftNotes, prompt: Text("Add notes"), axis: .vertical)
                     .lineLimit(4...10)
                     .foregroundStyle(DesignTokens.textPrimary)
             } header: {
@@ -95,9 +106,17 @@ struct ProjectDetailsView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
+                .disabled(!isFormValid)
             }
         }
-        .onChange(of: setup.setupName) { _, newName in
+        .onAppear {
+            // Populate draft state from setup model
+            draftSetupName = setup.setupName
+            draftClient = setup.client
+            draftProject = setup.project
+            draftNotes = setup.notes
+        }
+        .onChange(of: draftSetupName) { _, newName in
             viewModel.nameChanged(newName)
         }
         .sensoryFeedback(trigger: saveCount) { _, _ in
@@ -116,6 +135,14 @@ struct ProjectDetailsView: View {
     }
 
     private func save() {
+        guard isFormValid else { return }
+
+        // Commit draft changes to actual setup model only when Save is pressed
+        setup.setupName = draftSetupName
+        setup.client = draftClient
+        setup.project = draftProject
+        setup.notes = draftNotes
+
         let outcome = viewModel.saveTapped(for: setup)
         lastOutcome = outcome
         saveCount += 1
