@@ -287,14 +287,7 @@ struct FullScreenImageView: View {
     }
     
     private func setAsCoverImage() {
-        guard viewModel.sortedReferenceImages.indices.contains(selectedIndex) else { return }
-        let selectedRefImage = viewModel.sortedReferenceImages[selectedIndex]
-        
-        // Set createdAt to be earlier than the current earliest ReferenceImage
-        if let earliestDate = viewModel.sortedReferenceImages.map(\.createdAt).min() {
-            selectedRefImage.createdAt = earliestDate.addingTimeInterval(-1)
-        }
-        
+        viewModel.setAsCoverImage(at: selectedIndex)
         feedbackGenerator.selectionChanged()
     }
 }
