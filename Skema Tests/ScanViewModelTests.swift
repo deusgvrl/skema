@@ -9,7 +9,7 @@
 import ARKit
 import Foundation
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 /// Camera permission that tests set up, and that counts how often the system prompt would show.
 final class FakeCameraPermission: CameraPermission {

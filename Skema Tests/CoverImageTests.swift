@@ -6,7 +6,7 @@
 import Foundation
 import Testing
 import UIKit
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @MainActor
 @Suite("Setup cover image")

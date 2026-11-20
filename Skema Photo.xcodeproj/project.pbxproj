@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4F016F58309CCA040065B9E6 /* MeasureKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4F016F57309CCA040065B9E6 /* MeasureKit */; };
+		4F0F9C8C30B01E2A008B1AE9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4F0F9C8B30B01E2A008B1AE9 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,8 +22,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		000000000000000000000120 /* Final Challenge App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Final Challenge App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000120 /* Skema Photo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Skema Photo.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F016EDA309C7EF70065B9E6 /* Skema Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Skema Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F0F9C8B30B01E2A008B1AE9 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -56,6 +58,7 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				4F0F9C8B30B01E2A008B1AE9 /* AppIcon.icon */,
 				000000000000000000000010 /* Final Challenge App */,
 				4F016EDB309C7EF80065B9E6 /* Skema Tests */,
 				000000000000000000000020 /* Products */,
@@ -65,7 +68,7 @@
 		000000000000000000000020 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000120 /* Final Challenge App.app */,
+				000000000000000000000120 /* Skema Photo.app */,
 				4F016EDA309C7EF70065B9E6 /* Skema Tests.xctest */,
 			);
 			name = Products;
@@ -74,9 +77,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		000000000000000100000000 /* Final Challenge App */ = {
+		000000000000000100000000 /* Skema Photo */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "Final Challenge App" */;
+			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "Skema Photo" */;
 			buildPhases = (
 				000000000000000120000000 /* Sources */,
 				000000000000000130000000 /* Frameworks */,
@@ -87,12 +90,12 @@
 			fileSystemSynchronizedGroups = (
 				000000000000000000000010 /* Final Challenge App */,
 			);
-			name = "Final Challenge App";
+			name = "Skema Photo";
 			packageProductDependencies = (
 				4F016F57309CCA040065B9E6 /* MeasureKit */,
 			);
 			productName = MyApp;
-			productReference = 000000000000000000000120 /* Final Challenge App.app */;
+			productReference = 000000000000000000000120 /* Skema Photo.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4F016ED9309C7EF70065B9E6 /* Skema Tests */ = {
@@ -135,7 +138,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "Final Challenge App" */;
+			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "Skema Photo" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -152,7 +155,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				000000000000000100000000 /* Final Challenge App */,
+				000000000000000100000000 /* Skema Photo */,
 				4F016ED9309C7EF70065B9E6 /* Skema Tests */,
 			);
 		};
@@ -162,6 +165,7 @@
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				4F0F9C8C30B01E2A008B1AE9 /* AppIcon.icon in Resources */,
 			);
 		};
 		4F016ED8309C7EF70065B9E6 /* Resources */ = {
@@ -187,13 +191,13 @@
 /* Begin PBXTargetDependency section */
 		4F016EDF309C7EF80065B9E6 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000100000000 /* Final Challenge App */;
+			target = 000000000000000100000000 /* Skema Photo */;
 			targetProxy = 4F016EDE309C7EF80065B9E6 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		000000000000000011000000 /* Debug configuration for PBXProject "Final Challenge App" */ = {
+		000000000000000011000000 /* Debug configuration for PBXProject "Skema Photo" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -264,7 +268,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000012000000 /* Release configuration for PBXProject "Final Challenge App" */ = {
+		000000000000000012000000 /* Release configuration for PBXProject "Skema Photo" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -327,7 +331,7 @@
 			};
 			name = Release;
 		};
-		000000000000000111000000 /* Debug configuration for PBXNativeTarget "Final Challenge App" */ = {
+		000000000000000111000000 /* Debug configuration for PBXNativeTarget "Skema Photo" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -369,7 +373,7 @@
 			};
 			name = Debug;
 		};
-		000000000000000112000000 /* Release configuration for PBXNativeTarget "Final Challenge App" */ = {
+		000000000000000112000000 /* Release configuration for PBXNativeTarget "Skema Photo" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -434,7 +438,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Final Challenge App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Final Challenge App";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Skema Photo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Skema Photo";
 			};
 			name = Debug;
 		};
@@ -461,7 +465,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Final Challenge App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Final Challenge App";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Skema Photo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Skema Photo";
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -469,19 +473,19 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		000000000000000010000000 /* Build configuration list for PBXProject "Final Challenge App" */ = {
+		000000000000000010000000 /* Build configuration list for PBXProject "Skema Photo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000011000000 /* Debug configuration for PBXProject "Final Challenge App" */,
-				000000000000000012000000 /* Release configuration for PBXProject "Final Challenge App" */,
+				000000000000000011000000 /* Debug configuration for PBXProject "Skema Photo" */,
+				000000000000000012000000 /* Release configuration for PBXProject "Skema Photo" */,
 			);
 			defaultConfigurationName = Release;
 		};
-		000000000000000110000000 /* Build configuration list for PBXNativeTarget "Final Challenge App" */ = {
+		000000000000000110000000 /* Build configuration list for PBXNativeTarget "Skema Photo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				000000000000000111000000 /* Debug configuration for PBXNativeTarget "Final Challenge App" */,
-				000000000000000112000000 /* Release configuration for PBXNativeTarget "Final Challenge App" */,
+				000000000000000111000000 /* Debug configuration for PBXNativeTarget "Skema Photo" */,
+				000000000000000112000000 /* Release configuration for PBXNativeTarget "Skema Photo" */,
 			);
 			defaultConfigurationName = Release;
 		};

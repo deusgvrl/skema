@@ -10,7 +10,7 @@ import Testing
 import Foundation
 import ARKit
 import MeasureKit
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 func makePixelBuffer<Value>(width: Int, height: Int, format: OSType, values: [Value]) throws -> CVPixelBuffer {
     var buffer: CVPixelBuffer?

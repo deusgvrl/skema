@@ -9,7 +9,7 @@
 
 import Foundation
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @MainActor
 @Suite("Setups view model: scan entry")

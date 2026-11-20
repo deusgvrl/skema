@@ -7,7 +7,7 @@
 
 import ARKit
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @MainActor
 @Suite("Room scan view: the live camera")

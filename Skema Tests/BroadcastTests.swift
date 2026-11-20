@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Broadcast")
 struct BroadcastTests {

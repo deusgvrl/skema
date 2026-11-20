@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Setups list grouping (A10-94)")
 @MainActor

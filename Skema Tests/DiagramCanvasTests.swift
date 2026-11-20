@@ -1,6 +1,6 @@
 import Testing
 import CoreGraphics
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Diagram canvas fits every item (A10-98)")
 struct DiagramCanvasTests {

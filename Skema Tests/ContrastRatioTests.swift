@@ -5,7 +5,7 @@
 
 import Testing
 import SwiftUI
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 private func worstCaseCardBackdrop(style: UIUserInterfaceStyle) -> Color {
     let worstPhoto: Color = style == .dark ? .white : .black

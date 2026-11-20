@@ -8,7 +8,7 @@
 import Foundation
 import MeasureKit
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 /// Runs the real camera and LiDAR. Skipped in the Simulator and on iPhones without LiDAR.
 /// On the first run iOS asks for camera access: allow it, point the iPhone at the room, and run again.

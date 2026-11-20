@@ -7,7 +7,7 @@
 
 import Foundation
 import Testing
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 @Suite("Frame throttle")
 struct FrameThrottleTests {

@@ -1,7 +1,7 @@
 import Testing
 import PDFKit
 import UIKit
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 import Foundation
 
 @Suite("A4 PDF (A10-98)")

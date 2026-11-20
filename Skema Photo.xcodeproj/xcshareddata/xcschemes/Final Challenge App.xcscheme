@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000100000000"
-               BuildableName = "Final Challenge App.app"
+               BuildableName = "Skema Photo.app"
                BlueprintName = "Final Challenge App"
-               ReferencedContainer = "container:Final Challenge App.xcodeproj">
+               ReferencedContainer = "container:Skema Photo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -37,7 +37,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4F016ED9309C7EF70065B9E6"
                BuildableName = "Skema Tests.xctest"
-               ReferencedContainer = "container:Final Challenge App.xcodeproj">
+               ReferencedContainer = "container:Skema Photo.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -58,9 +58,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
-            BuildableName = "Final Challenge App.app"
+            BuildableName = "Skema Photo.app"
             BlueprintName = "Final Challenge App"
-            ReferencedContainer = "container:Final Challenge App.xcodeproj">
+            ReferencedContainer = "container:Skema Photo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -75,9 +75,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000000"
-            BuildableName = "Final Challenge App.app"
+            BuildableName = "Skema Photo.app"
             BlueprintName = "Final Challenge App"
-            ReferencedContainer = "container:Final Challenge App.xcodeproj">
+            ReferencedContainer = "container:Skema Photo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

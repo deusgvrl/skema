@@ -5,7 +5,7 @@
 
 import Testing
 import SwiftUI
-@testable import Final_Challenge_App
+@testable import Skema_Photo
 
 struct ResolvedRGBA {
     let red: Double
