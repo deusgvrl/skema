@@ -72,6 +72,8 @@ final class ScanViewModel {
     /// The floor ARKit found, used until the floor is tapped.
     @ObservationIgnored private var planeFloorY: Float?
     @ObservationIgnored private let tutorial: ScanGuideSettings?
+    /// Every tap that set something, newest last, for Undo.
+    private var history: [TapRecord] = []
     @ObservationIgnored private var lastCollect: Double?
     @ObservationIgnored private var guidanceHold = GuidanceHold()
 
@@ -100,6 +102,9 @@ final class ScanViewModel {
     private var floorY: Float? { floorHeight ?? planeFloorY }
 
     var hasFloor: Bool { floorAnchor != nil }
+
+    /// Undo is on once a tap set something.
+    var canUndo: Bool { !history.isEmpty }
 
     /// The first thing still missing: floor, subject, camera, light, then Finish.
     var currentStep: ScanStep {
@@ -176,9 +181,11 @@ final class ScanViewModel {
         }
         switch kind {
         case .floor:
+            history.append(.floor(previousAnchor: floorAnchor, previousHeight: floorHeight))
             floorAnchor = anchor
             floorHeight = ScanFloor.height(tappedY: anchor.y, planes: frame.planes.map(\.horizontalPlane))
         case .subject:
+            history.append(.subject(previous: subject))
             measurements.remove(subjectID)
             subjectBounds = nil
             subject = anchor
@@ -196,16 +203,44 @@ final class ScanViewModel {
         let name = (kind == .camera ? "Camera" : "Studio Lighting") + " \(number)"
         let equipment = Equipment(category: kind == .camera ? .camera : .light, name: name)
         items.append(ScanItem(id: equipment.id, kind: kind, name: name, anchor: anchor))
+        history.append(.item(equipment.id))
         draftSetup.nodes.append(equipment)
         // A light is measured at the middle of its head; a camera keeps the top-point rule for now.
         if kind == .light { measurements.setRule(.middle, for: equipment.id) }
     }
 
     private func remove(_ id: UUID) {
+        history.removeAll { $0 == .item(id) }
         items.removeAll { $0.id == id }
         draftSetup.nodes.removeAll { $0.id == id }
         measurements.remove(id)
         itemBounds[id] = nil
+    }
+
+    /// Undo: takes back the newest tap that set something (floor, subject, camera or light), and the next tap sets
+    /// what is missing again.
+    func undoTapped() {
+        guard let last = history.popLast() else { return }
+        message = nil
+        completedStep = nil
+        switch last {
+        case let .floor(previousAnchor, previousHeight):
+            floorAnchor = previousAnchor
+            floorHeight = previousHeight
+        case .subject(let previous):
+            measurements.remove(subjectID)
+            subjectBounds = nil
+            subject = previous
+        case .item(let id):
+            // The next item of the kind takes the undone one's number again.
+            if let item = items.first(where: { $0.id == id }), let number = item.name.split(separator: " ").last,
+               Int(number) == kindCounts[item.kind] {
+                kindCounts[item.kind] = (kindCounts[item.kind] ?? 1) - 1
+            }
+            remove(id)
+        }
+        refreshResults()
+        advance()
     }
 
     /// How close (in points) a tap must be to an item's tag spot to count as a tap on it.
@@ -497,4 +532,11 @@ struct WorldBox: Equatable {
             SIMD3(index & 1 == 0 ? min.x : max.x, index & 2 == 0 ? min.y : max.y, index & 4 == 0 ? min.z : max.z)
         }
     }
+}
+
+/// One tap that set something, with what it replaced, so Undo can put it back.
+private enum TapRecord: Equatable {
+    case floor(previousAnchor: SIMD3<Float>?, previousHeight: Float?)
+    case subject(previous: SIMD3<Float>?)
+    case item(UUID)
 }

@@ -176,6 +176,104 @@ struct ScanGuidedFlowTests {
         #expect(viewModel.subjectBox(in: screen) != nil)
     }
 
+    @Test("Nothing to undo before the first tap; undo then changes nothing")
+    func undoNothing() {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+
+        viewModel.undoTapped()
+
+        #expect(!viewModel.canUndo)
+        #expect(viewModel.currentStep == .floor)
+    }
+
+    @Test("Undo after the floor tap clears the floor and goes back to step 1")
+    func undoFloor() throws {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+        try tap(viewModel)
+
+        viewModel.undoTapped()
+
+        #expect(!viewModel.hasFloor && viewModel.floorHeight == nil)
+        #expect(viewModel.currentStep == .floor && viewModel.kind == .floor)
+        #expect(!viewModel.canUndo)
+    }
+
+    @Test("Undo after the subject tap clears the subject and asks for it again")
+    func undoSubject() throws {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+        try tap(viewModel, metres: 2)
+        try tap(viewModel, metres: 3)
+
+        viewModel.undoTapped()
+
+        #expect(viewModel.subject == nil && viewModel.subjectBox(in: screen) == nil)
+        #expect(viewModel.hasFloor)
+        #expect(viewModel.currentStep == .subject && viewModel.kind == .subject)
+    }
+
+    @Test("Undo removes the last light and its equipment; the next light takes its number again")
+    func undoLight() throws {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+        try tap(viewModel, metres: 2)
+        try tap(viewModel, metres: 3)
+        try tap(viewModel, at: leftOfMiddle)
+        try tap(viewModel, at: belowMiddle)
+        try tap(viewModel, at: CGPoint(x: 300, y: 1700))
+
+        viewModel.undoTapped()
+
+        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+
+        try tap(viewModel, at: CGPoint(x: 300, y: 1700))
+
+        #expect(viewModel.items.last?.name == "Studio Lighting 2")
+    }
+
+    @Test("Undo steps back one tap at a time, all the way to the floor")
+    func undoAll() throws {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+        try tap(viewModel, metres: 2)
+        try tap(viewModel, metres: 3)
+        try tap(viewModel, at: leftOfMiddle)
+        try tap(viewModel, at: belowMiddle)
+
+        viewModel.undoTapped()
+        #expect(viewModel.currentStep == .light)
+        viewModel.undoTapped()
+        #expect(viewModel.currentStep == .camera)
+        viewModel.undoTapped()
+        #expect(viewModel.currentStep == .subject)
+        viewModel.undoTapped()
+        #expect(viewModel.currentStep == .floor)
+        #expect(viewModel.items.isEmpty && viewModel.draftSetup.nodes.isEmpty && !viewModel.canUndo)
+    }
+
+    @Test("An item removed by tapping its tag is skipped by undo")
+    func undoSkipsRemovedItem() throws {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+        try tap(viewModel, metres: 2)
+        try tap(viewModel, metres: 3)
+        try tap(viewModel, at: leftOfMiddle)
+        let cameraTag = try #require(viewModel.tagPosition(of: viewModel.items[0].anchor, in: screen))
+        try tap(viewModel, at: cameraTag)
+        #expect(viewModel.items.isEmpty)
+
+        viewModel.undoTapped()
+
+        #expect(viewModel.subject == nil && viewModel.currentStep == .subject)
+    }
+
+    @Test("Undo clears the done flash and the last hint")
+    func undoClearsFlash() throws {
+        let viewModel = makeViewModel(tutorial: makeSettings())
+        try tap(viewModel)
+
+        viewModel.undoTapped()
+
+        #expect(viewModel.completedStep == nil && viewModel.message == nil)
+    }
+
     @Test("Skip hides the tutorial for good; ? replays it")
     func skipAndReplay() {
         let settings = makeSettings()

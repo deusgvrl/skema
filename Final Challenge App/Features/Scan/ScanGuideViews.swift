@@ -3,7 +3,7 @@
 //  Final Challenge App
 //
 //  The guided scan's controls over the camera (Sketch UT Review T01–T10): the coaching panel, the hint pill shown
-//  instead of it after the first scan, the Floor · Subject · Camera · Light chips, the tap ring and Finish Scan.
+//  instead of it after the first scan, the Floor · Subject · Camera · Light chips and Finish Scan.
 //  The camera screens are always dark, so these use fixed light-on-dark colours.
 //
 
@@ -157,39 +157,6 @@ struct ScanStatusChips: View {
     }
 }
 
-/// The ring that shows where to aim, with a "Tap" label during the tutorial (Sketch T01, T10). It does not catch
-/// taps: a tap on it reaches the camera view underneath.
-struct ScanTapRing: View {
-    let showsLabel: Bool
-
-    var body: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(.white.opacity(0.08))
-                    .strokeBorder(.white.opacity(0.35), lineWidth: 1)
-                    .frame(width: 72, height: 72)
-                Circle()
-                    .fill(.white.opacity(0.12))
-                    .strokeBorder(.white, lineWidth: 2.5)
-                    .frame(width: 48, height: 48)
-                Circle()
-                    .fill(.white)
-                    .frame(width: 10, height: 10)
-            }
-            if showsLabel {
-                Text("Tap")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 72, height: 28)
-                    .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
-            }
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
 /// Finish Scan: dim glass until it can finish, then white with a ring around it (Sketch T09).
 struct ScanFinishButton: View {
     let isEnabled: Bool
@@ -237,7 +204,6 @@ private struct TrailingIconLabelStyle: LabelStyle {
         ScanCoachingPanel(step: .floor, completed: nil, onSkip: {})
         ScanCoachingPanel(step: .camera, completed: .subject, onSkip: {})
         ScanHintPill(step: .floor, completed: nil)
-        ScanTapRing(showsLabel: true)
         ScanStatusChips(hasFloor: true, hasSubject: true, hasCamera: false, hasLight: false)
         ScanFinishButton(isEnabled: true) {}
         ScanFinishButton(isEnabled: false) {}

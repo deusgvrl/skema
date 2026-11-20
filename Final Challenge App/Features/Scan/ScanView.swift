@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The scan screen (LiDAR only, no object detection), guided step by step (Sketch UT Review T01–T10): tap the floor,
 /// the product, the camera and each light; each tap sets the next thing still missing. A coaching panel explains each
-/// step on the first scan (Skip hides it, ? brings it back); later scans show a short hint instead. The floor gets a
+/// step on the first scan (Skip hides it, ? brings it back); later scans show a short hint instead. Undo takes back
+/// the last tap. The floor gets a
 /// green grid and each tapped item a green box and tag. Tips show when the scan goes badly, ✕ asks before throwing the
 /// taps away, and Finish Scan opens the lighting diagram, where everything can still be edited. Without camera access
 /// or LiDAR it shows a message with "Add Equipment Manually" (Sketch R02–R04x).
@@ -76,10 +77,17 @@ struct ScanView: View {
                     }
                 }
             }
-            if viewModel.screen == .scanning, !viewModel.isTutorialVisible {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Show Tips", systemImage: "questionmark") {
-                        withAnimation { viewModel.replayTutorial() }
+            if viewModel.screen == .scanning {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("Undo", systemImage: "arrow.uturn.backward") {
+                        withAnimation { viewModel.undoTapped() }
+                    }
+                    .disabled(!viewModel.canUndo)
+                    .accessibilityHint("Takes back the last tap")
+                    if !viewModel.isTutorialVisible {
+                        Button("Show Tips", systemImage: "questionmark") {
+                            withAnimation { viewModel.replayTutorial() }
+                        }
                     }
                 }
             }
@@ -171,7 +179,6 @@ struct ScanView: View {
                     ScanGuidanceView(guidance: guidance)
                         .transition(.opacity)
                 }
-                ScanTapRing(showsLabel: viewModel.isTutorialVisible)
                 ScanStatusChips(
                     hasFloor: viewModel.hasFloor,
                     hasSubject: viewModel.subject != nil,
