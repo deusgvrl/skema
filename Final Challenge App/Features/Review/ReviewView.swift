@@ -88,14 +88,10 @@ struct ReviewView: View {
                 viewModel.beginEditing(undoManager: undoManager)
             }
         }
-        // Automatically deselect undone nodes when Undo/Redo mutates the nodes array
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
-                handleAppExit()
+                viewModel.discardSetup()
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
-            handleAppExit()
         }
         .onChange(of: viewModel.nodes) { _, newNodes in
             if let selectedId = selectedNodeId, !newNodes.contains(where: { $0.id == selectedId }) {
@@ -415,17 +411,6 @@ struct ReviewView: View {
             onDismissToSetups()
         } else {
             dismiss()
-        }
-    }
-    
-    private func handleAppExit() {
-        if viewModel.isEditingDiagram && viewModel.hasPendingEdits {
-            viewModel.discardEdits(undoManager: undoManager)
-        }
-        
-        // If coming from live camera scan and user hasn't explicitly saved:
-        if isFromLoadingScreen {
-            viewModel.discardSetup()
         }
     }
 }
