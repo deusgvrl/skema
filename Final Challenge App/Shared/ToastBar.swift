@@ -1,24 +1,33 @@
 import SwiftUI
 
-/// The bottom toast of the Setups list. SwiftUI has no built-in toast,
-/// so "Setup deleted" and "Setup saved" share this one.
+/// A white glass toast at the bottom of a screen (Sketch UT Review A-S08, A-S10, A-S11):
+/// an icon, a short message and, optionally, a red action after a divider ("Undo").
 struct ToastBar: View {
+    let systemImage: String
     let message: String
     var actionTitle: String?
     var action: (() -> Void)?
 
     var body: some View {
-        HStack {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .foregroundStyle(DesignTokens.textSecondary)
+                .accessibilityHidden(true)
             Text(message)
-            Spacer()
+                .foregroundStyle(DesignTokens.textPrimary)
             if let actionTitle, let action {
+                Divider()
+                    .frame(height: 20)
                 Button(actionTitle, action: action)
-                    .bold()
+                    .fontWeight(.semibold)
+                    .foregroundStyle(DesignTokens.accentText)
             }
         }
-        .padding()
-        .background(.regularMaterial, in: .capsule)
-        .padding(.horizontal)
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 18)
+        .frame(minHeight: 48)
+        .glassEffect(.regular, in: .capsule)
+        .accessibilityElement(children: .combine)
     }
 }
 

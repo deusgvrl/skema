@@ -22,10 +22,6 @@ struct RecentlyDeletedTests {
         return RecentlyDeletedTests.jakarta.date(from: parts)!
     }
 
-    private let settings = ScanGuideSettings(
-        defaults: UserDefaults(suiteName: "RecentlyDeletedTests.\(UUID().uuidString)")!
-    )
-
     /// Stores a setup. A nil `saved` date makes it a draft.
     private func store(_ name: String, saved: Date?, deleted: Date? = nil, in storage: StorageController) -> Setup {
         let setup = Setup(setupName: name)
@@ -36,7 +32,7 @@ struct RecentlyDeletedTests {
     }
 
     private func setupsViewModel(_ storage: StorageController, now: Date) -> SetupsViewModel {
-        SetupsViewModel(scanGuide: settings, storageController: storage, now: { now })
+        SetupsViewModel(storageController: storage, now: { now })
     }
 
     private func recentlyDeletedViewModel(_ storage: StorageController, now: Date) -> RecentlyDeletedViewModel {

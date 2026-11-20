@@ -69,6 +69,15 @@ public struct ScanMeasurements: Sendable {
         rules[id] = nil
     }
 
+    /// The smallest box (world, axis-aligned) holding every point kept for the equipment `id`; nil before any.
+    /// The scan screen draws its outline around the tapped item.
+    public func bounds(for id: UUID) -> (min: SIMD3<Float>, max: SIMD3<Float>)? {
+        guard let points = equipment[id]?.points, let first = points.first else { return nil }
+        return points.dropFirst().reduce((min: first, max: first)) { box, point in
+            (min: simd_min(box.min, point), max: simd_max(box.max, point))
+        }
+    }
+
     /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light uses `.middle`.
     public mutating func setRule(_ rule: CentreRule, for id: UUID) {
         rules[id] = rule
