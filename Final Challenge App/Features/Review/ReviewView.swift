@@ -10,6 +10,7 @@ struct ReviewView: View {
 
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
@@ -88,6 +89,14 @@ struct ReviewView: View {
             }
         }
         // Automatically deselect undone nodes when Undo/Redo mutates the nodes array
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                handleAppExit()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+            handleAppExit()
+        }
         .onChange(of: viewModel.nodes) { _, newNodes in
             if let selectedId = selectedNodeId, !newNodes.contains(where: { $0.id == selectedId }) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -406,6 +415,17 @@ struct ReviewView: View {
             onDismissToSetups()
         } else {
             dismiss()
+        }
+    }
+    
+    private func handleAppExit() {
+        if viewModel.isEditingDiagram && viewModel.hasPendingEdits {
+            viewModel.discardEdits(undoManager: undoManager)
+        }
+        
+        // If coming from live camera scan and user hasn't explicitly saved:
+        if isFromLoadingScreen {
+            viewModel.discardSetup()
         }
     }
 }
