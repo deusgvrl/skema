@@ -11,12 +11,10 @@ struct FullScreenImageView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var viewModel: SetupDetailViewModel
     @State var selectedIndex: Int
+    let namespace: Namespace.ID
 
     @State private var isDeleteAlert: Bool = false
     @State private var isControlsHidden: Bool = false
-    @State private var isZoomed: Bool = false
-    @State private var dragOffset: CGSize = .zero
-    @State private var isDraggingDown: Bool = false
     @State private var scrollPositionID: Int?
 
     /// Top bar height (status bar + navigation bar), kept at its largest so hiding the controls
@@ -40,19 +38,6 @@ struct FullScreenImageView: View {
         )
     }
 
-    // Dynamic background opacity during drag-to-dismiss
-    private var backgroundOpacity: Double {
-        if isControlsHidden { return 1.0 }
-        let progress = max(0, dragOffset.height) / 300.0
-        return max(0.0, 1.0 - progress)
-    }
-
-    // Scale reduction during drag-to-dismiss
-    private var dragScale: CGFloat {
-        let progress = max(0, dragOffset.height) / 1000.0
-        return max(0.85, 1.0 - progress)
-    }
-
     var body: some View {
         GeometryReader { geometry in
             content
@@ -65,34 +50,22 @@ struct FullScreenImageView: View {
 
     private var content: some View {
         ZStack {
-            // Layer 1: Background Layer
+            // Layer 1: Background
             (isControlsHidden ? Color.black : DesignTokens.pageBackground)
-                .opacity(backgroundOpacity)
                 .ignoresSafeArea()
 
-            // Layer 2: Main Full-Bleed Image Paging View
-            TabView(selection: $selectedIndex) {
-                ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
-                    if viewModel.referenceImages.indices.contains(index) {
-                        ZoomableImageView(
-                            image: viewModel.referenceImages[index],
-                            isSelected: index == selectedIndex,
-                            isZoomed: $isZoomed,
-                            isControlsHidden: $isControlsHidden,
-                            fitInsets: photoInsets
-                        )
-                        .ignoresSafeArea()
-                        .tag(index)
-                    }
-                }
+            // Layer 2: Pager (pinch zoom, double tap, swipe between photos)
+            PhotoPager(
+                images: viewModel.referenceImages,
+                selection: $selectedIndex,
+                fitInsets: photoInsets,
+                contentKey: viewModel.sortedReferenceImages.map(\.id)
+            ) {
+                withAnimation(.snappy) { isControlsHidden.toggle() }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea()
-            .offset(y: max(0, dragOffset.height))
-            .scaleEffect(dragScale)
-            .simultaneousGesture(isZoomed ? nil : dragToDismissGesture)
 
-            // Layer 3: Floating Overlay Controls (Thumbnail Strip)
+            // Layer 3: Thumbnail strip
             VStack {
                 Spacer()
 
@@ -161,13 +134,13 @@ struct FullScreenImageView: View {
                     .allowsHitTesting(!isControlsHidden)
                 }
             }
-            .offset(y: max(0, dragOffset.height))
-            .scaleEffect(dragScale)
         }
         .ignoresSafeArea()
         .statusBarHidden(isControlsHidden)
         .toolbar(isControlsHidden ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
+        // Native swipe-down dismiss + hero animation back to the tapped thumbnail
+        .navigationTransition(.zoom(sourceID: selectedIndex, in: namespace))
         .onAppear {
             scrollPositionID = selectedIndex
             feedbackGenerator.prepare()
@@ -212,7 +185,7 @@ struct FullScreenImageView: View {
                     }
                 }
             }
-            
+
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
@@ -236,37 +209,6 @@ struct FullScreenImageView: View {
         }
     }
 
-    // Directionally-locked drag-down gesture
-    private var dragToDismissGesture: some Gesture {
-        DragGesture(minimumDistance: 8, coordinateSpace: .local)
-            .onChanged { value in
-                let horizontal = abs(value.translation.width)
-                let vertical = value.translation.height
-
-                if !isDraggingDown {
-                    if vertical > 8 && vertical > horizontal * 1.2 {
-                        isDraggingDown = true
-                        dragOffset = value.translation
-                    }
-                } else {
-                    dragOffset = value.translation
-                }
-            }
-            .onEnded { value in
-                let vertical = value.translation.height
-                let predictedVelocity = value.predictedEndTranslation.height
-
-                if isDraggingDown && (vertical > 120 || predictedVelocity > 350) {
-                    dismiss()
-                } else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
-                        dragOffset = .zero
-                    }
-                }
-                isDraggingDown = false
-            }
-    }
-
     private func deleteCurrentImage() {
         guard !viewModel.referenceImages.isEmpty,
               viewModel.referenceImages.indices.contains(selectedIndex) else { return }
@@ -285,9 +227,11 @@ struct FullScreenImageView: View {
             scrollPositionID = selectedIndex
         }
     }
-    
+
     private func setAsCoverImage() {
         viewModel.setAsCoverImage(at: selectedIndex)
+        selectedIndex = 0
+        scrollPositionID = 0
         feedbackGenerator.selectionChanged()
     }
 }

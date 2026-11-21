@@ -31,6 +31,8 @@ struct SetupDetailView: View {
     
     @State private var currentSheetHeight: CGFloat = 76
     
+    @Namespace private var zoomNamespace
+    
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
     
     private var quickActionsOpacity: Double {
@@ -115,10 +117,20 @@ struct SetupDetailView: View {
             }
             .ignoresSafeArea()
         }
+//        .fullScreenCover(isPresented: $showReferenceDetail) {
+//            NavigationStack {
+//                FullScreenImageView(
+//                    viewModel: viewModel,
+//                    selectedIndex: selectedPreviewIndex,
+//                    namespace: zoomNamespace
+//                )
+//            }
+//        }
         .navigationDestination(isPresented: $showReferenceDetail) {
             FullScreenImageView(
                 viewModel: viewModel,
-                selectedIndex: selectedPreviewIndex
+                selectedIndex: selectedPreviewIndex,
+                namespace: zoomNamespace
             )
         }
         .sheet(isPresented: unifiedSheetBinding, onDismiss: {
@@ -329,6 +341,7 @@ struct SetupDetailView: View {
                 showReferenceDetail = true
             }
         }
+        .matchedTransitionSource(id: index, in: zoomNamespace)
     }
     
     // MARK: - Unified Sheet
