@@ -5,10 +5,12 @@
 //  Created by Muhammad Dzakki Abdullah on 11/11/26.
 //
 //  The camera, with a green grid lying on the floor once it is tapped (Sketch UT Review T02).
+//  A10-106: RealityKit's ARView (it was SceneKit's ARSCNView), so the 3D outline can hide behind real surfaces.
 //
 
 import Foundation
 import ARKit
+import RealityKit
 import SwiftUI
 
 struct RoomScanView: UIViewRepresentable {
@@ -18,47 +20,57 @@ struct RoomScanView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIView(context: Context) -> ARSCNView {
-        let view = ARSCNView(frame: .zero)
-        view.session = session
-        view.automaticallyUpdatesLighting = false
+    func makeUIView(context: Context) -> ARView {
+        let view = Self.makeCameraView(session: session)
+        let root = AnchorEntity(world: .zero)
+        view.scene.addAnchor(root)
+        context.coordinator.root = root
         return view
     }
 
-    func updateUIView(_ view: ARSCNView, context: Context) {
+    func updateUIView(_ view: ARView, context: Context) {
         guard let floor else {
-            context.coordinator.grid?.removeFromParentNode()
+            context.coordinator.grid?.removeFromParent()
             context.coordinator.grid = nil
             return
         }
-        let grid = context.coordinator.grid ?? FloorGrid.makeNode()
-        if grid.parent == nil { view.scene.rootNode.addChildNode(grid) }
+        let grid = context.coordinator.grid ?? FloorGrid.makeEntity()
+        if grid.parent == nil { context.coordinator.root?.addChild(grid) }
         context.coordinator.grid = grid
         // A few millimetres up, so the grid never sinks under the real floor.
-        grid.simdPosition = SIMD3(floor.x, floor.y + 0.005, floor.z)
+        grid.position = SIMD3(floor.x, floor.y + 0.005, floor.z)
+    }
+
+    /// The camera view on the scan's own session. ScanSession configures and runs it and stays its delegate, so the
+    /// view must not configure the session itself.
+    static func makeCameraView(session: ARSession) -> ARView {
+        let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
+        view.session = session
+        return view
     }
 
     final class Coordinator {
-        var grid: SCNNode?
+        var root: AnchorEntity?
+        var grid: ModelEntity?
     }
 }
 
 /// A 4 m green grid, 25 cm squares, fading out towards its edge.
 enum FloorGrid {
-    static let size: CGFloat = 4
+    static let size: Float = 4
     static let squares = 16
 
-    static func makeNode() -> SCNNode {
-        let plane = SCNPlane(width: size, height: size)
-        let material = SCNMaterial()
-        material.diffuse.contents = texture()
-        material.lightingModel = .constant
-        material.isDoubleSided = true
-        material.writesToDepthBuffer = false
-        plane.materials = [material]
-        let node = SCNNode(geometry: plane)
-        node.eulerAngles.x = -.pi / 2
-        return node
+    /// The same grid as the SceneKit version: flat on the floor, unlit, seen from both sides, writes no depth.
+    static func makeEntity() -> ModelEntity {
+        var material = UnlitMaterial()
+        if let image = texture().cgImage,
+           let texture = try? TextureResource(image: image, options: .init(semantic: .color)) {
+            material.color = .init(tint: .white, texture: .init(texture))
+        }
+        material.blending = .transparent(opacity: 1.0)
+        material.faceCulling = .none
+        material.writesDepth = false
+        return ModelEntity(mesh: .generatePlane(width: size, depth: size), materials: [material])
     }
 
     private static func texture() -> UIImage {
