@@ -54,6 +54,25 @@ public struct WorldBox: Equatable, Sendable {
         }
     }
 
+    /// A straight line in the world from `start` to `end`, in metres.
+    public struct Edge: Sendable {
+        public let start: SIMD3<Float>
+        public let end: SIMD3<Float>
+
+        public init(start: SIMD3<Float>, end: SIMD3<Float>) {
+            self.start = start
+            self.end = end
+        }
+    }
+
+    /// A10-106 case 17: the box's 12 edges, each between two corners that differ on one axis (`corners` bits).
+    public var edges: [Edge] {
+        let corners = self.corners
+        return corners.indices.flatMap { index in
+            [1, 2, 4].filter { index & $0 == 0 }.map { Edge(start: corners[index], end: corners[index | $0]) }
+        }
+    }
+
     /// Linear percentile of sorted values (the same maths as numpy's default), `percent` from 0 to 100.
     private static func percentile(of sorted: [Float], _ percent: Float) -> Float {
         let position = percent / 100 * Float(sorted.count - 1)

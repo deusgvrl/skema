@@ -325,6 +325,13 @@ final class ScanViewModel {
         box(of: itemBounds[item.id], in: size)
     }
 
+    /// A10-106: the world box of every tapped item and the subject, drawn as 3D outlines in the camera view.
+    var outlineBoxes: [UUID: WorldBox] {
+        var boxes = itemBounds
+        if let subjectBounds { boxes[subjectID] = subjectBounds }
+        return boxes
+    }
+
     /// The green outline around the subject.
     func subjectBox(in size: CGSize) -> CGRect? {
         box(of: subjectBounds, in: size)

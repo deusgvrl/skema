@@ -10,6 +10,8 @@
 
 import Foundation
 import ARKit
+import Combine
+import MeasureKit
 import RealityKit
 import SwiftUI
 
@@ -17,6 +19,8 @@ struct RoomScanView: UIViewRepresentable {
     let session: ARSession
     /// A world point on the floor (the floor tap at the floor's height); nil hides the grid.
     var floor: SIMD3<Float>?
+    /// A10-106: the world box of each tapped item, drawn as a 3D dashed box.
+    var outlines: [UUID: WorldBox] = [:]
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -25,10 +29,21 @@ struct RoomScanView: UIViewRepresentable {
         let root = AnchorEntity(world: .zero)
         view.scene.addAnchor(root)
         context.coordinator.root = root
+        let outlines = ScanOutlines(root: root)
+        context.coordinator.outlines = outlines
+        // Every frame, each dash is resized so it stays 4 pt thick on the screen.
+        context.coordinator.frameUpdates = view.scene.subscribe(to: SceneEvents.Update.self) { [weak view] _ in
+            MainActor.assumeIsolated {
+                guard let view else { return }
+                outlines.resize(cameraPosition: view.cameraTransform.translation,
+                                focalLength: Self.focalLength(of: view))
+            }
+        }
         return view
     }
 
     func updateUIView(_ view: ARView, context: Context) {
+        context.coordinator.outlines?.show(outlines)
         guard let floor else {
             context.coordinator.grid?.removeFromParent()
             context.coordinator.grid = nil
@@ -46,12 +61,25 @@ struct RoomScanView: UIViewRepresentable {
     static func makeCameraView(session: ARSession) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
         view.session = session
+        // A10-106: the room mesh hides the parts of the outline that are behind real surfaces.
+        view.environment.sceneUnderstanding.options.insert(.occlusion)
         return view
+    }
+
+    /// The camera's focal length in screen points: the picture's fx (pixels), scaled the way the upright picture fills
+    /// the view (as `ScanOverlay`). Zero before the first frame.
+    static func focalLength(of view: ARView) -> Float {
+        guard let camera = view.session.currentFrame?.camera, view.bounds.width > 0 else { return 0 }
+        let picture = camera.imageResolution
+        let scale = max(view.bounds.width / picture.height, view.bounds.height / picture.width)
+        return camera.intrinsics[0][0] * Float(scale)
     }
 
     final class Coordinator {
         var root: AnchorEntity?
         var grid: ModelEntity?
+        var outlines: ScanOutlines?
+        var frameUpdates: (any Cancellable)?
     }
 }
 
