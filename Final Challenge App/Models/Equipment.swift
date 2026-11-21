@@ -175,6 +175,25 @@ extension Equipment {
         self.accessories = snapshot.accessories
         self.notes = snapshot.notes
     }
+    
+    /// Rotate every node pointing to subject (0,0)
+    func pointToSubject() {
+            let dx = -positionX
+            let dy = -positionY
+            
+            // Guard against division by zero if node is right on the subject center
+            guard hypot(dx, dy) > 0.001 else { return }
+            
+            // In screen coordinates (+Y is down), adding 90° aligns front pointer with target vector
+            var targetAngle = (atan2(dy, dx) * 180.0 / .pi) + 90.0
+            
+            // Normalize angle to [0, 360) range
+            targetAngle = targetAngle.truncatingRemainder(dividingBy: 360.0)
+            if targetAngle < 0 { targetAngle += 360.0 }
+            
+            self.rotationAngle = targetAngle
+            self.syncHorizontalAimFromRotation()
+        }
 }
 
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
