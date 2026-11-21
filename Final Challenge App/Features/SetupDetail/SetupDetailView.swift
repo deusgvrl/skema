@@ -270,7 +270,6 @@ struct SetupDetailView: View {
             }
             .pickerStyle(.segmented)
             .controlSize(.large)
-            .glassEffect(.regular.interactive())
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
