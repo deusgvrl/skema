@@ -378,7 +378,7 @@ final class ScanViewModel {
         insertDraftSetup()
         stopListening()
         write(measurements.results(subject: subjectID, floorY: floorY ?? 0))
-        draftSetup.alignFirstCameraToSixOClock()
+        draftSetup.alignAndOrientDiagram()
         storageController.save()
         scan?.stop()
     }
