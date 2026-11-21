@@ -115,7 +115,7 @@ final class ZoomablePhotoVC: UIViewController, UIScrollViewDelegate {
     private let onSingleTap: () -> Void
     private let scrollView = UIScrollView()
     private let contentView = UIView()      // the view that gets zoomed
-    private let imageView = UIImageView()   // aspect-fit inside the inset area
+    let imageView = UIImageView()   // aspect-fit inside the inset area
 
     init(image: UIImage, index: Int, fitInsets: UIEdgeInsets, onSingleTap: @escaping () -> Void) {
         self.image = image
