@@ -23,6 +23,7 @@ final class SetupDetailViewModel {
     var selectedEquipment: Equipment? = nil
     var isDeleteAlertPresented: Bool = false
     var isShowSubjectSheet: Bool = false
+    var isDeleteImageAlertPresented: Bool = false
 
     // PDF Share State (A10-99)
     private(set) var isPreparingPDF = false
@@ -31,7 +32,6 @@ final class SetupDetailViewModel {
     var isPDFFailedAlertPresented = false
     
     // References Tab State
-    var isSelectionMode: Bool = false
     var referenceImages: [UIImage] = []
     
     /// Deterministically sorted SwiftData models by creation date
@@ -145,18 +145,6 @@ final class SetupDetailViewModel {
     }
     
     // MARK: - Delete Reference Image Operations
-    
-    /// Deletes a specific ReferenceImage model from SwiftData and local array
-    func deleteReferenceImage(_ image: ReferenceImage) {
-        let sorted = sortedReferenceImages
-        if let index = sorted.firstIndex(where: { $0.id == image.id }) {
-            if referenceImages.indices.contains(index) {
-                referenceImages.remove(at: index)
-            }
-        }
-        storageController.deleteReferenceImage(image)
-    }
-    
     /// Deletes a single reference image by matching index in sortedReferenceImages
     func deleteReferenceImage(at index: Int) {
         let sorted = sortedReferenceImages
@@ -169,23 +157,6 @@ final class SetupDetailViewModel {
         }
         
         storageController.deleteReferenceImage(refImageToDelete)
-    }
-    
-    /// Batch deletes reference images by a set of indices
-    func deleteReferenceImages(at indices: Set<Int>) {
-        let sorted = sortedReferenceImages
-        let sortedIndices = indices.sorted(by: >)
-        
-        for index in sortedIndices {
-            guard sorted.indices.contains(index) else { continue }
-            let refImageToDelete = sorted[index]
-            
-            if referenceImages.indices.contains(index) {
-                referenceImages.remove(at: index)
-            }
-            
-            storageController.deleteReferenceImage(refImageToDelete)
-        }
     }
     
     func setAsCoverImage(at index: Int) {

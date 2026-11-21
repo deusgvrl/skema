@@ -19,7 +19,7 @@ struct SetupDetailView: View {
     // Selection & Preview State
     @State private var selectedPreviewIndex: Int = 0
     @State private var showReferenceDetail: Bool = false
-    @State private var selectedImageIndices: Set<Int> = []
+    @State private var imageIndexToDelete: Int? = nil
     
     // Unified diagram sheet state
     @State private var activeSheetContent: DiagramSheetContent?
@@ -30,6 +30,8 @@ struct SetupDetailView: View {
     @State private var selectedDetent: PresentationDetent = .height(76)
     
     @State private var currentSheetHeight: CGFloat = 76
+    
+    @Namespace private var zoomNamespace
     
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
     
@@ -118,7 +120,8 @@ struct SetupDetailView: View {
         .navigationDestination(isPresented: $showReferenceDetail) {
             FullScreenImageView(
                 viewModel: viewModel,
-                selectedIndex: selectedPreviewIndex
+                selectedIndex: selectedPreviewIndex,
+                namespace: zoomNamespace
             )
         }
         .sheet(isPresented: unifiedSheetBinding, onDismiss: {
@@ -170,6 +173,19 @@ struct SetupDetailView: View {
         } message: {
             Text(viewModel.deleteMessage)
         }
+        .alert("Delete This Photo?", isPresented: $viewModel.isDeleteImageAlertPresented) {
+                    Button("Cancel", role: .cancel) {
+                imageIndexToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let index = imageIndexToDelete {
+                    viewModel.deleteReferenceImage(at: index)
+                }
+                imageIndexToDelete = nil
+            }
+        } message: {
+            Text("It will be removed from this setup's references.")
+        }
     }
     
     // MARK: - Floating Node Toolbar Component & Actions
@@ -177,17 +193,6 @@ struct SetupDetailView: View {
     @ViewBuilder
     private func nodeQuickActionsToolbar(for nodeId: UUID) -> some View {
         HStack(spacing: 16) {
-//            Button {
-//                duplicateNode(id: nodeId)
-//            } label: {
-//                Image(systemName: "plus.square.on.square")
-//                    .font(.subheadline.weight(.medium))
-//                    .foregroundStyle(DesignTokens.textPrimary)
-//            }
-//            
-//            Divider()
-//                .frame(height: 16)
-            
             Button(role: .destructive) {
                 quickDeleteNode(id: nodeId)
             } label: {
@@ -297,7 +302,6 @@ struct SetupDetailView: View {
     
     @ViewBuilder
     private func referenceImageCell(at index: Int) -> some View {
-        let isSelected = selectedImageIndices.contains(index)
         
         ZStack(alignment: .topTrailing) {
             Image(uiImage: viewModel.referenceImages[index])
@@ -306,29 +310,29 @@ struct SetupDetailView: View {
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 .aspectRatio(1, contentMode: .fit)
                 .clipped()
-                .opacity(viewModel.isSelectionMode && isSelected ? 0.75 : 1.0)
-            
-            if viewModel.isSelectionMode {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : .white)
-                    .shadow(color: .black.opacity(0.3), radius: 2)
-                    .padding(6)
-            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if viewModel.isSelectionMode {
-                if isSelected {
-                    selectedImageIndices.remove(index)
-                } else {
-                    selectedImageIndices.insert(index)
-                }
-            } else {
-                selectedPreviewIndex = index
-                showReferenceDetail = true
+            selectedPreviewIndex = index
+            showReferenceDetail = true
+        }
+        .contextMenu {
+            Button {
+                viewModel.setAsCoverImage(at: index)
+            } label: {
+                Label("Set as Cover Photo", systemImage: "photo.artframe")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                imageIndexToDelete = index
+                viewModel.isDeleteImageAlertPresented = true
+            } label: {
+                Label("Delete Photo", systemImage: "trash")
             }
         }
+        .matchedTransitionSource(id: index, in: zoomNamespace)
     }
     
     // MARK: - Unified Sheet
