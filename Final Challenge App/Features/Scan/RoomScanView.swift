@@ -10,7 +10,6 @@
 
 import Foundation
 import ARKit
-import Combine
 import MeasureKit
 import RealityKit
 import SwiftUI
@@ -29,21 +28,13 @@ struct RoomScanView: UIViewRepresentable {
         let root = AnchorEntity(world: .zero)
         view.scene.addAnchor(root)
         context.coordinator.root = root
-        let outlines = ScanOutlines(root: root)
-        context.coordinator.outlines = outlines
-        // Every frame, each dash is resized so it stays 4 pt thick on the screen.
-        context.coordinator.frameUpdates = view.scene.subscribe(to: SceneEvents.Update.self) { [weak view] _ in
-            MainActor.assumeIsolated {
-                guard let view else { return }
-                outlines.resize(cameraPosition: view.cameraTransform.translation,
-                                focalLength: Self.focalLength(of: view))
-            }
-        }
+        context.coordinator.outlines = ScanOutlines(root: root)
         return view
     }
 
     func updateUIView(_ view: ARView, context: Context) {
-        context.coordinator.outlines?.show(outlines)
+        context.coordinator.outlines?.show(outlines, cameraPosition: view.cameraTransform.translation,
+                                           focalLength: Self.focalLength(of: view))
         guard let floor else {
             context.coordinator.grid?.removeFromParent()
             context.coordinator.grid = nil
@@ -63,6 +54,8 @@ struct RoomScanView: UIViewRepresentable {
         view.session = session
         // A10-106: the room mesh hides the parts of the outline that are behind real surfaces.
         view.environment.sceneUnderstanding.options.insert(.occlusion)
+        // A10-106 crash fix: no grounding shadows; the lines and grid need none, and they cost GPU work.
+        view.renderOptions.insert(.disableGroundingShadows)
         return view
     }
 
@@ -79,7 +72,6 @@ struct RoomScanView: UIViewRepresentable {
         var root: AnchorEntity?
         var grid: ModelEntity?
         var outlines: ScanOutlines?
-        var frameUpdates: (any Cancellable)?
     }
 }
 

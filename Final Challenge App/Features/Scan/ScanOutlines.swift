@@ -3,8 +3,10 @@
 //  Skema Photo
 //
 //  A10-106 (Amadeus, 21 Nov): each tapped item's world box drawn as a true 3D box in the camera view. White, 70%,
-//  dashed (6 cm dash, 4 cm gap), round ends, 4 pt on the screen at every distance. The room mesh hides the parts
-//  behind real surfaces (RealityKit occlusion, turned on in RoomScanView).
+//  dashed (6 cm dash, 4 cm gap), round ends. The room mesh hides the parts behind real surfaces (RealityKit
+//  occlusion, turned on in RoomScanView).
+//  Crash fix (21 Nov): each box is ONE mesh and one entity (it was about 1,500 entities, which ran the GPU out of
+//  memory). The line thickness is set when the mesh is built (T1): 4 pt at the camera's distance at that moment.
 //
 
 import Foundation
@@ -14,32 +16,21 @@ import UIKit
 
 @MainActor
 final class ScanOutlines {
-    /// One dash: a rod with a ball at each end, so its ends are round.
-    private struct Dash {
-        let rod: ModelEntity
-        let caps: [ModelEntity]
-        let middle: SIMD3<Float>
-        let length: Float
-    }
-
     private struct Outline {
         let box: WorldBox
-        let entity: Entity
-        let dashes: [Dash]
+        let entity: ModelEntity
     }
 
-    /// A box that moved less than this (1 cm on every side) keeps its old dashes, so they are not rebuilt 5 times a
-    /// second while the grown box changes by millimetres.
+    /// A box that moved less than this (1 cm on every side) keeps its old mesh.
     static let rebuildStep: Float = 0.01
 
     private let root: Entity
     private var outlines: [UUID: Outline] = [:]
 
-    private static let rodMesh = MeshResource.generateCylinder(height: 1, radius: 1)
-    private static let capMesh = MeshResource.generateSphere(radius: 1)
     private static let material: UnlitMaterial = {
         var material = UnlitMaterial(color: .white)
         material.blending = .transparent(opacity: .init(floatLiteral: OutlineLayout.opacity))
+        material.faceCulling = .none
         return material
     }()
 
@@ -47,30 +38,25 @@ final class ScanOutlines {
         self.root = root
     }
 
-    /// Shows exactly the given boxes: new ones are built, changed ones rebuilt, missing ones removed.
-    func show(_ boxes: [UUID: WorldBox]) {
+    /// Shows exactly the given boxes: new ones are built, moved ones get a new mesh, missing ones are removed.
+    /// `focalLength` is in screen points; before the first camera frame it is 0 and nothing is built yet.
+    func show(_ boxes: [UUID: WorldBox], cameraPosition: SIMD3<Float>, focalLength: Float) {
         for (id, outline) in outlines where boxes[id] == nil {
             outline.entity.removeFromParent()
             outlines[id] = nil
         }
+        guard focalLength > 0 else { return }
         for (id, box) in boxes {
             if let old = outlines[id], !Self.hasMoved(from: old.box, to: box) { continue }
-            outlines[id]?.entity.removeFromParent()
-            let outline = Self.makeOutline(of: box)
-            root.addChild(outline.entity)
-            outlines[id] = outline
-        }
-    }
-
-    /// Every frame: each dash gets the radius that makes it `OutlineLayout.thickness` points thick at its distance.
-    func resize(cameraPosition: SIMD3<Float>, focalLength: Float) {
-        guard focalLength > 0 else { return }
-        for outline in outlines.values {
-            for dash in outline.dashes {
-                let radius = OutlineLayout.radius(distance: simd_distance(cameraPosition, dash.middle),
-                                                  focalLength: focalLength)
-                dash.rod.scale = SIMD3(radius, dash.length, radius)
-                for cap in dash.caps { cap.scale = SIMD3(repeating: radius) }
+            let radius = OutlineMesh.radius(for: box, cameraPosition: cameraPosition, focalLength: focalLength)
+            guard let mesh = Self.mesh(of: OutlineMesh.geometry(of: box, radius: radius)) else { continue }
+            if let old = outlines[id] {
+                old.entity.model?.mesh = mesh
+                outlines[id] = Outline(box: box, entity: old.entity)
+            } else {
+                let entity = ModelEntity(mesh: mesh, materials: [Self.material])
+                root.addChild(entity)
+                outlines[id] = Outline(box: box, entity: entity)
             }
         }
     }
@@ -80,32 +66,12 @@ final class ScanOutlines {
             || simd_reduce_max(simd_abs(old.max - new.max)) >= rebuildStep
     }
 
-    private static func makeOutline(of box: WorldBox) -> Outline {
-        let entity = Entity()
-        var dashes: [Dash] = []
-        for edge in box.edges {
-            for piece in OutlineLayout.dashes(from: edge.start, to: edge.end) {
-                let dash = makeDash(from: piece.start, to: piece.end)
-                entity.addChild(dash.rod)
-                dash.caps.forEach { entity.addChild($0) }
-                dashes.append(dash)
-            }
-        }
-        return Outline(box: box, entity: entity, dashes: dashes)
-    }
-
-    /// A rod from `start` to `end` (the cylinder's axis is y, turned onto the dash) and a ball at each end.
-    /// Box edges always run along +x, +y or +z, so the turn is never a half turn.
-    private static func makeDash(from start: SIMD3<Float>, to end: SIMD3<Float>) -> Dash {
-        let length = simd_distance(start, end)
-        let rod = ModelEntity(mesh: rodMesh, materials: [material])
-        rod.position = (start + end) / 2
-        rod.orientation = simd_quatf(from: SIMD3(0, 1, 0), to: (end - start) / length)
-        let caps = [start, end].map { point -> ModelEntity in
-            let cap = ModelEntity(mesh: capMesh, materials: [material])
-            cap.position = point
-            return cap
-        }
-        return Dash(rod: rod, caps: caps, middle: (start + end) / 2, length: length)
+    /// One RealityKit mesh from the box's triangles. Nil when there are none or RealityKit refuses them.
+    private static func mesh(of geometry: OutlineGeometry) -> MeshResource? {
+        guard !geometry.indices.isEmpty else { return nil }
+        var descriptor = MeshDescriptor(name: "outline")
+        descriptor.positions = MeshBuffers.Positions(geometry.positions)
+        descriptor.primitives = .triangles(geometry.indices)
+        return try? MeshResource.generate(from: [descriptor])
     }
 }

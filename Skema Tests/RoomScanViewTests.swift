@@ -24,4 +24,11 @@ struct RoomScanViewTests {
         #expect(view.session === session)
         #expect(session.delegate === scan)
     }
+
+    @Test("Case 25 (A10-106): the camera view draws no grounding shadows")
+    func viewHasNoGroundingShadows() {
+        let view = RoomScanView.makeCameraView(session: ARSession())
+
+        #expect(view.renderOptions.contains(.disableGroundingShadows))
+    }
 }
