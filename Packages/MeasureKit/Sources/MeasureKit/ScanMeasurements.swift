@@ -55,6 +55,8 @@ public struct EquipmentPoints: Sendable {
 public struct ScanMeasurements: Sendable {
     private var equipment: [UUID: EquipmentPoints] = [:]
     private var rules: [UUID: CentreRule] = [:]
+    /// The small boxes of equipment collected with `addSurface`, newest last.
+    private var boxes: [UUID: [WorldBox]] = [:]
 
     public init() {}
 
@@ -67,6 +69,7 @@ public struct ScanMeasurements: Sendable {
     public mutating func remove(_ id: UUID) {
         equipment[id] = nil
         rules[id] = nil
+        boxes[id] = nil
     }
 
     /// The smallest box (world, axis-aligned) holding every point kept for the equipment `id`; nil before any.
@@ -76,6 +79,28 @@ public struct ScanMeasurements: Sendable {
         return points.dropFirst().reduce((min: first, max: first)) { box, point in
             (min: simd_min(box.min, point), max: simd_max(box.max, point))
         }
+    }
+
+    /// A small box needs at least this many points of one frame (A10-106, Amadeus: 20, as the A10-90 sightings).
+    public static let minSurfacePoints = 20
+    /// The big box is the union of this many newest small boxes (A10-90 rule E, 30).
+    public static let maxKeptBoxes = 30
+
+    /// A10-106 cases 6–7: one frame's painted surface of the equipment `id` (`DepthGrouping.surface`). Its points join
+    /// the equipment's points as `add(points:to:camera:)` does, and with `minSurfacePoints` or more they make a small
+    /// box; the newest `maxKeptBoxes` are kept.
+    public mutating func addSurface(points: [SIMD3<Float>], to id: UUID, camera: CameraModel) {
+        add(points: points, to: id, camera: camera)
+        guard points.count >= Self.minSurfacePoints, let box = WorldBox.around(points) else { return }
+        var kept = boxes[id, default: []]
+        kept.append(box)
+        boxes[id] = Array(kept.suffix(Self.maxKeptBoxes))
+    }
+
+    /// The grown box of the equipment `id`: the union of its kept small boxes. Nil before its first small box.
+    public func bigBox(for id: UUID) -> WorldBox? {
+        guard let kept = boxes[id], let first = kept.first else { return nil }
+        return kept.dropFirst().reduce(first) { $0.union($1) }
     }
 
     /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light uses `.middle`.
@@ -100,7 +125,12 @@ public struct ScanMeasurements: Sendable {
         let centres = centres(subject: subject)
         let subjectCentres = centres[subject]
         var results: [UUID: EquipmentResult] = [:]
-        for (id, own) in centres {
+        for (id, found) in centres {
+            // A10-106: an item with a grown box is measured at the middle height of the box's back.
+            var own = found
+            if own.status == .measured, let box = bigBox(for: id) {
+                own = Geometry.backCentres(of: box, subjectBase: id == subject ? nil : subjectCentres?.baseCentre)
+            }
             results[id] = EquipmentResult(
                 status: own.status,
                 distanceToSubject: subjectCentres.flatMap { Geometry.floorDistance(from: $0, to: own) },
