@@ -52,6 +52,10 @@ struct DiagramEntity: View {
         .contentShape(Circle())
         .scaleEffect(1 / currentScale)
         .position(position)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Subject")
+        .accessibilityHint("Double tap to select or view details")
+        .accessibilityAddTraits(.isButton)
         .onTapGesture {
             onTap()
         }
