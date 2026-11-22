@@ -39,7 +39,7 @@ final class SetupsViewModel {
         }
     }
 
-    @ObservationIgnored private let storageController: StorageController
+    @ObservationIgnored let storageController: StorageController
     @ObservationIgnored private let now: () -> Date
 
     init(storageController: StorageController? = nil,

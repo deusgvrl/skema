@@ -1,9 +1,3 @@
-//
-//  NodeView.swift
-//  Final Challenge App
-//
-//  Created by Satriya Handha Wibowo on 16/11/26.
-//
 import SwiftUI
 
 struct NodeView: View {
@@ -175,6 +169,8 @@ struct NodeView: View {
                 .fontWeight(isSelected ? .bold : .regular)
                 .foregroundStyle(DesignTokens.textPrimary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .fixedSize()
                 .offset(y: 20)
         }
@@ -221,6 +217,26 @@ struct NodeView: View {
                     }
                 }
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(node.displayName)
+        .accessibilityValue(
+            "\(node.category.rawValue), distance: \(node.distance) meters, rotation: \(Int(node.rotationAngle))°"
+        )
+        .accessibilityHint(
+            isSelected ? "Selected. Double-tap to deselect or use Actions to adjust." : "Double-tap to select."
+        )
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
+        .accessibilityAction(named: "Rotate 45° clockwise") {
+            node.rotationAngle = (node.rotationAngle + 45).truncatingRemainder(dividingBy: 360)
+            node.syncHorizontalAimFromRotation()
+        }
+        .accessibilityAction(named: "Rotate 45° counterclockwise") {
+            node.rotationAngle = (node.rotationAngle - 45 + 360).truncatingRemainder(dividingBy: 360)
+            node.syncHorizontalAimFromRotation()
+        }
+        .accessibilityAction(named: "Point to subject") {
+            node.pointToSubject()
+        }
     }
 
     // MARK: - Cardinal Alignment & Auto-Snap Helper

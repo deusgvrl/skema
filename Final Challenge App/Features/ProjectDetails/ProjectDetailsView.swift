@@ -52,13 +52,6 @@ struct ProjectDetailsView: View {
                 }
             } header: {
                 FormSectionHeader("Setup")
-            } footer: {
-                // R07e
-                if viewModel.showsNameRequired || (!isFormValid && draftSetupName.isEmpty) {
-                    Text("Add a name to save this setup.")
-                        .font(.footnote)
-                        .foregroundStyle(DesignTokens.accentText)
-                }
             }
             .listRowBackground(DesignTokens.formRowBackground)
 
@@ -79,12 +72,14 @@ struct ProjectDetailsView: View {
             } header: {
                 FormSectionHeader("Notes")
             } footer: {
-                Text("""
-                    Camera settings live with each camera in Equipment. \
-                    You can add reference photos from the shoot later in References.
-                    """)
-                    .font(.footnote)
-                    .foregroundStyle(DesignTokens.textSecondary)
+                if setup.firstSavedDate == nil {
+                    Text("""
+                        Camera settings live with each camera in Equipment. \
+                        You can add reference photos from the shoot later in References.
+                        """)
+                        .font(.footnote)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
             }
             .listRowBackground(DesignTokens.formRowBackground)
         }
@@ -112,7 +107,6 @@ struct ProjectDetailsView: View {
             }
         }
         .onAppear {
-            // Populate draft state from setup model
             draftSetupName = setup.setupName
             draftClient = setup.client
             draftProject = setup.project
@@ -124,7 +118,6 @@ struct ProjectDetailsView: View {
         .sensoryFeedback(trigger: saveCount) { _, _ in
             lastOutcome == .saved ? .success : .error
         }
-        // R07f
         .alert("Couldn’t Save Setup", isPresented: $viewModel.isSaveFailedAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Try Again") {
@@ -139,7 +132,6 @@ struct ProjectDetailsView: View {
     private func save() {
         guard isFormValid else { return }
 
-        // Commit draft changes to actual setup model only when Save is pressed
         setup.setupName = draftSetupName
         setup.client = draftClient
         setup.project = draftProject
@@ -158,7 +150,7 @@ struct ProjectDetailsView: View {
     }
 }
 
-/// "Name ……… value" row: label left, grey editable value right (Sketch R07).
+/// "Name ……… value" row: label left, primary editable value right (Sketch R07).
 private struct DetailsRow<Field: View>: View {
     let title: LocalizedStringKey
     @ViewBuilder let field: () -> Field
@@ -174,7 +166,7 @@ private struct DetailsRow<Field: View>: View {
                 .foregroundStyle(DesignTokens.textPrimary)
             field()
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(DesignTokens.textSecondary)
+                .foregroundStyle(DesignTokens.textPrimary)
         }
     }
 }

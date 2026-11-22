@@ -17,12 +17,18 @@ struct DiagramEntity: View {
     var currentScale: CGFloat = 1.0
     var onTap: () -> Void
 
+    @ScaledMetric(relativeTo: .caption) private var circleDimension: CGFloat = 64
+
+    private var effectiveSize: CGFloat {
+        min(max(circleDimension, 64), 84)
+    }
+
     var body: some View {
         ZStack {
-            // Subject Circle Shape (enlarged to 64x64)
+            // Subject Circle Shape (adapts with Dynamic Type)
             Circle()
                 .fill(DesignTokens.accentPrimary)
-                .frame(width: 64, height: 64)
+                .frame(width: effectiveSize, height: effectiveSize)
                 .overlay(
                     Circle()
                         .stroke(DesignTokens.diagramSubjectBorder, lineWidth: 1.5)
@@ -38,13 +44,18 @@ struct DiagramEntity: View {
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .padding(.horizontal, 8)
+                .minimumScaleFactor(0.5)
+                .padding(.horizontal, 6)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
-        .frame(width: 64, height: 64)
+        .frame(width: effectiveSize, height: effectiveSize)
         .contentShape(Circle())
         .scaleEffect(1 / currentScale)
         .position(position)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Subject")
+        .accessibilityHint("Double tap to select or view details")
+        .accessibilityAddTraits(.isButton)
         .onTapGesture {
             onTap()
         }

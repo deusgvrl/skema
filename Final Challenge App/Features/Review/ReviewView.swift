@@ -1,4 +1,3 @@
-// swiftlint:disable type_body_length
 import SwiftUI
 
 /// Top-down lighting diagram after scan, and editing it (Sketch R04, R04m, R09 · A10-10, A10-17).
@@ -11,7 +10,6 @@ struct ReviewView: View {
 
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
@@ -87,13 +85,8 @@ struct ReviewView: View {
             toolbarContent
         }
         .onAppear {
-            if !isFromLoadingScreen && !viewModel.isEditingDiagram {
+            if (!isFromLoadingScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
-            }
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .background {
-                viewModel.discardSetup()
             }
         }
         .onChange(of: viewModel.nodes) { _, newNodes in
@@ -352,6 +345,8 @@ struct ReviewView: View {
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save Changes", systemImage: "checkmark") {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
                     viewModel.confirmEdits(undoManager: undoManager)
                     if !isFromLoadingScreen { dismiss() }
                 }
@@ -361,7 +356,11 @@ struct ReviewView: View {
             }
         } else {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Next", systemImage: "chevron.right") { navigateToR07 = true }
+                Button("Next", systemImage: "chevron.right") {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
+                    navigateToR07 = true
+                }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
             }
@@ -407,6 +406,8 @@ struct ReviewView: View {
         if viewModel.hasPendingEdits {
             showsDiscardChangesAlert = true
         } else {
+            selectedNodeId = nil
+            activeSheetContent = nil
             viewModel.discardEdits(undoManager: undoManager)
             if !isFromLoadingScreen { dismiss() }
         }
