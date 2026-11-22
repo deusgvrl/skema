@@ -1,3 +1,4 @@
+// swiftlint:disable type_body_length
 import SwiftUI
 
 /// Top-down lighting diagram after scan, and editing it (Sketch R04, R04m, R09 · A10-10, A10-17).
@@ -97,26 +98,6 @@ struct ReviewView: View {
                     selectedDetent = .height(76)
                 }
             }
-        }
-        .alert("Save This Setup?", isPresented: $showsSaveSetupAlert) {
-            Button("Save Setup") { navigateToR07 = true }
-            .keyboardShortcut(.defaultAction)
-            Button("Discard", role: .destructive) {
-                viewModel.discardSetup()
-                dismissAll()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("If you leave now, this scan and its diagram will be lost.")
-        }
-        .alert("Discard Changes?", isPresented: $showsDiscardChangesAlert) {
-            Button("Keep Editing", role: .cancel) { }
-            Button("Discard", role: .destructive) {
-                viewModel.discardEdits(undoManager: undoManager)
-                if !isFromLoadingScreen { dismiss() }
-            }
-        } message: {
-            Text("Your changes to this diagram won't be saved.")
         }
         .navigationDestination(isPresented: $navigateToR07) {
             ProjectDetailsView(
@@ -305,6 +286,29 @@ struct ReviewView: View {
                     closeEditMode()
                 } else {
                     closeReview()
+                }
+            }
+            // Popovers on the X (like Reminders); tapping outside one keeps the user here.
+            .confirmationDialog(
+                "Save this setup? If you leave now, this scan and its diagram will be lost.",
+                isPresented: $showsSaveSetupAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Save Setup") { navigateToR07 = true }
+                    .keyboardShortcut(.defaultAction)
+                Button("Discard", role: .destructive) {
+                    viewModel.discardSetup()
+                    dismissAll()
+                }
+            }
+            .confirmationDialog(
+                "Are you sure you want to discard your changes to this diagram?",
+                isPresented: $showsDiscardChangesAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Discard Changes", role: .destructive) {
+                    viewModel.discardEdits(undoManager: undoManager)
+                    if !isFromLoadingScreen { dismiss() }
                 }
             }
         }

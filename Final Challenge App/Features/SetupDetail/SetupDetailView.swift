@@ -1,3 +1,4 @@
+// swiftlint:disable type_body_length
 import SwiftUI
 import PhotosUI
 import QuickLook
@@ -139,14 +140,6 @@ struct SetupDetailView: View {
                 undoManager: undoManager,
                 isReadOnly: false
             )
-        }
-        .alert("Discard Changes?", isPresented: $showsDiscardChangesAlert) {
-            Button("Keep Editing", role: .cancel) { }
-            Button("Discard", role: .destructive) {
-                withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
-            }
-        } message: {
-            Text("Your changes to this diagram won't be saved.")
         }
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
@@ -459,6 +452,16 @@ struct SetupDetailView: View {
                 if viewModel.reviewViewModel.hasPendingEdits {
                     showsDiscardChangesAlert = true
                 } else {
+                    withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
+                }
+            }
+            // A popover on the X (like Reminders); tapping outside it keeps editing.
+            .confirmationDialog(
+                "Are you sure you want to discard your changes to this diagram?",
+                isPresented: $showsDiscardChangesAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Discard Changes", role: .destructive) {
                     withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
                 }
             }
