@@ -63,6 +63,16 @@ struct EquipmentFormView: View {
                             dismiss()
                         }
                     }
+                    // A popover on the X (like Reminders); tapping outside it keeps editing.
+                    .confirmationDialog(
+                        formViewModel.isEditing
+                            ? "Are you sure you want to discard your changes?"
+                            : "Are you sure you want to discard this new equipment?",
+                        isPresented: $isDiscardAlertPresented,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Discard Changes", role: .destructive) { dismiss() }
+                    }
                 }
 
                 if !isReadOnly {
@@ -120,14 +130,6 @@ struct EquipmentFormView: View {
                 isDirty = false
                 isSwitchingNode = false
             }
-        }
-
-        // Unsaved changes confirmation alert
-        .alert("Discard Unsaved Changes?", isPresented: $isDiscardAlertPresented) {
-            Button("Keep Editing", role: .cancel) { }
-            Button("Discard", role: .destructive) { dismiss() }
-        } message: {
-            Text("You have unsaved changes. Are you sure you want to discard them?")
         }
 
         // Delete confirmation alert

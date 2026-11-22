@@ -76,6 +76,16 @@ struct ScanView: View {
                         leave()
                     }
                 }
+                // A popover on the X (like Reminders); tapping outside it keeps scanning.
+                .confirmationDialog(
+                    "Are you sure you want to cancel this scan? Everything you tapped so far will be lost.",
+                    isPresented: $showsLeaveAlert,
+                    titleVisibility: .visible
+                ) {
+                    Button("Cancel Scan", role: .destructive) {
+                        leave()
+                    }
+                }
             }
             if viewModel.screen == .scanning {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -91,14 +101,6 @@ struct ScanView: View {
                     }
                 }
             }
-        }
-        .alert("Cancel This Scan?", isPresented: $showsLeaveAlert) {
-            Button("Continue", role: .cancel) {}
-            Button("Cancel Scan", role: .destructive) {
-                leave()
-            }
-        } message: {
-            Text("Everything you tapped so far will be lost.")
         }
         .toolbarColorScheme(usesCameraAppearance ? .dark : nil, for: .navigationBar)
         .task { await viewModel.start() }
