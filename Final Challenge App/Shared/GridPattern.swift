@@ -12,13 +12,13 @@ struct GridPattern: Shape {
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        for x in stride(from: 0, through: rect.width, by: step) {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
+        for xOffset in stride(from: 0, through: rect.width, by: step) {
+            path.move(to: CGPoint(x: xOffset, y: 0))
+            path.addLine(to: CGPoint(x: xOffset, y: rect.height))
         }
-        for y in stride(from: 0, through: rect.height, by: step) {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
+        for yOffset in stride(from: 0, through: rect.height, by: step) {
+            path.move(to: CGPoint(x: 0, y: yOffset))
+            path.addLine(to: CGPoint(x: rect.width, y: yOffset))
         }
         return path
     }
