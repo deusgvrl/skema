@@ -1,4 +1,3 @@
-// swiftlint:disable type_body_length
 import SwiftUI
 
 /// Top-down lighting diagram after scan, and editing it (Sketch R04, R04m, R09 · A10-10, A10-17).
@@ -86,7 +85,7 @@ struct ReviewView: View {
             toolbarContent
         }
         .onAppear {
-            if !isFromLoadingScreen && !viewModel.isEditingDiagram {
+            if (!isFromLoadingScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
             }
         }

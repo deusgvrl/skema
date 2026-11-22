@@ -1,4 +1,3 @@
-// swiftlint:disable type_body_length
 import SwiftUI
 import PhotosUI
 import QuickLook
