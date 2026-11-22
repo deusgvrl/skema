@@ -9,6 +9,7 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
     let session: any ARSessionControlling
 
     private let supportsLiDAR: @Sendable () -> Bool
+    private let supportsMesh: @Sendable () -> Bool
     private let delegateQueue = DispatchQueue(label: "ScanSession.delegate", qos: .userInitiated)
     private let frameBroadcast = Broadcast<ScanFrame>(bufferSize: 1)
     private let stateBroadcast = Broadcast<ScanSessionState>(bufferSize: 8)
@@ -23,10 +24,12 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
     init(
         session: any ARSessionControlling = ARSession(),
         frameInterval: TimeInterval = 1.0 / 15.0,
-        supportsLiDAR: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsLiDAR() }
+        supportsLiDAR: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsLiDAR() },
+        supportsMesh: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsMesh() }
     ) {
         self.session = session
         self.supportsLiDAR = supportsLiDAR
+        self.supportsMesh = supportsMesh
         self.store = Mutex(Store(throttle: FrameThrottle(minimumInterval: frameInterval)))
         super.init()
         session.delegateQueue = delegateQueue
@@ -37,10 +40,17 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
         ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
     }
 
-    static func makeConfiguration() -> ARWorldTrackingConfiguration {
+    /// The room mesh (scene reconstruction) that RealityKit's occlusion uses to hide the outline behind real
+    /// surfaces (A10-106). Not every LiDAR iPhone may offer it, so the app asks.
+    static func deviceSupportsMesh() -> Bool {
+        ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
+    }
+
+    static func makeConfiguration(withMesh: Bool = false) -> ARWorldTrackingConfiguration {
         let configuration = ARWorldTrackingConfiguration()
         configuration.frameSemantics = [.sceneDepth]
         configuration.planeDetection = [.horizontal]
+        if withMesh { configuration.sceneReconstruction = .mesh }
         return configuration
     }
 
@@ -72,7 +82,7 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
             current.state = .running
         }
         stateBroadcast.yield(.running)
-        session.run(Self.makeConfiguration(), options: [.resetTracking, .removeExistingAnchors])
+        session.run(Self.makeConfiguration(withMesh: supportsMesh()), options: [.resetTracking, .removeExistingAnchors])
     }
 
     func stop() {

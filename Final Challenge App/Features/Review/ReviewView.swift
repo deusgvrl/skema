@@ -1,3 +1,4 @@
+// swiftlint:disable type_body_length
 import SwiftUI
 
 /// Top-down lighting diagram after scan, and editing it (Sketch R04, R04m, R09 · A10-10, A10-17).
@@ -14,7 +15,7 @@ struct ReviewView: View {
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
-    @State private var selectedNodeId: UUID? = nil
+    @State private var selectedNodeId: UUID?
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
     @State private var showsSaveSetupAlert = false
@@ -68,7 +69,9 @@ struct ReviewView: View {
             .ignoresSafeArea(edges: .bottom)
 
             // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
-            if viewModel.isEditingDiagram, case .equipment(let nodeId) = activeSheetContent, quickActionsOpacity > 0.01 {
+            if viewModel.isEditingDiagram,
+               case .equipment(let nodeId) = activeSheetContent,
+               quickActionsOpacity > 0.01 {
                 nodeQuickActionsToolbar(for: nodeId)
                     .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
                     .opacity(quickActionsOpacity)            // Fades out continuously
@@ -102,26 +105,6 @@ struct ReviewView: View {
                 }
             }
         }
-        .alert("Save This Setup?", isPresented: $showsSaveSetupAlert) {
-            Button("Save Setup") { navigateToR07 = true }
-            .keyboardShortcut(.defaultAction)
-            Button("Discard", role: .destructive) {
-                viewModel.discardSetup()
-                dismissAll()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("If you leave now, this scan and its diagram will be lost.")
-        }
-        .alert("Discard Changes?", isPresented: $showsDiscardChangesAlert) {
-            Button("Keep Editing", role: .cancel) { }
-            Button("Discard", role: .destructive) {
-                viewModel.discardEdits(undoManager: undoManager)
-                if !isFromLoadingScreen { dismiss() }
-            }
-        } message: {
-            Text("Your changes to this diagram won't be saved.")
-        }
         .navigationDestination(isPresented: $navigateToR07) {
             ProjectDetailsView(
                 setup: viewModel.draftSetup,
@@ -134,9 +117,9 @@ struct ReviewView: View {
             activeSheetContent = nil
             selectedNodeId = nil
             selectedDetent = .height(76)
-        }) {
+        }, content: {
             unifiedSheetContent
-        }
+        })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
         }
@@ -309,6 +292,29 @@ struct ReviewView: View {
                     closeEditMode()
                 } else {
                     closeReview()
+                }
+            }
+            // Popovers on the X (like Reminders); tapping outside one keeps the user here.
+            .confirmationDialog(
+                "Save this setup? If you leave now, this scan and its diagram will be lost.",
+                isPresented: $showsSaveSetupAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Save Setup") { navigateToR07 = true }
+                    .keyboardShortcut(.defaultAction)
+                Button("Discard", role: .destructive) {
+                    viewModel.discardSetup()
+                    dismissAll()
+                }
+            }
+            .confirmationDialog(
+                "Are you sure you want to discard your changes to this diagram?",
+                isPresented: $showsDiscardChangesAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Discard Changes", role: .destructive) {
+                    viewModel.discardEdits(undoManager: undoManager)
+                    if !isFromLoadingScreen { dismiss() }
                 }
             }
         }

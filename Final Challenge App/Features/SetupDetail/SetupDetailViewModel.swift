@@ -13,32 +13,32 @@ final class SetupDetailViewModel {
     @ObservationIgnored private let storageController: StorageController
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let pdfRenderer: PDFRenderer
-    
+
     // Tab Navigation
     var selectedTab: Int = 0 // 0 = Diagram, 1 = References
-    
+
     // Presentation Flags
     var isEditingDiagram: Bool = false
     var isEditingProjectDetails: Bool = false
-    var selectedEquipment: Equipment? = nil
+    var selectedEquipment: Equipment?
     var isDeleteAlertPresented: Bool = false
     var isShowSubjectSheet: Bool = false
+    var isDeleteImageAlertPresented: Bool = false
 
     // PDF Share State (A10-99)
     private(set) var isPreparingPDF = false
     /// Setting this shows the QuickLook preview, which has the system share button.
     var pdfURL: URL?
     var isPDFFailedAlertPresented = false
-    
+
     // References Tab State
-    var isSelectionMode: Bool = false
     var referenceImages: [UIImage] = []
-    
+
     /// Deterministically sorted SwiftData models by creation date
     var sortedReferenceImages: [ReferenceImage] {
         setup.referenceImages.sorted(by: { $0.createdAt < $1.createdAt })
     }
-    
+
     init(
         setup: Setup,
         storageController: StorageController? = nil,
@@ -53,11 +53,11 @@ final class SetupDetailViewModel {
         self.reviewViewModel = ReviewViewModel(setup: setup, storageController: storage)
         self.loadReferenceImages()
     }
-    
+
     var setupName: String {
         setup.setupName.isEmpty ? "Untitled Setup" : setup.setupName
     }
-    
+
     /// "Aesop · November catalog" under the title (Sketch R08); empty when neither is set.
     var formattedSubtitle: String {
         [setup.client, setup.project]
@@ -65,7 +65,7 @@ final class SetupDetailViewModel {
             .filter { !$0.isEmpty }
             .joined(separator: " · ")
     }
-    
+
     /// The alert text: saved setups can be recovered for 30 days, drafts cannot (A10-95).
     var deleteMessage: String {
         setup.firstSavedDate == nil
@@ -82,7 +82,7 @@ final class SetupDetailViewModel {
         }
         completion()
     }
-    
+
     private static let pdfFallbackName = "Untitled Setup"
     private static let pdfExtension = "pdf"
 
@@ -120,85 +120,56 @@ final class SetupDetailViewModel {
             UIImage(data: ref.imageData)
         }
     }
-    
+
     /// Saves a single UIImage to SwiftData using StorageController
     func addReferenceImage(_ image: UIImage) {
         referenceImages.append(image)
-        
+
         if let data = image.jpegData(compressionQuality: 0.8) {
             let newRefImage = ReferenceImage(imageData: data)
             storageController.addReferenceImage(newRefImage, to: setup)
         }
     }
-    
+
     /// Loads PhotosPickerItem data asynchronously and saves each image to SwiftData
     func addReferenceImages(from items: [PhotosPickerItem]) async {
         for item in items {
             guard let data = try? await item.loadTransferable(type: Data.self),
                   let image = UIImage(data: data) else { continue }
-            
+
             referenceImages.append(image)
-            
+
             let newRefImage = ReferenceImage(imageData: data)
             storageController.addReferenceImage(newRefImage, to: setup)
         }
     }
-    
+
     // MARK: - Delete Reference Image Operations
-    
-    /// Deletes a specific ReferenceImage model from SwiftData and local array
-    func deleteReferenceImage(_ image: ReferenceImage) {
-        let sorted = sortedReferenceImages
-        if let index = sorted.firstIndex(where: { $0.id == image.id }) {
-            if referenceImages.indices.contains(index) {
-                referenceImages.remove(at: index)
-            }
-        }
-        storageController.deleteReferenceImage(image)
-    }
-    
     /// Deletes a single reference image by matching index in sortedReferenceImages
     func deleteReferenceImage(at index: Int) {
         let sorted = sortedReferenceImages
         guard sorted.indices.contains(index) else { return }
-        
+
         let refImageToDelete = sorted[index]
-        
+
         if referenceImages.indices.contains(index) {
             referenceImages.remove(at: index)
         }
-        
+
         storageController.deleteReferenceImage(refImageToDelete)
     }
-    
-    /// Batch deletes reference images by a set of indices
-    func deleteReferenceImages(at indices: Set<Int>) {
-        let sorted = sortedReferenceImages
-        let sortedIndices = indices.sorted(by: >)
-        
-        for index in sortedIndices {
-            guard sorted.indices.contains(index) else { continue }
-            let refImageToDelete = sorted[index]
-            
-            if referenceImages.indices.contains(index) {
-                referenceImages.remove(at: index)
-            }
-            
-            storageController.deleteReferenceImage(refImageToDelete)
-        }
-    }
-    
+
     func setAsCoverImage(at index: Int) {
         guard sortedReferenceImages.indices.contains(index) else { return }
         let selectedRefImage = sortedReferenceImages[index]
-        
+
         if let earliestDate = sortedReferenceImages.map(\.createdAt).min() {
             selectedRefImage.createdAt = earliestDate.addingTimeInterval(-1)
         }
-        
+
         let currentRefs = setup.referenceImages
         setup.referenceImages = currentRefs
-        
+
         storageController.save()
         loadReferenceImages()
     }

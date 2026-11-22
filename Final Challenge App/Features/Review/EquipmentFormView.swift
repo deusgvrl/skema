@@ -3,24 +3,24 @@ import SwiftUI
 struct EquipmentFormView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var formViewModel: EquipmentFormViewModel
-    
+
     @Binding var selectedDetent: PresentationDetent
-    
+
     let viewModel: ReviewViewModel
     let editingNodeId: UUID?
     let undoManager: UndoManager?
     var isReadOnly: Bool = false
-    
+
     // State management for dirty tracking and confirmation alerts
     @State private var isDeleteAlert: Bool = false
     @State private var isDiscardAlertPresented: Bool = false
     @State private var isDirty: Bool = false
     @State private var isSwitchingNode: Bool = false
-    
+
     private var editingTitle: String? {
         viewModel.nodes.first { $0.id == editingNodeId }?.displayName
     }
-    
+
     init(
         viewModel: ReviewViewModel,
         editingNodeId: UUID?,
@@ -38,210 +38,16 @@ struct EquipmentFormView: View {
             reviewViewModel: viewModel
         ))
     }
-    
+
     var body: some View {
         @Bindable var formViewModel = formViewModel
-        
+
         NavigationStack {
             Form {
-                // 1. Equipment Section
-                Section(header: FormSectionHeader("Equipment")) {
-                    Picker("Category", selection: $formViewModel.category) {
-                        ForEach(EquipmentCategory.allCases) { cat in
-                            Text(cat.rawValue).tag(cat)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(.primary)
-                    .disabled(isReadOnly)
-                    
-                    HStack {
-                        Text("Name")
-                        Spacer()
-                        TextField("Required", text: $formViewModel.name)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                            .disabled(isReadOnly)
-                    }
-                    
-                    if formViewModel.category != .accessory {
-                        HStack {
-                            Text("Role / label")
-                            Spacer()
-                            TextField(formViewModel.category == .light ? "e.g. Accent light" : "e.g. Second camera", text: $formViewModel.role)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .disabled(isReadOnly)
-                        }
-                    }
-                }
-                .listRowBackground(DesignTokens.formRowBackground)
-                
-                // 2. Category-Specific Settings
-                if formViewModel.category == .light {
-                    Section(header: FormSectionHeader("Light Settings")) {
-                        HStack {
-                            Text("Power")
-                            Spacer()
-                            TextField("1/16", text: $formViewModel.power)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .disabled(isReadOnly)
-                        }
-                        HStack {
-                            Text("Color temperature")
-                            Spacer()
-                            TextField("5600", text: $formViewModel.colorTemp)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .keyboardType(.numberPad)
-                                .disabled(isReadOnly)
-                            Text("K")
-                                .foregroundStyle(DesignTokens.textSecondary)
-                        }
-                    }
-                    .listRowBackground(DesignTokens.formRowBackground)
-                }
-                
-                if formViewModel.category == .camera {
-                    Section(header: FormSectionHeader("Lens")) {
-                        HStack {
-                            Text("Lens")
-                            Spacer()
-                            TextField("50", text: $formViewModel.lens)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .disabled(isReadOnly)
-                            Text("mm")
-                                .foregroundStyle(DesignTokens.textSecondary)
-                        }
-                    }
-                    .listRowBackground(DesignTokens.formRowBackground)
-                    
-                    Section(header: FormSectionHeader("Camera Settings")) {
-                        HStack {
-                            Text("ISO")
-                            Spacer()
-                            TextField("100", text: $formViewModel.iso)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .keyboardType(.numberPad)
-                                .disabled(isReadOnly)
-                        }
-                        HStack {
-                            Text("Aperture")
-                            Spacer()
-                            TextField("f/2.8", text: $formViewModel.aperture)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .disabled(isReadOnly)
-                        }
-                        HStack {
-                            Text("Shutter speed")
-                            Spacer()
-                            TextField("1/200", text: $formViewModel.shutterSpeed)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .disabled(isReadOnly)
-                        }
-                        HStack {
-                            Text("White balance")
-                            Spacer()
-                            TextField("5600", text: $formViewModel.whiteBalance)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .keyboardType(.numberPad)
-                                .disabled(isReadOnly)
-                            Text("K")
-                                .foregroundStyle(DesignTokens.textSecondary)
-                        }
-                    }
-                    .listRowBackground(DesignTokens.formRowBackground)
-                }
-                
-                // 3. Position & Direction
-                if formViewModel.category != .accessory {
-                    Section(
-                        header: FormSectionHeader("Position & Direction"),
-                        footer: Text(isReadOnly ? "Viewing equipment details from read-only mode." : """
-                            It's placed next to the subject for now. You can drag it to the right spot \
-                            on the diagram, or change these values anytime later.
-                            """)
-                            .font(.footnote)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                    ) {
-                        HStack {
-                            Text("Height")
-                            Spacer()
-                            TextField("0.0", text: $formViewModel.height)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .keyboardType(.decimalPad)
-                                .disabled(isReadOnly)
-                            Text("m")
-                                .foregroundStyle(DesignTokens.textSecondary)
-                        }
-                        HStack {
-                            Text("Tilt")
-                            Spacer()
-                            TextField("0", text: $formViewModel.tilt)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .keyboardType(.numberPad)
-                                .disabled(isReadOnly)
-                            Text("°")
-                                .foregroundStyle(DesignTokens.textSecondary)
-                        }
-                        
-                        if formViewModel.category == .light {
-                            HStack {
-                                Text("Horizontal aim")
-                                Spacer()
-                                TextField("0", text: $formViewModel.horizontalAim)
-                                    .multilineTextAlignment(.trailing)
-                                    .foregroundStyle(DesignTokens.textSecondary)
-                                    .keyboardType(.numberPad)
-                                    .disabled(isReadOnly)
-                                Text("°")
-                                    .foregroundStyle(DesignTokens.textSecondary)
-                            }
-                        }
-                        
-                        HStack {
-                            Text("Distance to subject")
-                                .lineLimit(1)
-                                .layoutPriority(1)
-                            Spacer()
-                            TextField("0.0", text: $formViewModel.distance)
-                                .multilineTextAlignment(.trailing)
-                                .foregroundStyle(DesignTokens.textSecondary)
-                                .keyboardType(.decimalPad)
-                                .disabled(isReadOnly)
-                            Text("m")
-                                .foregroundStyle(DesignTokens.textSecondary)
-                        }
-                    }
-                    .listRowBackground(DesignTokens.formRowBackground)
-                }
-                
-                // 4. Notes & Accessories
-                if formViewModel.category == .accessory {
-                    Section(header: FormSectionHeader("Notes")) {
-                        TextField("Add notes", text: $formViewModel.notes, axis: .vertical)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                            .lineLimit(4...8)
-                            .disabled(isReadOnly)
-                    }
-                    .listRowBackground(DesignTokens.formRowBackground)
-                } else {
-                    Section(header: FormSectionHeader("Accessories")) {
-                        TextField("Add accessories", text: $formViewModel.accessories, axis: .vertical)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                            .lineLimit(4...8)
-                            .disabled(isReadOnly)
-                    }
-                    .listRowBackground(DesignTokens.formRowBackground)
-                }
+                equipmentSection
+                categorySpecificSettingsSection
+                positionAndDirectionSection
+                notesAndAccessoriesSection
             }
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
@@ -257,8 +63,18 @@ struct EquipmentFormView: View {
                             dismiss()
                         }
                     }
+                    // A popover on the X (like Reminders); tapping outside it keeps editing.
+                    .confirmationDialog(
+                        formViewModel.isEditing
+                            ? "Are you sure you want to discard your changes?"
+                            : "Are you sure you want to discard this new equipment?",
+                        isPresented: $isDiscardAlertPresented,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Discard Changes", role: .destructive) { dismiss() }
+                    }
                 }
-                
+
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
                         if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
@@ -315,15 +131,7 @@ struct EquipmentFormView: View {
                 isSwitchingNode = false
             }
         }
-        
-        // Unsaved changes confirmation alert
-        .alert("Discard Unsaved Changes?", isPresented: $isDiscardAlertPresented) {
-            Button("Keep Editing", role: .cancel) { }
-            Button("Discard", role: .destructive) { dismiss() }
-        } message: {
-            Text("You have unsaved changes. Are you sure you want to discard them?")
-        }
-        
+
         // Delete confirmation alert
         .alert("Delete Equipment", isPresented: $isDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -334,6 +142,227 @@ struct EquipmentFormView: View {
             }
         } message: {
             Text("Are you sure you want to remove this equipment?")
+        }
+    }
+}
+
+// MARK: - Form Sections
+private extension EquipmentFormView {
+    @ViewBuilder
+    var equipmentSection: some View {
+        @Bindable var formViewModel = formViewModel
+
+        Section(header: FormSectionHeader("Equipment")) {
+            Picker("Category", selection: $formViewModel.category) {
+                ForEach(EquipmentCategory.allCases) { cat in
+                    Text(cat.rawValue).tag(cat)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(.primary)
+            .disabled(isReadOnly)
+
+            HStack {
+                Text("Name")
+                Spacer()
+                TextField("Required", text: $formViewModel.name)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(DesignTokens.textSecondary)
+                    .disabled(isReadOnly)
+            }
+
+            if formViewModel.category != .accessory {
+                HStack {
+                    Text("Role / label")
+                    Spacer()
+                    let rolePrompt = formViewModel.category == .light
+                        ? "e.g. Accent light"
+                        : "e.g. Second camera"
+                    TextField(rolePrompt, text: $formViewModel.role)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .disabled(isReadOnly)
+                }
+            }
+        }
+        .listRowBackground(DesignTokens.formRowBackground)
+    }
+
+    @ViewBuilder
+    var categorySpecificSettingsSection: some View {
+        @Bindable var formViewModel = formViewModel
+
+        if formViewModel.category == .light {
+            Section(header: FormSectionHeader("Light Settings")) {
+                HStack {
+                    Text("Power")
+                    Spacer()
+                    TextField("1/16", text: $formViewModel.power)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .disabled(isReadOnly)
+                }
+                HStack {
+                    Text("Color temperature")
+                    Spacer()
+                    TextField("5600", text: $formViewModel.colorTemp)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .keyboardType(.numberPad)
+                        .disabled(isReadOnly)
+                    Text("K")
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
+        }
+
+        if formViewModel.category == .camera {
+            Section(header: FormSectionHeader("Lens")) {
+                HStack {
+                    Text("Lens")
+                    Spacer()
+                    TextField("50", text: $formViewModel.lens)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .disabled(isReadOnly)
+                    Text("mm")
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
+
+            Section(header: FormSectionHeader("Camera Settings")) {
+                HStack {
+                    Text("ISO")
+                    Spacer()
+                    TextField("100", text: $formViewModel.iso)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .keyboardType(.numberPad)
+                        .disabled(isReadOnly)
+                }
+                HStack {
+                    Text("Aperture")
+                    Spacer()
+                    TextField("f/2.8", text: $formViewModel.aperture)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .disabled(isReadOnly)
+                }
+                HStack {
+                    Text("Shutter speed")
+                    Spacer()
+                    TextField("1/200", text: $formViewModel.shutterSpeed)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .disabled(isReadOnly)
+                }
+                HStack {
+                    Text("White balance")
+                    Spacer()
+                    TextField("5600", text: $formViewModel.whiteBalance)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .keyboardType(.numberPad)
+                        .disabled(isReadOnly)
+                    Text("K")
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
+        }
+    }
+
+    @ViewBuilder
+    var positionAndDirectionSection: some View {
+        @Bindable var formViewModel = formViewModel
+
+        if formViewModel.category != .accessory {
+            Section(
+                header: FormSectionHeader("Position & Direction"),
+                footer: Text(isReadOnly ? "Viewing equipment details from read-only mode." : """
+                    It's placed next to the subject for now. You can drag it to the right spot \
+                    on the diagram, or change these values anytime later.
+                    """)
+                    .font(.footnote)
+                    .foregroundStyle(DesignTokens.textSecondary)
+            ) {
+                HStack {
+                    Text("Height")
+                    Spacer()
+                    TextField("0.0", text: $formViewModel.height)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .keyboardType(.decimalPad)
+                        .disabled(isReadOnly)
+                    Text("m")
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+                HStack {
+                    Text("Tilt")
+                    Spacer()
+                    TextField("0", text: $formViewModel.tilt)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .keyboardType(.numberPad)
+                        .disabled(isReadOnly)
+                    Text("°")
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+
+                if formViewModel.category == .light {
+                    HStack {
+                        Text("Horizontal aim")
+                        Spacer()
+                        TextField("0", text: $formViewModel.horizontalAim)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(DesignTokens.textSecondary)
+                            .keyboardType(.numberPad)
+                            .disabled(isReadOnly)
+                        Text("°")
+                            .foregroundStyle(DesignTokens.textSecondary)
+                    }
+                }
+
+                HStack {
+                    Text("Distance to subject")
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    Spacer()
+                    TextField("0.0", text: $formViewModel.distance)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                        .keyboardType(.decimalPad)
+                        .disabled(isReadOnly)
+                    Text("m")
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
+        }
+    }
+
+    @ViewBuilder
+    var notesAndAccessoriesSection: some View {
+        @Bindable var formViewModel = formViewModel
+
+        if formViewModel.category == .accessory {
+            Section(header: FormSectionHeader("Notes")) {
+                TextField("Add notes", text: $formViewModel.notes, axis: .vertical)
+                    .foregroundStyle(DesignTokens.textSecondary)
+                    .lineLimit(4...8)
+                    .disabled(isReadOnly)
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
+        } else {
+            Section(header: FormSectionHeader("Accessories")) {
+                TextField("Add accessories", text: $formViewModel.accessories, axis: .vertical)
+                    .foregroundStyle(DesignTokens.textSecondary)
+                    .lineLimit(4...8)
+                    .disabled(isReadOnly)
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
         }
     }
 }

@@ -1,3 +1,4 @@
+// swiftlint:disable type_body_length
 import SwiftUI
 import PhotosUI
 import QuickLook
@@ -6,67 +7,75 @@ struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.undoManager) private var undoManager
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @State private var viewModel: SetupDetailViewModel
-    
+
     private static let diagramImageScale: CGFloat = 3
-    
+
     // Photo Pickers State
     @State private var showCamera = false
     @State private var showPhotoPicker = false
     @State private var photoPickerSelection: [PhotosPickerItem] = []
-    
+
+    // Camera capture access
+    @State private var showCameraDenied = false
+    @State private var openLibraryAfterDenied = false
+    private let cameraPermission: CameraPermission = SystemCameraPermission()
+
     // Selection & Preview State
     @State private var selectedPreviewIndex: Int = 0
     @State private var showReferenceDetail: Bool = false
-    @State private var selectedImageIndices: Set<Int> = []
-    
+    @State private var imageIndexToDelete: Int?
+
     // Unified diagram sheet state
     @State private var activeSheetContent: DiagramSheetContent?
-    @State private var selectedNodeId: UUID? = nil
+    @State private var selectedNodeId: UUID?
     @State private var isAddingNode = false
     @State private var showsDiscardChangesAlert = false
-    
+
     @State private var selectedDetent: PresentationDetent = .height(76)
-    
+
     @State private var currentSheetHeight: CGFloat = 76
-    
+
+    @Namespace private var zoomNamespace
+
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
-    
+
     private var quickActionsOpacity: Double {
         let fadeStartHeight: CGFloat = 76
         let fadeDistance: CGFloat = 100 // Fades out fully over 100pt of vertical drag
         let progress = min(max((currentSheetHeight - fadeStartHeight) / fadeDistance, 0.0), 1.0)
         return 1.0 - progress
     }
-    
+
     private var quickActionsScale: CGFloat {
         let progress = 1.0 - quickActionsOpacity
         return 1.0 - (progress * 0.1)
     }
-    
+
     init(setup: Setup, storageController: StorageController? = nil) {
         self._viewModel = State(initialValue: SetupDetailViewModel(
             setup: setup,
             storageController: storageController
         ))
     }
-    
+
     var body: some View {
         @Bindable var viewModel = viewModel
-        
+
         ZStack(alignment: .bottom) {
             // Main Content Layer
             VStack(spacing: 0) {
                 tabPicker
-                
+
                 if isEditing || viewModel.selectedTab == 0 {
                     diagramContent
                 } else {
                     referencesContent
                 }
             }
-            
+
             if isEditing, case .equipment(let nodeId) = activeSheetContent, quickActionsOpacity > 0.01 {
                 nodeQuickActionsToolbar(for: nodeId)
                     .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
@@ -118,16 +127,17 @@ struct SetupDetailView: View {
         .navigationDestination(isPresented: $showReferenceDetail) {
             FullScreenImageView(
                 viewModel: viewModel,
-                selectedIndex: selectedPreviewIndex
+                selectedIndex: selectedPreviewIndex,
+                namespace: zoomNamespace
             )
         }
         .sheet(isPresented: unifiedSheetBinding, onDismiss: {
             activeSheetContent = nil
             selectedNodeId = nil
             selectedDetent = .height(76)
-        }) {
+        }, content: {
             unifiedSheetContent
-        }
+        })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(
                 viewModel: viewModel.reviewViewModel,
@@ -135,14 +145,6 @@ struct SetupDetailView: View {
                 undoManager: undoManager,
                 isReadOnly: false
             )
-        }
-        .alert("Discard Changes?", isPresented: $showsDiscardChangesAlert) {
-            Button("Keep Editing", role: .cancel) { }
-            Button("Discard", role: .destructive) {
-                withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
-            }
-        } message: {
-            Text("Your changes to this diagram won't be saved.")
         }
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
@@ -170,24 +172,34 @@ struct SetupDetailView: View {
         } message: {
             Text(viewModel.deleteMessage)
         }
+        .alert("Delete This Photo?", isPresented: $viewModel.isDeleteImageAlertPresented) {
+                    Button("Cancel", role: .cancel) {
+                imageIndexToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let index = imageIndexToDelete {
+                    viewModel.deleteReferenceImage(at: index)
+                }
+                imageIndexToDelete = nil
+            }
+        } message: {
+            Text("It will be removed from this setup's references.")
+        }
+        .fullScreenCover(isPresented: $showCameraDenied, onDismiss: {
+            if openLibraryAfterDenied {
+                openLibraryAfterDenied = false
+                showPhotoPicker = true
+            }
+        }, content: {
+            cameraDenied()
+        })
     }
-    
+
     // MARK: - Floating Node Toolbar Component & Actions
-    
+
     @ViewBuilder
     private func nodeQuickActionsToolbar(for nodeId: UUID) -> some View {
         HStack(spacing: 16) {
-//            Button {
-//                duplicateNode(id: nodeId)
-//            } label: {
-//                Image(systemName: "plus.square.on.square")
-//                    .font(.subheadline.weight(.medium))
-//                    .foregroundStyle(DesignTokens.textPrimary)
-//            }
-//            
-//            Divider()
-//                .frame(height: 16)
-            
             Button(role: .destructive) {
                 quickDeleteNode(id: nodeId)
             } label: {
@@ -202,19 +214,19 @@ struct SetupDetailView: View {
         .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
-    
+
     private func duplicateNode(id: UUID) {
         guard let original = viewModel.reviewViewModel.nodes.first(where: { $0.id == id }) else { return }
         let oldNodes = viewModel.reviewViewModel.nodes.map { $0.clone() }
-        
+
         let duplicate = original.clone()
         duplicate.id = UUID()
         duplicate.name = "\(original.name) Copy"
         duplicate.position = CGPoint(x: original.position.x + 24, y: original.position.y + 24)
-        
+
         viewModel.reviewViewModel.nodes.append(duplicate)
         viewModel.reviewViewModel.applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
-        
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedNodeId = duplicate.id
             activeSheetContent = .equipment(duplicate.id)
@@ -222,14 +234,14 @@ struct SetupDetailView: View {
         }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
-    
+
     private func quickDeleteNode(id: UUID) {
         guard let index = viewModel.reviewViewModel.nodes.firstIndex(where: { $0.id == id }) else { return }
         let oldNodes = viewModel.reviewViewModel.nodes.map { $0.clone() }
-        
+
         viewModel.reviewViewModel.nodes.remove(at: index)
         viewModel.reviewViewModel.applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
-        
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedNodeId = nil
             activeSheetContent = nil
@@ -237,9 +249,9 @@ struct SetupDetailView: View {
         }
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
     }
-    
+
     // MARK: - Sub-Expressions
-    
+
     @ViewBuilder
     private var tabPicker: some View {
         if !isEditing {
@@ -249,12 +261,11 @@ struct SetupDetailView: View {
             }
             .pickerStyle(.segmented)
             .controlSize(.large)
-            .glassEffect(.regular.interactive())
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
     }
-    
+
     private var diagramContent: some View {
         ReviewDiagramContentView(
             viewModel: viewModel.reviewViewModel,
@@ -272,7 +283,7 @@ struct SetupDetailView: View {
         )
         .ignoresSafeArea(edges: .bottom)
     }
-    
+
     @ViewBuilder
     private var referencesContent: some View {
         ZStack {
@@ -294,11 +305,10 @@ struct SetupDetailView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private func referenceImageCell(at index: Int) -> some View {
-        let isSelected = selectedImageIndices.contains(index)
-        
+
         ZStack(alignment: .topTrailing) {
             Image(uiImage: viewModel.referenceImages[index])
                 .resizable()
@@ -306,33 +316,33 @@ struct SetupDetailView: View {
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 .aspectRatio(1, contentMode: .fit)
                 .clipped()
-                .opacity(viewModel.isSelectionMode && isSelected ? 0.75 : 1.0)
-            
-            if viewModel.isSelectionMode {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : .white)
-                    .shadow(color: .black.opacity(0.3), radius: 2)
-                    .padding(6)
-            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if viewModel.isSelectionMode {
-                if isSelected {
-                    selectedImageIndices.remove(index)
-                } else {
-                    selectedImageIndices.insert(index)
-                }
-            } else {
-                selectedPreviewIndex = index
-                showReferenceDetail = true
+            selectedPreviewIndex = index
+            showReferenceDetail = true
+        }
+        .contextMenu {
+            Button {
+                viewModel.setAsCoverImage(at: index)
+            } label: {
+                Label("Set as Cover Photo", systemImage: "photo.artframe")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                imageIndexToDelete = index
+                viewModel.isDeleteImageAlertPresented = true
+            } label: {
+                Label("Delete Photo", systemImage: "trash")
             }
         }
+        .matchedTransitionSource(id: index, in: zoomNamespace)
     }
-    
+
     // MARK: - Unified Sheet
-    
+
     private var unifiedSheetBinding: Binding<Bool> {
         Binding(
             get: { activeSheetContent != nil },
@@ -347,7 +357,7 @@ struct SetupDetailView: View {
             }
         )
     }
-    
+
     @ViewBuilder
         private var unifiedSheetContent: some View {
             Group {
@@ -398,7 +408,7 @@ struct SetupDetailView: View {
             }
         }
     // MARK: - Tap Handlers
-    
+
     private func handleNodeTap(_ node: Equipment) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
@@ -406,7 +416,7 @@ struct SetupDetailView: View {
         selectedNodeId = node.id
         activeSheetContent = .equipment(node.id)
     }
-    
+
     private func handleSubjectTap() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
@@ -414,7 +424,7 @@ struct SetupDetailView: View {
         selectedNodeId = nil
         activeSheetContent = .subject
     }
-    
+
     private func handleEmptyTap() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedNodeId = nil
@@ -422,24 +432,24 @@ struct SetupDetailView: View {
             selectedDetent = .height(76)
         }
     }
-    
+
     // MARK: - Toolbar Content
-    
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         if isEditing {
             editToolbar
         }
-        
+
         principalToolbar
-        
+
         if !isEditing {
             moreMenuToolbar
         }
-        
+
         bottomToolbar
     }
-    
+
     @ToolbarContentBuilder
     private var editToolbar: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
@@ -450,8 +460,18 @@ struct SetupDetailView: View {
                     withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
                 }
             }
+            // A popover on the X (like Reminders); tapping outside it keeps editing.
+            .confirmationDialog(
+                "Are you sure you want to discard your changes to this diagram?",
+                isPresented: $showsDiscardChangesAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Discard Changes", role: .destructive) {
+                    withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
+                }
+            }
         }
-        
+
         ToolbarItem(placement: .confirmationAction) {
             HStack(spacing: 4) {
                 Button("Undo", systemImage: "arrow.uturn.backward") {
@@ -459,7 +479,7 @@ struct SetupDetailView: View {
                     viewModel.reviewViewModel.updateUndoState(undoManager: undoManager)
                 }
                 .disabled(!viewModel.reviewViewModel.canUndo)
-                
+
                 Button("Redo", systemImage: "arrow.uturn.forward") {
                     undoManager?.redo()
                     viewModel.reviewViewModel.updateUndoState(undoManager: undoManager)
@@ -467,9 +487,9 @@ struct SetupDetailView: View {
                 .disabled(!viewModel.reviewViewModel.canRedo)
             }
         }
-        
+
         ToolbarSpacer(.fixed, placement: .confirmationAction)
-        
+
         ToolbarItem(placement: .confirmationAction) {
             Button("Save Changes", systemImage: "checkmark") {
                 withAnimation { viewModel.reviewViewModel.confirmEdits(undoManager: undoManager) }
@@ -479,7 +499,7 @@ struct SetupDetailView: View {
             .disabled(!viewModel.reviewViewModel.hasPendingEdits)
         }
     }
-    
+
     @ToolbarContentBuilder
     private var principalToolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
@@ -496,7 +516,7 @@ struct SetupDetailView: View {
             .accessibilityElement(children: .combine)
         }
     }
-    
+
     @ToolbarContentBuilder
     private var moreMenuToolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
@@ -521,11 +541,11 @@ struct SetupDetailView: View {
             .accessibilityLabel("More")
         }
     }
-    
+
     @ToolbarContentBuilder
     private var bottomToolbar: some ToolbarContent {
         ToolbarSpacer(placement: .bottomBar)
-        
+
         if activeSheetContent == nil && (isEditing || viewModel.selectedTab == 0) {
             ToolbarItem(placement: .bottomBar) {
                 floatingButton
@@ -533,7 +553,7 @@ struct SetupDetailView: View {
         } else if !isEditing && viewModel.selectedTab == 1 {
             ToolbarItem(placement: .bottomBar) {
                 Menu {
-                    Button("Take Photo", systemImage: "camera") { showCamera = true }
+                    Button("Take Photo", systemImage: "camera") { takePhotoTapped() }
                     Button("Choose from Library", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
                 } label: {
                     Label("Add Image", systemImage: "plus")
@@ -541,7 +561,7 @@ struct SetupDetailView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var floatingButton: some View {
         if isEditing {
@@ -568,7 +588,7 @@ struct SetupDetailView: View {
             .tint(DesignTokens.accentPrimary)
         }
     }
-    
+
     private func shareTapped() {
         let base = PDFLayout.diagramCanvasSize
         let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
@@ -579,7 +599,7 @@ struct SetupDetailView: View {
         renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
         viewModel.shareTapped(diagram: renderer.uiImage)
     }
-    
+
     private var referencesEmptyState: some View {
         ContentUnavailableView {
             Label("No References Yet", systemImage: "photo")
@@ -588,6 +608,68 @@ struct SetupDetailView: View {
             Add any photos from the shoot, like the final shot, the product, or the set, \
             so you can match this setup next time. Tap + to add a reference.
             """)
+        }
+    }
+
+    private func takePhotoTapped() {
+        // No camera hardware (simulator): CameraPicker already falls back to the photo library.
+        guard CameraService.shared.isCameraAvailable else {
+            showCamera = true
+            return
+        }
+
+        switch cameraPermission.status {
+        case .authorized:
+            showCamera = true
+        case .denied:
+            showCameraDenied = true
+        case .notDetermined:
+            Task {
+                if await cameraPermission.request() {
+                    showCamera = true
+                } else {
+                    showCameraDenied = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Camera Denied
+
+    @ViewBuilder
+    private func cameraDenied() -> some View {
+        NavigationStack {
+            ScanMessageView(title: "Camera Access Is Off", systemImage: "video.slash", message: Text("""
+                        Lighting Memory needs the camera to take reference photos. \
+                        Turn it on in Settings, or choose a photo from your library.
+                        """)) {
+
+                ScanPrimaryButton(title: "Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+
+                Button("Choose From Library") {
+                    openLibraryAfterDenied = true
+                    showCameraDenied = false
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DesignTokens.accentText)
+
+            }
+            .padding(.horizontal, 24)
+
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", systemImage: "xmark") { showCameraDenied = false }
+                }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, cameraPermission.status == .authorized {
+                showCameraDenied = false
+            }
         }
     }
 }

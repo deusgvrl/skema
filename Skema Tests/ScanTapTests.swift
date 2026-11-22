@@ -52,7 +52,7 @@ struct ScanTapTests {
         try tap(viewModel, .subject, metres: 3, withFloor: false)
 
         #expect(viewModel.subject == nil)
-        #expect(viewModel.message == "Point the phone at the floor first")
+        #expect(viewModel.message == "Point the phone down at the floor first.")
     }
 
     @Test("A tap on the subject puts it at the LiDAR point under the tap")
@@ -83,7 +83,8 @@ struct ScanTapTests {
 
         try tap(viewModel, .light)
         try tap(viewModel, .camera, at: leftOfMiddle)
-        try tap(viewModel, .light, at: CGPoint(x: 720, y: 1344))
+        // A10-106: the second light is on a wall at 3 m, another surface than the first light's wall at 2 m.
+        try tap(viewModel, .light, at: CGPoint(x: 720, y: 1344), metres: 3)
 
         #expect(viewModel.items.map(\.name) == ["Studio Lighting 1", "Camera 1", "Studio Lighting 2"])
     }
@@ -116,7 +117,8 @@ struct ScanTapTests {
         let viewModel = makeViewModel()
         try tap(viewModel, .light)
 
-        try tap(viewModel, .light, at: leftOfMiddle)
+        // A10-106: on the same flat wall the second tap would be "Already tapped"; a wall at 3 m is another surface.
+        try tap(viewModel, .light, at: leftOfMiddle, metres: 3)
 
         #expect(viewModel.items.count == 2)
     }
@@ -160,11 +162,13 @@ struct ScanTapTests {
         viewModel.finishTapped()
 
         // The subject wall is 3 m ahead, the light's wall 2 m ahead: 1 m apart, on the phone's side (plan down).
+        // A10-106: the distance goes to the back of the light's grown box, 1 cm nearer the phone (the 2 cm minimum
+        // depth of a flat wall's box): 1.01 m.
         let light = try #require(viewModel.draftSetup.nodes.first)
         let height = try #require(Double(light.height.replacingOccurrences(of: " m", with: "")))
-        #expect(light.distance == "1.00")
-        // A light is measured at the middle of its head: here the column from 3 cm above the floor up to the top of
-        // the wall at 2 m, so its middle is 1.24 m above the floor.
+        #expect(light.distance == "1.01")
+        // A10-106: a light is measured at the middle height of its grown box: here the wall painted from 3 cm above
+        // the floor up to the top of the picture at 2 m, so its middle is 1.24 m above the floor.
         #expect(abs(height - 1.24) < 0.05)
         #expect(abs(light.position.x) < 2 && abs(light.position.y - 100) < 2)
     }
@@ -216,7 +220,9 @@ struct ScanTapTests {
         let item = try #require(viewModel.items.first)
         let light = try #require(viewModel.draftSetup.nodes.first)
         #expect(viewModel.statusText(for: item) == "Saved" && viewModel.isSaved(item))
-        #expect(light.distance == "1.00" && !light.height.isEmpty)
+        // A10-106: the distance goes to the back of the light's grown box. A flat wall's box gets the 2 cm minimum
+        // depth, so its back is 1 cm nearer the phone: 1.01 m.
+        #expect(light.distance == "1.01" && !light.height.isEmpty)
         #expect(abs(light.position.y - 100) < 2)
         #expect(viewModel.subjectStatusText == "Saved" && viewModel.subjectIsSaved)
     }
