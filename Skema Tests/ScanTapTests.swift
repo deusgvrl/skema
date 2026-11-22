@@ -52,7 +52,7 @@ struct ScanTapTests {
         try tap(viewModel, .subject, metres: 3, withFloor: false)
 
         #expect(viewModel.subject == nil)
-        #expect(viewModel.message == "Point the phone at the floor first")
+        #expect(viewModel.message == "Point the phone down at the floor first.")
     }
 
     @Test("A tap on the subject puts it at the LiDAR point under the tap")

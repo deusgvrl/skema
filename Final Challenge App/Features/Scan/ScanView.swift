@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// The scan screen (LiDAR only, no object detection), guided step by step (Sketch UT Review T01–T10): tap the floor,
-/// the product, the camera and each light; each tap sets the next thing still missing. A coaching panel explains each
-/// step on the first scan (Skip hides it, ? brings it back); later scans show a short hint instead. Undo takes back
-/// the last tap. The floor gets a
-/// green grid and each tapped item a green box and tag. Tips show when the scan goes badly, ✕ asks before throwing the
+/// The scan screen (LiDAR only, no object detection), guided step by step (Sketch UT Review T01–T10): point at the
+/// floor until it is found (A10-112, no tap), then tap the product, the camera and each light; each tap sets the next
+/// thing still missing. A coaching panel explains each step on the first scan (Skip hides it, ? brings it back); later
+/// scans show a short hint instead. Undo takes back the last tap. Each tapped item gets a box and tag; the floor is not
+/// drawn. Tips show when the scan goes badly, ✕ asks before throwing the
 /// taps away, and Finish Scan opens the lighting diagram, where everything can still be edited. Without camera access
 /// or LiDAR it shows a message with "Add Equipment Manually" (Sketch R02–R04x).
 struct ScanView: View {
@@ -29,7 +29,7 @@ struct ScanView: View {
             background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, floor: floorPoint, outlines: viewModel.outlineBoxes)
+                    RoomScanView(session: session, outlines: viewModel.outlineBoxes)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.tap(atScreen: tap, screenSize: geometry.size)
@@ -140,12 +140,6 @@ struct ScanView: View {
     private func addEquipmentManually() {
         viewModel.insertDraftSetup()
         reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup, storageController: viewModel.storageController)
-    }
-
-    /// The tapped floor point at the floor's height, for the green grid.
-    private var floorPoint: SIMD3<Float>? {
-        guard let anchor = viewModel.floorAnchor, let height = viewModel.floorHeight else { return nil }
-        return SIMD3(anchor.x, height, anchor.z)
     }
 
     private var topBar: some View {
@@ -265,9 +259,9 @@ struct ScanView: View {
     }
 }
 
-/// What is drawn over the camera for each tap (Sketch T02–T09): "Floor ✓" at the floor tap, and a green box with a
-/// tag above it for the subject and each camera and light. A tag is green once its values are saved; until then it says
-/// why not ("Measuring…", "Too far, over 5 m").
+/// What is drawn over the camera for each tap (Sketch T02–T09): a green box with a tag above it for the subject and
+/// each camera and light (the floor has no tag since A10-112). A tag is green once its values are saved; until then it
+/// says why not ("Measuring…", "Too far, over 5 m").
 private struct ScanTagsView: View {
     let viewModel: ScanViewModel
 
@@ -275,9 +269,6 @@ private struct ScanTagsView: View {
         GeometryReader { geometry in
             let size = geometry.size
             ZStack {
-                if let floor = viewModel.floorAnchor, let point = viewModel.tagPosition(of: floor, in: size) {
-                    ScanTag(title: "Floor", status: nil).position(clamped(point, in: size))
-                }
                 if let subject = viewModel.subject {
                     marker(title: "Subject", status: viewModel.subjectIsSaved ? nil : viewModel.subjectStatusText,
                            box: viewModel.subjectBox(in: size),
