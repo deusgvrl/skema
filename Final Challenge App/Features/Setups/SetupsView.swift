@@ -3,9 +3,12 @@ import SwiftUI
 /// Saved setups, by month or by client (Sketch R01, R01b, R01f, R01q, R01v, R01z · A10-13).
 struct SetupsView: View {
     @State private var viewModel = SetupsViewModel()
+    @State private var reviewViewModel: ReviewViewModel?
     @State private var isShowingRecentlyDeleted = false
     @FocusState private var isSearchFocused: Bool
     @ScaledMetric(relativeTo: .title2) private var bottomControlSize: CGFloat = 48
+
+    private let gridColumns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
     var body: some View {
         @Bindable var viewModel = viewModel
@@ -15,7 +18,11 @@ struct SetupsView: View {
                 content
             }
             .safeAreaInset(edge: .bottom) {
-                bottomBar
+                SetupsBottomBarView(
+                    viewModel: viewModel,
+                    isSearchFocused: $isSearchFocused,
+                    bottomControlSize: bottomControlSize
+                )
             }
             .navigationTitle("Setups")
             .toolbarTitleDisplayMode(.inlineLarge)
@@ -26,6 +33,18 @@ struct SetupsView: View {
             }
             .navigationDestination(for: Setup.self) { selectedSetup in
                 SetupDetailView(setup: selectedSetup)
+            }
+            .fullScreenCover(item: $reviewViewModel) { reviewModel in
+                NavigationStack {
+                    ReviewView(
+                        isFromLoadingScreen: true,
+                        viewModel: reviewModel,
+                        onDismissToSetups: {
+                            reviewViewModel = nil
+                            viewModel.fetchSetups()
+                        }
+                    )
+                }
             }
             .navigationDestination(isPresented: $viewModel.isShowingScan) {
                 ScanView(onDismissToSetups: {
@@ -73,7 +92,7 @@ struct SetupsView: View {
     @ViewBuilder
     private var content: some View {
         if viewModel.showsEmptyState {
-            emptyState
+            SetupsEmptyStateView()
         } else if viewModel.showsNoResults {
             ContentUnavailableView.search(text: viewModel.searchText)
         } else {
@@ -108,45 +127,35 @@ struct SetupsView: View {
 
             LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 18) {
                 ForEach(setups) { setup in
-                    NavigationLink(value: setup) {
-                        SetupGridItem(setup: setup)
+                    if setup.firstSavedDate == nil {
+                        Button {
+                            reviewViewModel = ReviewViewModel(
+                                setup: setup,
+                                storageController: viewModel.storageController
+                            )
+                        } label: {
+                            SetupGridItem(setup: setup)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { deleteButton(for: setup) }
+                    } else {
+                        NavigationLink(value: setup) {
+                            SetupGridItem(setup: setup)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { deleteButton(for: setup) }
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu { deleteButton(for: setup) }
                 }
             }
             .padding(.horizontal)
         }
     }
 
-    private let gridColumns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
-
     private func deleteButton(for setup: Setup) -> some View {
         Button(role: .destructive) {
             viewModel.deleteTapped(setup)
         } label: {
             Label("Delete", systemImage: "trash")
-        }
-    }
-
-    private var emptyState: some View {
-        ContentUnavailableView {
-            Label {
-                Text("No Setups Yet")
-                    .font(.title2.bold())
-                    .foregroundStyle(DesignTokens.textPrimary)
-            } icon: {
-                LightStandGlyph()
-                    .stroke(DesignTokens.textSecondary, style: StrokeStyle(lineWidth: 2.5, lineJoin: .round))
-                    .frame(width: 40, height: 52)
-            }
-        } description: {
-            Text("""
-                Scan your first lighting setup. The diagram, \
-                equipment and references are saved here, so you can rebuild it next time.
-                """)
-            .font(.subheadline)
-            .foregroundStyle(DesignTokens.textSecondary)
         }
     }
 
@@ -171,10 +180,39 @@ struct SetupsView: View {
             Label("Group By", systemImage: "line.3.horizontal.decrease")
         }
     }
+}
 
-    // MARK: - Bottom bar
+// MARK: - Extracted Subviews
 
-    private var bottomBar: some View {
+private struct SetupsEmptyStateView: View {
+    var body: some View {
+        ContentUnavailableView {
+            Label {
+                Text("No Setups Yet")
+                    .font(.title2.bold())
+                    .foregroundStyle(DesignTokens.textPrimary)
+            } icon: {
+                LightStandGlyph()
+                    .stroke(DesignTokens.textSecondary, style: StrokeStyle(lineWidth: 2.5, lineJoin: .round))
+                    .frame(width: 40, height: 52)
+            }
+        } description: {
+            Text("""
+                Scan your first lighting setup. The diagram, \
+                equipment and references are saved here, so you can rebuild it next time.
+                """)
+            .font(.subheadline)
+            .foregroundStyle(DesignTokens.textSecondary)
+        }
+    }
+}
+
+private struct SetupsBottomBarView: View {
+    @Bindable var viewModel: SetupsViewModel
+    @FocusState.Binding var isSearchFocused: Bool
+    let bottomControlSize: CGFloat
+
+    var body: some View {
         VStack(spacing: 8) {
             if viewModel.lastDeleted != nil {
                 deletedToast
@@ -201,7 +239,7 @@ struct SetupsView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(DesignTokens.textSecondary)
                 .accessibilityHidden(true)
-            TextField("Search", text: Bindable(viewModel).searchText)
+            TextField("Search", text: $viewModel.searchText)
                 .focused($isSearchFocused)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
@@ -261,7 +299,6 @@ struct SetupsView: View {
         }
     }
 
-    /// "Setup Saved" after Project Details (A10-97).
     private var savedToast: some View {
         ToastBar(systemImage: "checkmark", message: "Setup Saved")
             .transition(.move(edge: .bottom).combined(with: .opacity))

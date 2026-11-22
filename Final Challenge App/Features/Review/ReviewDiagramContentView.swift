@@ -84,7 +84,7 @@ private struct DiagramTipPill<TipType: Tip>: View {
                         Image(systemName: "xmark")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(DesignTokens.textSecondary)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 28, height: 28)
                             .background(Circle().fill(Color.white.opacity(0.12)))
                             .frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
