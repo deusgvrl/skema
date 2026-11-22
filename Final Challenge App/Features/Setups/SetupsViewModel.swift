@@ -6,7 +6,7 @@ import Observation
 @MainActor
 @Observable
 final class SetupsViewModel {
-    
+
     var setups: [Setup] = []
     var isShowingScan = false
     var showsEmptyState: Bool { setups.isEmpty }
@@ -48,7 +48,7 @@ final class SetupsViewModel {
         self.storageController = storageController ?? StorageController.shared
         self.fetchSetups()
     }
-    
+
     /// + opens the scan straight away; the tutorial runs inside it (Sketch UT Review T01).
     func newSetupTapped() {
         isShowingScan = true

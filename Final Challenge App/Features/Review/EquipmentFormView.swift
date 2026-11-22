@@ -3,24 +3,24 @@ import SwiftUI
 struct EquipmentFormView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var formViewModel: EquipmentFormViewModel
-    
+
     @Binding var selectedDetent: PresentationDetent
-    
+
     let viewModel: ReviewViewModel
     let editingNodeId: UUID?
     let undoManager: UndoManager?
     var isReadOnly: Bool = false
-    
+
     // State management for dirty tracking and confirmation alerts
     @State private var isDeleteAlert: Bool = false
     @State private var isDiscardAlertPresented: Bool = false
     @State private var isDirty: Bool = false
     @State private var isSwitchingNode: Bool = false
-    
+
     private var editingTitle: String? {
         viewModel.nodes.first { $0.id == editingNodeId }?.displayName
     }
-    
+
     init(
         viewModel: ReviewViewModel,
         editingNodeId: UUID?,
@@ -38,10 +38,10 @@ struct EquipmentFormView: View {
             reviewViewModel: viewModel
         ))
     }
-    
+
     var body: some View {
         @Bindable var formViewModel = formViewModel
-        
+
         NavigationStack {
             Form {
                 // 1. Equipment Section
@@ -54,7 +54,7 @@ struct EquipmentFormView: View {
                     .pickerStyle(.menu)
                     .tint(.primary)
                     .disabled(isReadOnly)
-                    
+
                     HStack {
                         Text("Name")
                         Spacer()
@@ -63,7 +63,7 @@ struct EquipmentFormView: View {
                             .foregroundStyle(DesignTokens.textSecondary)
                             .disabled(isReadOnly)
                     }
-                    
+
                     if formViewModel.category != .accessory {
                         HStack {
                             Text("Role / label")
@@ -76,7 +76,7 @@ struct EquipmentFormView: View {
                     }
                 }
                 .listRowBackground(DesignTokens.formRowBackground)
-                
+
                 // 2. Category-Specific Settings
                 if formViewModel.category == .light {
                     Section(header: FormSectionHeader("Light Settings")) {
@@ -102,7 +102,7 @@ struct EquipmentFormView: View {
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
-                
+
                 if formViewModel.category == .camera {
                     Section(header: FormSectionHeader("Lens")) {
                         HStack {
@@ -117,7 +117,7 @@ struct EquipmentFormView: View {
                         }
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
-                    
+
                     Section(header: FormSectionHeader("Camera Settings")) {
                         HStack {
                             Text("ISO")
@@ -158,7 +158,7 @@ struct EquipmentFormView: View {
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
-                
+
                 // 3. Position & Direction
                 if formViewModel.category != .accessory {
                     Section(
@@ -192,7 +192,7 @@ struct EquipmentFormView: View {
                             Text("°")
                                 .foregroundStyle(DesignTokens.textSecondary)
                         }
-                        
+
                         if formViewModel.category == .light {
                             HStack {
                                 Text("Horizontal aim")
@@ -206,7 +206,7 @@ struct EquipmentFormView: View {
                                     .foregroundStyle(DesignTokens.textSecondary)
                             }
                         }
-                        
+
                         HStack {
                             Text("Distance to subject")
                                 .lineLimit(1)
@@ -223,7 +223,7 @@ struct EquipmentFormView: View {
                     }
                     .listRowBackground(DesignTokens.formRowBackground)
                 }
-                
+
                 // 4. Notes & Accessories
                 if formViewModel.category == .accessory {
                     Section(header: FormSectionHeader("Notes")) {
@@ -258,7 +258,7 @@ struct EquipmentFormView: View {
                         }
                     }
                 }
-                
+
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
                         if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
@@ -315,7 +315,7 @@ struct EquipmentFormView: View {
                 isSwitchingNode = false
             }
         }
-        
+
         // Unsaved changes confirmation alert
         .alert("Discard Unsaved Changes?", isPresented: $isDiscardAlertPresented) {
             Button("Keep Editing", role: .cancel) { }
@@ -323,7 +323,7 @@ struct EquipmentFormView: View {
         } message: {
             Text("You have unsaved changes. Are you sure you want to discard them?")
         }
-        
+
         // Delete confirmation alert
         .alert("Delete Equipment", isPresented: $isDeleteAlert) {
             Button("Cancel", role: .cancel) { }

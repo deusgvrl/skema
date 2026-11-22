@@ -8,7 +8,7 @@
 import Testing
 import Foundation
 import SwiftUI
-@testable import Skema_Photo 
+@testable import Skema_Photo
 
 @Suite("EquipmentFormViewModel Tests")
 @MainActor

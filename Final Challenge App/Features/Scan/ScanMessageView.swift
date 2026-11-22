@@ -15,7 +15,6 @@ struct ScanMessageView<Actions: View>: View {
     let message: Text
     @ViewBuilder let actions: () -> Actions
 
-
     var body: some View {
         // Scrolls only when large Dynamic Type no longer fits on screen.
         ViewThatFits(in: .vertical) {
@@ -31,7 +30,7 @@ struct ScanMessageView<Actions: View>: View {
     private var content: some View {
         VStack(spacing: 0) {
             Image(systemName: systemImage)
-                .font(.system(size: 56, weight: .regular)) 
+                .font(.system(size: 56, weight: .regular))
                 .foregroundStyle(DesignTokens.textPrimary)
                 .accessibilityHidden(true)
 

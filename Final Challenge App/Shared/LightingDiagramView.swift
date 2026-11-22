@@ -4,27 +4,27 @@ struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
     var isExportedToPdf: Bool = false
-    var undoManager: UndoManager? = nil
-    
+    var undoManager: UndoManager?
+
     // Converted to Binding so parent controls selection lifecycle
     @Binding var selectedNodeId: UUID?
-    
-    var onNodeTap: ((Equipment) -> Void)? = nil
-    var onSubjectTap: (() -> Void)? = nil
-    var onEmptyTap: (() -> Void)? = nil
-    
+
+    var onNodeTap: ((Equipment) -> Void)?
+    var onSubjectTap: (() -> Void)?
+    var onEmptyTap: (() -> Void)?
+
     @State private var nodesSnapshot: [Equipment] = []
-    
+
     // Smooth Zoom & Pan States
     @State private var zoomScale: CGFloat = 1.0
     @GestureState private var magnifyBy: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @GestureState private var dragOffset: CGSize = .zero
-    
+
     // Scale Meter Visibility State
     @State private var showScaleMeter: Bool = false
-    @State private var hideScaleMeterTask: Task<Void, Never>? = nil
-    
+    @State private var hideScaleMeterTask: Task<Void, Never>?
+
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
@@ -46,13 +46,13 @@ struct LightingDiagramView: View {
         self.onSubjectTap = onSubjectTap
         self.onEmptyTap = onEmptyTap
     }
-    
+
     var body: some View {
         GeometryReader { geo in
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
             let currentScale = zoomScale * magnifyBy
             let gridConfig = GridConfig.config(for: currentScale)
-            
+
             ZStack {
                 // Background Grid (Hides when isReadOnly is true)
                 if !isReadOnly {
@@ -61,7 +61,7 @@ struct LightingDiagramView: View {
                         .frame(width: 6000, height: 6000)
                         .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 }
-                 
+
                 // Connecting Lines
                 Path { path in
                     for node in viewModel.nodes {
@@ -73,7 +73,7 @@ struct LightingDiagramView: View {
                     DesignTokens.diagramGuide,
                     style: StrokeStyle(lineWidth: 1 / currentScale, dash: [4 / currentScale, 3 / currentScale])
                 )
-                 
+
                 // Subject Card
                 DiagramEntity(
                     title: "Subject",
@@ -83,19 +83,19 @@ struct LightingDiagramView: View {
                 ) {
                     onSubjectTap?()
                 }
-                 
+
                 // Distance Labels
                 let minDistanceThreshold = 1.5 / currentScale
 
-                ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { index, node in
+                ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
-                    
+
                     if isExportedToPdf || distanceValue >= minDistanceThreshold {
                         let dx = node.position.x
                         let dy = node.position.y
                         let posX = subjectCenter.x + dx * 0.5
                         let posY = subjectCenter.y + dy * 0.5
-                        
+
                         let angle: Double = {
                             var rawAngle = atan2(dy, dx) * 180 / .pi
                             if rawAngle > 90 {
@@ -105,7 +105,7 @@ struct LightingDiagramView: View {
                             }
                             return rawAngle
                         }()
-                        
+
                         Text("\(node.distance) m")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(DesignTokens.textSecondary)
@@ -122,7 +122,7 @@ struct LightingDiagramView: View {
                             .transition(.opacity)
                     }
                 }
-                
+
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
                     NodeView(
@@ -196,7 +196,7 @@ struct LightingDiagramView: View {
                     .onEnded { value in
                         zoomScale *= value.magnification
                         zoomScale = max(0.3, min(zoomScale, 8.0))
-                        
+
                         guard !isReadOnly else { return }
                         hideScaleMeterTask?.cancel()
                         hideScaleMeterTask = Task {
@@ -218,7 +218,7 @@ struct LightingDiagramView: View {
             if !isReadOnly {
                 let activeScale = zoomScale * magnifyBy
                 let activeConfig = GridConfig.config(for: activeScale)
-                
+
                 ScaleMeterView(
                     labelText: activeConfig.labelText,
                     barWidth: activeConfig.stepInPoints * activeScale

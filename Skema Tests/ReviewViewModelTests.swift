@@ -8,8 +8,7 @@
 import Testing
 import Foundation
 import SwiftUI
-@testable import Skema_Photo 
-
+@testable import Skema_Photo
 
 @Suite("ReviewViewModel Tests")
 @MainActor
@@ -20,7 +19,7 @@ struct ReviewViewModelTests {
         let storage = StorageController(inMemory: true)
         let setup = Setup(setupName: "Studio A", client: "Acme", project: "Commercial")
         let light = Equipment(category: .light, label: "E1", name: "Key Light", role: "Main")
-        
+
         setup.nodes.append(light)
         storage.addSetup(setup)
 

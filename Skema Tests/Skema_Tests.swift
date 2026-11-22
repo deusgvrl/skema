@@ -23,4 +23,3 @@ struct ProjectSetupTests {
         #expect(deviceFamilies == [1])
     }
 }
-

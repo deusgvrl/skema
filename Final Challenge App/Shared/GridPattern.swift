@@ -9,7 +9,7 @@ import SwiftUI
 
 struct GridPattern: Shape {
     var step: CGFloat = 50
-    
+
     func path(in rect: CGRect) -> Path {
         var path = Path()
         for x in stride(from: 0, through: rect.width, by: step) {
@@ -24,16 +24,15 @@ struct GridPattern: Shape {
     }
 }
 
-
 struct GridConfig {
     let stepInPoints: CGFloat // Grid tile width in canvas model points
     let labelText: String     // Scale badge text (e.g. "25 cm", "50 cm", "1 m")
-    
+
     /// Calculates the optimal grid subdivision step based on the active zoom factor
     static func config(for scale: CGFloat) -> GridConfig {
         // Target model distance that maps to roughly 50–70 screen pixels
         let targetMeters = 0.5 / scale
-        
+
         if targetMeters <= 0.08 {
             // Very Deep Zoom (scale >= 6.25x) -> 5 cm per tile
             return GridConfig(stepInPoints: 5, labelText: "5 cm")

@@ -12,30 +12,30 @@ struct NodeView: View {
     let isSelected: Bool
     var isReadOnly: Bool = false
     var zoomScale: CGFloat = 1.0
-    
+
     var onTap: () -> Void
     var onGestureStart: () -> Void
     var onGestureEnd: () -> Void
-    
+
     // Rotation & Handle Stretch States
     @State private var isRotating = false
     @State private var isDragging = false
     @State private var globalCenter: CGPoint = .zero
     @State private var dragStartPosition: CGPoint = .zero
-    
+
     // Dynamic Handle Distance State (Stretches on drag, snaps back on release)
     private let defaultHandleDistance: CGFloat = 72.0
-    
+
     // Rotation Haptic State
     @State private var lastHapticAngle: Double = 0.0
-    @State private var feedbackGenerator: UISelectionFeedbackGenerator? = nil
-    
+    @State private var feedbackGenerator: UISelectionFeedbackGenerator?
+
     @State private var currentHandleDistance: CGFloat = 72.0
     @State private var grabOffset: CGFloat = 0   // NEW
-    
+
     // Cardinal Alignment Drag Haptic State (12, 3, 6, 9 o'clock)
-    @State private var lastCardinalSnap: Int? = nil
-    
+    @State private var lastCardinalSnap: Int?
+
     var body: some View {
         ZStack {
             // 1. Rotating Equipment Shape, Directional Arrow & Rotate Handle
@@ -43,32 +43,32 @@ struct NodeView: View {
                 switch node.category {
                 case .camera:
                     TopViewCameraShapeView(isSelected: isSelected)
-                    
+
                 case .light:
                     TopViewLightShapeView(isSelected: isSelected)
-                    
+
                 case .accessory:
                     TopViewAccessoryShapeView(isSelected: isSelected)
                 }
-                
+
                 // Directional Pointer Ray & Front Rotate Handle
                 if isSelected && !isReadOnly {
                     let lineLength = max(10, currentHandleDistance - 48)
-                    
+
                     // Dashed Line extending forward from the node
                     DashedLine()
                         .stroke(DesignTokens.accentPrimary, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                         .frame(width: 2, height: lineLength)
                         .offset(y: -(currentHandleDistance + 4) / 2)
                         .shadow(color: DesignTokens.accentPrimary.opacity(0.3), radius: 2)
-                    
+
                     // Directional Chevron Arrowhead (placed right below rotation handle)
                     Image(systemName: "chevron.up")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(DesignTokens.accentPrimary)
                         .offset(y: -currentHandleDistance + 20)
                         .shadow(color: DesignTokens.accentPrimary.opacity(0.4), radius: 2)
-                    
+
                     // Stretchable Rotation Handle Button (positioned at the top tip)
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 13, weight: .bold))
@@ -90,36 +90,36 @@ struct NodeView: View {
                                 .onChanged { value in
                                     let dx = value.location.x - globalCenter.x
                                     let dy = value.location.y - globalCenter.y
-                                    
+
                                     // Screen-space distance (node is counter-scaled, so 1 unit == 1 screen point)
                                     let fingerDistance = hypot(dx, dy)
-                                    
+
                                     if !isRotating {
                                         isRotating = true
                                         onGestureStart()
-                                        
+
                                         // Remember where on the handle the finger grabbed, so there's no jump
                                         grabOffset = fingerDistance - currentHandleDistance
-                                        
+
                                         feedbackGenerator = UISelectionFeedbackGenerator()
                                         feedbackGenerator?.prepare()
                                         lastHapticAngle = node.rotationAngle
                                     }
-                                    
+
                                     // Stretch: same feel at every zoom level
                                     currentHandleDistance = max(defaultHandleDistance, fingerDistance - grabOffset)
-                                    
+
                                     // Angle for front-positioned handle (-Y direction)
                                     var visualAngle = (atan2(dy, dx) * 180 / .pi) + 90
                                     if visualAngle < 0 { visualAngle += 360 }
-                                    
+
                                     let step = 3.0
                                     if Int(visualAngle / step) != Int(lastHapticAngle / step) {
                                         feedbackGenerator?.selectionChanged()
                                         feedbackGenerator?.prepare()
                                         lastHapticAngle = visualAngle
                                     }
-                                    
+
                                     node.rotationAngle = visualAngle
                                     node.syncHorizontalAimFromRotation()
                                 }
@@ -129,7 +129,7 @@ struct NodeView: View {
                                     grabOffset = 0
                                     onGestureEnd()
                                     feedbackGenerator = nil
-                                    
+
                                     // Snap back only after the handle is released
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                         currentHandleDistance = defaultHandleDistance
@@ -193,22 +193,22 @@ struct NodeView: View {
             DragGesture(coordinateSpace: .global)
                 .onChanged { value in
                     guard !isReadOnly, !isRotating else { return }
-                    
+
                     if !isDragging {
                         isDragging = true
                         dragStartPosition = node.position
                         onGestureStart()
                     }
-                    
+
                     let canvasDeltaX = value.translation.width / zoomScale
                     let canvasDeltaY = value.translation.height / zoomScale
-                    
+
                     let rawX = dragStartPosition.x + canvasDeltaX
                     let rawY = dragStartPosition.y + canvasDeltaY
                     let rawPosition = CGPoint(x: rawX, y: rawY)
-                    
+
                     let snappedPosition = applyCardinalSnap(to: rawPosition)
-                    
+
                     node.position = snappedPosition
                     node.syncDistanceFromPosition()
                 }
@@ -222,9 +222,9 @@ struct NodeView: View {
                 }
         )
     }
-    
+
     // MARK: - Cardinal Alignment & Auto-Snap Helper
-    
+
     private func applyCardinalSnap(to rawPosition: CGPoint) -> CGPoint {
         let dx = rawPosition.x
         let dy = rawPosition.y
@@ -234,14 +234,14 @@ struct NodeView: View {
             lastCardinalSnap = nil
             return rawPosition
         }
-        
+
         var angle = atan2(dy, dx) * 180 / .pi
         if angle < 0 { angle += 360 }
-        
+
         let cardinalAngles = [0, 90, 180, 270]
         let tolerance: Double = 1.0
-        
-        var activeCardinal: Int? = nil
+
+        var activeCardinal: Int?
         for cardinal in cardinalAngles {
             let diff = abs(angle - Double(cardinal))
             let minDiff = min(diff, 360 - diff)
@@ -250,13 +250,13 @@ struct NodeView: View {
                 break
             }
         }
-        
+
         if let cardinal = activeCardinal {
             if lastCardinalSnap != cardinal {
                 lastCardinalSnap = cardinal
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
-            
+
             switch cardinal {
             case 0:   return CGPoint(x: radius, y: 0)
             case 90:  return CGPoint(x: 0, y: radius)
@@ -290,7 +290,7 @@ struct Trapezoid: Shape {
         let topWidth = rect.width
         let bottomWidth = rect.width * 0.45
         let inset = (topWidth - bottomWidth) / 2.0
-        
+
         path.move(to: CGPoint(x: 0, y: 0))
         path.addLine(to: CGPoint(x: topWidth, y: 0))
         path.addLine(to: CGPoint(x: topWidth - inset, y: rect.height))
@@ -304,7 +304,7 @@ struct Trapezoid: Shape {
 
 struct TopViewCameraShapeView: View {
     let isSelected: Bool
-    
+
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 5)
@@ -339,7 +339,7 @@ struct TopViewCameraShapeView: View {
 
 struct TopViewLightShapeView: View {
     let isSelected: Bool
-    
+
     var body: some View {
         ZStack(alignment: .top) {
             Trapezoid()
@@ -375,7 +375,7 @@ struct TopViewLightShapeView: View {
 
 struct TopViewAccessoryShapeView: View {
     let isSelected: Bool
-    
+
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 4)

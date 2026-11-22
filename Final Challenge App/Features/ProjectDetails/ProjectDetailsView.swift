@@ -7,7 +7,7 @@ struct ProjectDetailsView: View {
     var isPresentedModally: Bool = false
     var onDismissToSetups: (() -> Void)?
     @State private var viewModel: ProjectDetailsViewModel
-    
+
     // Draft state variables to prevent mutating SwiftData model until user taps Save
     @State private var draftSetupName: String = ""
     @State private var draftClient: String = ""

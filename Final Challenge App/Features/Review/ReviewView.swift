@@ -14,7 +14,7 @@ struct ReviewView: View {
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
-    @State private var selectedNodeId: UUID? = nil
+    @State private var selectedNodeId: UUID?
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
     @State private var showsSaveSetupAlert = false

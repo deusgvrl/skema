@@ -17,7 +17,7 @@ struct ReviewDiagramContentView: View {
 
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
-    var onEmptyTap: (() -> Void)? = nil
+    var onEmptyTap: (() -> Void)?
 
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
@@ -34,7 +34,7 @@ struct ReviewDiagramContentView: View {
                     onSubjectTap: onSubjectTap,
                     onEmptyTap: onEmptyTap
                 )
-                
+
                 if !viewModel.nodes.isEmpty {
                     Group {
                         if viewModel.isEditingDiagram {
