@@ -53,7 +53,6 @@ struct ProjectDetailsView: View {
             } header: {
                 FormSectionHeader("Setup")
             } footer: {
-                // R07e
                 if viewModel.showsNameRequired || (!isFormValid && draftSetupName.isEmpty) {
                     Text("Add a name to save this setup.")
                         .font(.footnote)
@@ -112,7 +111,6 @@ struct ProjectDetailsView: View {
             }
         }
         .onAppear {
-            // Populate draft state from setup model
             draftSetupName = setup.setupName
             draftClient = setup.client
             draftProject = setup.project
@@ -124,7 +122,6 @@ struct ProjectDetailsView: View {
         .sensoryFeedback(trigger: saveCount) { _, _ in
             lastOutcome == .saved ? .success : .error
         }
-        // R07f
         .alert("Couldn’t Save Setup", isPresented: $viewModel.isSaveFailedAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Try Again") {
@@ -139,7 +136,6 @@ struct ProjectDetailsView: View {
     private func save() {
         guard isFormValid else { return }
 
-        // Commit draft changes to actual setup model only when Save is pressed
         setup.setupName = draftSetupName
         setup.client = draftClient
         setup.project = draftProject
@@ -158,7 +154,7 @@ struct ProjectDetailsView: View {
     }
 }
 
-/// "Name ……… value" row: label left, grey editable value right (Sketch R07).
+/// "Name ……… value" row: label left, primary editable value right (Sketch R07).
 private struct DetailsRow<Field: View>: View {
     let title: LocalizedStringKey
     @ViewBuilder let field: () -> Field
@@ -174,7 +170,7 @@ private struct DetailsRow<Field: View>: View {
                 .foregroundStyle(DesignTokens.textPrimary)
             field()
                 .multilineTextAlignment(.trailing)
-                .foregroundStyle(DesignTokens.textSecondary)
+                .foregroundStyle(DesignTokens.textPrimary)
         }
     }
 }

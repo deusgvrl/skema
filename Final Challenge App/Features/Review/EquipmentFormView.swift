@@ -63,7 +63,6 @@ struct EquipmentFormView: View {
                             dismiss()
                         }
                     }
-                    // A popover on the X (like Reminders); tapping outside it keeps editing.
                     .confirmationDialog(
                         formViewModel.isEditing
                             ? "Are you sure you want to discard your changes?"
@@ -78,7 +77,6 @@ struct EquipmentFormView: View {
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
                         if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
-                            // Fullscreen / Expanded Mode: Show Checkmark to Save
                             Button("Done", systemImage: "checkmark") {
                                 formViewModel.saveNode(undoManager: undoManager) {
                                     dismiss()
@@ -88,7 +86,6 @@ struct EquipmentFormView: View {
                             .tint(DesignTokens.accentPrimary)
                             .disabled(!formViewModel.isFormValid)
                         } else {
-                            // Compact / Medium Mode: Show Pencil to Expand Fullscreen
                             Button("Edit Details", systemImage: "pencil.and.list.clipboard") {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .large
@@ -101,7 +98,6 @@ struct EquipmentFormView: View {
                 }
             }
         }
-        // Track form edits to update dirty status
         .onChange(of: formViewModel.category) { _, _ in if !isSwitchingNode { isDirty = true } }
         .onChange(of: formViewModel.name) { _, _ in if !isSwitchingNode { isDirty = true } }
         .onChange(of: formViewModel.role) { _, _ in if !isSwitchingNode { isDirty = true } }
@@ -131,8 +127,6 @@ struct EquipmentFormView: View {
                 isSwitchingNode = false
             }
         }
-
-        // Delete confirmation alert
         .alert("Delete Equipment", isPresented: $isDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -167,7 +161,7 @@ private extension EquipmentFormView {
                 Spacer()
                 TextField("Required", text: $formViewModel.name)
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(DesignTokens.textSecondary)
+                    .foregroundStyle(DesignTokens.textPrimary)
                     .disabled(isReadOnly)
             }
 
@@ -180,7 +174,7 @@ private extension EquipmentFormView {
                         : "e.g. Second camera"
                     TextField(rolePrompt, text: $formViewModel.role)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .disabled(isReadOnly)
                 }
             }
@@ -197,17 +191,17 @@ private extension EquipmentFormView {
                 HStack {
                     Text("Power")
                     Spacer()
-                    TextField("1/16", text: $formViewModel.power)
+                    TextField("e.g. 1/16", text: $formViewModel.power)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .disabled(isReadOnly)
                 }
                 HStack {
                     Text("Color temperature")
                     Spacer()
-                    TextField("5600", text: $formViewModel.colorTemp)
+                    TextField("e.g. 5600", text: $formViewModel.colorTemp)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .keyboardType(.numberPad)
                         .disabled(isReadOnly)
                     Text("K")
@@ -222,9 +216,9 @@ private extension EquipmentFormView {
                 HStack {
                     Text("Lens")
                     Spacer()
-                    TextField("50", text: $formViewModel.lens)
+                    TextField("e.g. 50", text: $formViewModel.lens)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .disabled(isReadOnly)
                     Text("mm")
                         .foregroundStyle(DesignTokens.textSecondary)
@@ -236,34 +230,34 @@ private extension EquipmentFormView {
                 HStack {
                     Text("ISO")
                     Spacer()
-                    TextField("100", text: $formViewModel.iso)
+                    TextField("e.g. 100", text: $formViewModel.iso)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .keyboardType(.numberPad)
                         .disabled(isReadOnly)
                 }
                 HStack {
                     Text("Aperture")
                     Spacer()
-                    TextField("f/2.8", text: $formViewModel.aperture)
+                    TextField("e.g. f/2.8", text: $formViewModel.aperture)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .disabled(isReadOnly)
                 }
                 HStack {
                     Text("Shutter speed")
                     Spacer()
-                    TextField("1/200", text: $formViewModel.shutterSpeed)
+                    TextField("e.g. 1/200", text: $formViewModel.shutterSpeed)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .disabled(isReadOnly)
                 }
                 HStack {
                     Text("White balance")
                     Spacer()
-                    TextField("5600", text: $formViewModel.whiteBalance)
+                    TextField("e.g. 5600", text: $formViewModel.whiteBalance)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .keyboardType(.numberPad)
                         .disabled(isReadOnly)
                     Text("K")
@@ -291,9 +285,9 @@ private extension EquipmentFormView {
                 HStack {
                     Text("Height")
                     Spacer()
-                    TextField("0.0", text: $formViewModel.height)
+                    TextField("e.g. 1.8", text: $formViewModel.height)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .keyboardType(.decimalPad)
                         .disabled(isReadOnly)
                     Text("m")
@@ -302,9 +296,9 @@ private extension EquipmentFormView {
                 HStack {
                     Text("Tilt")
                     Spacer()
-                    TextField("0", text: $formViewModel.tilt)
+                    TextField("e.g. 0", text: $formViewModel.tilt)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .keyboardType(.numberPad)
                         .disabled(isReadOnly)
                     Text("°")
@@ -315,9 +309,9 @@ private extension EquipmentFormView {
                     HStack {
                         Text("Horizontal aim")
                         Spacer()
-                        TextField("0", text: $formViewModel.horizontalAim)
+                        TextField("e.g. 0", text: $formViewModel.horizontalAim)
                             .multilineTextAlignment(.trailing)
-                            .foregroundStyle(DesignTokens.textSecondary)
+                            .foregroundStyle(DesignTokens.textPrimary)
                             .keyboardType(.numberPad)
                             .disabled(isReadOnly)
                         Text("°")
@@ -330,9 +324,9 @@ private extension EquipmentFormView {
                         .lineLimit(1)
                         .layoutPriority(1)
                     Spacer()
-                    TextField("0.0", text: $formViewModel.distance)
+                    TextField("e.g. 2.0", text: $formViewModel.distance)
                         .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                        .foregroundStyle(DesignTokens.textPrimary)
                         .keyboardType(.decimalPad)
                         .disabled(isReadOnly)
                     Text("m")
@@ -350,7 +344,7 @@ private extension EquipmentFormView {
         if formViewModel.category == .accessory {
             Section(header: FormSectionHeader("Notes")) {
                 TextField("Add notes", text: $formViewModel.notes, axis: .vertical)
-                    .foregroundStyle(DesignTokens.textSecondary)
+                    .foregroundStyle(DesignTokens.textPrimary)
                     .lineLimit(4...8)
                     .disabled(isReadOnly)
             }
@@ -358,7 +352,7 @@ private extension EquipmentFormView {
         } else {
             Section(header: FormSectionHeader("Accessories")) {
                 TextField("Add accessories", text: $formViewModel.accessories, axis: .vertical)
-                    .foregroundStyle(DesignTokens.textSecondary)
+                    .foregroundStyle(DesignTokens.textPrimary)
                     .lineLimit(4...8)
                     .disabled(isReadOnly)
             }

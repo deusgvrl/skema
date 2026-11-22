@@ -45,11 +45,10 @@ struct SubjectFormView: View {
                     HStack {
                         Text("Height from floor")
                         Spacer()
-                        TextField("0.0", text: $heightText)
+                        TextField("e.g. 0.0", text: $heightText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
-                            .foregroundStyle(DesignTokens.textSecondary)
-                            .frame(width: 80)
+                            .foregroundStyle(DesignTokens.textPrimary)
                             .disabled(isReadOnly)
                         Text("m")
                             .foregroundStyle(DesignTokens.textSecondary)
@@ -85,9 +84,10 @@ struct SubjectFormView: View {
             ToolbarItem(placement: .confirmationAction) {
                 if selectedDetent == .large || selectedDetent == .medium {
                     Button("Done", systemImage: "checkmark") {
+                        let normalizedHeight = sanitizeDecimalInput(heightText)
                         viewModel.updateSubjectHeight(
                             oldValue: initialSubjectHeight,
-                            newValue: heightText,
+                            newValue: normalizedHeight,
                             undoManager: undoManager
                         )
                         dismiss()
@@ -95,7 +95,7 @@ struct SubjectFormView: View {
                     .buttonStyle(.glassProminent)
                     .tint(DesignTokens.accentPrimary)
                 } else {
-                    Button("Edit Details", systemImage: "pencil") {
+                    Button("Edit Details", systemImage: "pencil.and.list.clipboard") {
                         withAnimation(.easeInOut(duration: 0.25)) {
                             selectedDetent = .large
                         }
@@ -105,6 +105,11 @@ struct SubjectFormView: View {
                 }
             }
         }
+    }
+
+    /// Replaces commas with standard dots (e.g. "1,3" -> "1.3") for valid Double parsing.
+    private func sanitizeDecimalInput(_ input: String) -> String {
+        input.replacingOccurrences(of: ",", with: ".")
     }
 }
 
