@@ -47,6 +47,16 @@ struct ScanSessionTests {
         #expect(run.options.contains(.removeExistingAnchors))
     }
 
+    @Test("Case 20 (A10-106): the scan asks for the room mesh only when supported", arguments: [true, false])
+    func startAsksForTheMeshWhenSupported(supported: Bool) throws {
+        let scan = ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { supported })
+
+        try scan.start()
+
+        let configuration = try #require(fake.runs.first?.configuration as? ARWorldTrackingConfiguration)
+        #expect(configuration.sceneReconstruction == (supported ? .mesh : []))
+    }
+
     @Test("Start without LiDAR throws and never runs ARKit")
     func startWithoutLiDARThrows() {
         let scan = makeScan(supportsLiDAR: false)

@@ -11,7 +11,7 @@ import SwiftUI
 
 /// The scan screen's fixed colours.
 enum ScanPalette {
-    /// The tags, boxes, ticks and the floor grid (#30D158, Sketch).
+    /// The tags, boxes and ticks (#30D158, Sketch).
     static let green = Color(red: 0x30 / 255, green: 0xD1 / 255, blue: 0x58 / 255)
     /// Text on the green tags: black, because white on this green is under 2:1.
     static let onGreen = Color.black

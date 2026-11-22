@@ -4,9 +4,8 @@ import CoreGraphics
 import MeasureKit
 import Observation
 
-/// What a tap on the camera view sets.
+/// What a tap on the camera view sets. The floor is not a tap: it is found by pointing the phone at it (A10-112).
 enum ScanTapKind: Equatable {
-    case floor
     case subject
     case light
     case camera
@@ -25,17 +24,18 @@ struct ScanItem: Identifiable {
 }
 
 /// The scan (LiDAR only, no object detection: the team chose taps after usability testing, 19 Nov 2026).
-/// A guided sequence (Sketch UT Review T01–T10): the photographer taps the floor, the subject, the camera and
-/// each light, and each tap sets the next thing still missing (`ScanStep`); a coaching panel explains each step on
-/// the first scan. A tap picks a LiDAR point; its vertical column (10 cm radius, from 3 cm above the floor to 3 m)
-/// is collected on every frame (the A10-41 painted items), and Finish writes distance, height and plan position onto
-/// the draft equipment, ready to edit in the lighting plan. While scanning, tips say when tracking, light or
-/// distance goes badly (A10-69).
+/// A guided sequence (Sketch UT Review T01–T10): the photographer points the phone at the floor until ARKit finds it
+/// (A10-112, no tap), then taps the subject, the camera and each light; each tap sets the next thing still missing
+/// (`ScanStep`), and a coaching panel explains each step on the first scan. A tap picks a LiDAR point; its vertical
+/// column (10 cm radius, from 3 cm above the floor to 3 m) is collected on every frame (the A10-41 painted items), and
+/// Finish writes distance, height and plan position onto the draft equipment, ready to edit in the lighting plan.
+/// While scanning, tips say when tracking, light or distance goes badly (A10-69).
 @Observable
 final class ScanViewModel {
     private(set) var screen = ScanScreen.starting
-    /// What the next tap sets. It follows `currentStep` after every tap; tests may set it directly.
-    var kind = ScanTapKind.floor
+    /// What the next tap sets. It follows `currentStep` after every tap; tests may set it directly. Until the floor is
+    /// found, no tap sets anything.
+    var kind = ScanTapKind.subject
     var draftSetup = Setup(setupName: "")
     private(set) var items: [ScanItem] = []
     /// The subject's anchor, nil until it is tapped.
@@ -47,10 +47,6 @@ final class ScanViewModel {
     private(set) var camera: CameraModel?
     /// The tip shown while scanning ("Move slower", "More light"…), nil when the scan goes well (A10-69).
     private(set) var guidance: ScanGuidance?
-    /// The tapped floor point, nil until the floor is tapped (step 1).
-    private(set) var floorAnchor: SIMD3<Float>?
-    /// The floor's height from the floor tap (`ScanFloor.height`), for the floor grid. Nil until tapped.
-    private(set) var floorHeight: Float?
     /// The coaching panel (first scan, or after ?); a hint pill shows instead when it is hidden.
     private(set) var isTutorialVisible: Bool
     /// The step whose tap just landed, for the panel's short "done" state. The view clears it.
@@ -71,8 +67,10 @@ final class ScanViewModel {
     @ObservationIgnored private let subjectID = UUID()
     @ObservationIgnored private var kindCounts: [ScanTapKind: Int] = [:]
     @ObservationIgnored private var latestFrame: ScanFrame?
-    /// The floor ARKit found, used until the floor is tapped.
-    @ObservationIgnored private var planeFloorY: Float?
+    /// The floor ARKit found (`FloorPicker`: its lowest floor plane); nil until it finds one. Step 1 (A10-112).
+    private var planeFloorY: Float?
+    /// The time of the first frame without a floor, for the "Floor not found yet" tip.
+    @ObservationIgnored private var floorSearchStart: Double?
     @ObservationIgnored private let tutorial: ScanGuideSettings?
     /// Every tap that set something, newest last, for Undo.
     private var history: [TapRecord] = []
@@ -100,10 +98,15 @@ final class ScanViewModel {
         self.isTutorialVisible = !(tutorial?.isTutorialDone ?? false)
     }
 
-    /// The tapped floor, or ARKit's floor until then.
-    private var floorY: Float? { floorHeight ?? planeFloorY }
+    /// The floor's height: ARKit's floor. Nil until it is found.
+    var floorY: Float? { planeFloorY }
 
-    var hasFloor: Bool { floorAnchor != nil }
+    var hasFloor: Bool { planeFloorY != nil }
+
+    /// How long (seconds of frames) the scan looks for the floor before the tip shows (A10-112).
+    static let floorWaitBeforeTip: Double = 5
+    static let pointAtFloorText = "Point the phone down at the floor first."
+    static let floorNotFoundText = "Floor not found yet. Tilt down and move closer to the floor."
 
     /// Undo is on once a tap set something.
     var canUndo: Bool { !history.isEmpty }
@@ -132,9 +135,29 @@ final class ScanViewModel {
         completedStep = nil
     }
 
+    /// Step 1 (A10-112): the floor is ARKit's lowest floor plane, found by pointing the phone at it, with no tap. The
+    /// first time there is one, step 1 is done; after `floorWaitBeforeTip` seconds of frames without one, a tip says
+    /// what to do, and it goes when the floor is found.
+    /// - Returns: true when this frame found the floor for the first time.
+    @discardableResult
+    private func updateFloor(from frame: ScanFrame) -> Bool {
+        let hadFloor = hasFloor
+        planeFloorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? planeFloorY
+        guard hasFloor else {
+            let start = floorSearchStart ?? frame.timestamp
+            floorSearchStart = start
+            if frame.timestamp - start >= Self.floorWaitBeforeTip { message = Self.floorNotFoundText }
+            return false
+        }
+        guard !hadFloor else { return false }
+        if message == Self.floorNotFoundText { message = nil }
+        completedStep = .floor
+        return true
+    }
+
     /// After a tap: the next tap sets what is still missing, and reaching Finish counts as doing the tutorial.
     private func advance() {
-        kind = currentStep.tapKind
+        kind = currentStep.tapKind ?? .subject
         if currentStep == .finish { tutorial?.isTutorialDone = true }
     }
 
@@ -162,7 +185,7 @@ final class ScanViewModel {
     func tap(atScreen point: CGPoint, screenSize: CGSize, in frame: ScanFrame) {
         message = nil
         camera = frame.camera
-        planeFloorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? planeFloorY
+        updateFloor(from: frame)
         guard let picture = ScanOverlay.picturePoint(fromScreen: point, camera: frame.camera, screenSize: screenSize)
         else { return }
         // A tap on an item's tag spot (in a light or camera mode) removes it.
@@ -171,8 +194,8 @@ final class ScanViewModel {
             advance()
             return
         }
-        guard kind == .floor || floorY != nil else {
-            message = "Point the phone at the floor first"
+        guard hasFloor else {
+            message = Self.pointAtFloorText
             return
         }
         guard let depth = frame.depth,
@@ -182,16 +205,17 @@ final class ScanViewModel {
             return
         }
         switch kind {
-        case .floor:
-            history.append(.floor(previousAnchor: floorAnchor, previousHeight: floorHeight))
-            floorAnchor = anchor
-            floorHeight = ScanFloor.height(tappedY: anchor.y, planes: frame.planes.map(\.horizontalPlane))
         case .subject:
             history.append(.subject(previous: subject))
             measurements.remove(subjectID)
             subjectBounds = nil
             subject = anchor
         case .light, .camera:
+            // A10-106 case 12: a light tap inside a light's grown box is that light again, not a new one.
+            if kind == .light, let light = light(containing: anchor) {
+                message = "Already tapped: Light \(light.name.split(separator: " ").last ?? "")"
+                return
+            }
             addItem(kind, anchor: anchor)
         }
         completedStep = ScanStep(completing: kind)
@@ -211,6 +235,11 @@ final class ScanViewModel {
         if kind == .light { measurements.setRule(.middle, for: equipment.id) }
     }
 
+    /// The light whose grown box holds `point`, if any.
+    private func light(containing point: SIMD3<Float>) -> ScanItem? {
+        items.first { $0.kind == .light && measurements.bigBox(for: $0.id)?.contains(point) == true }
+    }
+
     private func remove(_ id: UUID) {
         history.removeAll { $0 == .item(id) }
         items.removeAll { $0.id == id }
@@ -219,16 +248,13 @@ final class ScanViewModel {
         itemBounds[id] = nil
     }
 
-    /// Undo: takes back the newest tap that set something (floor, subject, camera or light), and the next tap sets
-    /// what is missing again.
+    /// Undo: takes back the newest tap that set something (subject, camera or light), and the next tap sets what is
+    /// missing again. The floor is not a tap, so Undo never takes it back.
     func undoTapped() {
         guard let last = history.popLast() else { return }
         message = nil
         completedStep = nil
         switch last {
-        case let .floor(previousAnchor, previousHeight):
-            floorAnchor = previousAnchor
-            floorHeight = previousHeight
         case .subject(let previous):
             measurements.remove(subjectID)
             subjectBounds = nil
@@ -262,7 +288,9 @@ final class ScanViewModel {
     /// Internal so tests can call it.
     func collect(from frame: ScanFrame) {
         camera = frame.camera
-        planeFloorY = FloorPicker.floorY(frame.planes.map(\.horizontalPlane)) ?? planeFloorY
+        // A frame that finds the floor moves the scan on to the subject. A tap's own frame does not (`tap`): the tap
+        // keeps the kind it was made with.
+        if updateFloor(from: frame) { advance() }
         guard let depth = frame.depth, let floorY else { return }
         let heights = (floorY + Self.columnFloorGap)...(floorY + Self.columnHeight)
         func paint(around anchor: SIMD3<Float>, for id: UUID) {
@@ -275,10 +303,24 @@ final class ScanViewModel {
             subjectBounds = measurements.bounds(for: subjectID).map { WorldBox(min: $0.min, max: $0.max) }
         }
         for item in items {
-            paint(around: item.anchor, for: item.id)
-            itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
+            if item.kind == .light {
+                // A10-106: a light is the surface painted from its tap; its outline is its grown box.
+                paintSurface(of: item, depth: depth, camera: frame.camera, floorY: floorY)
+                itemBounds[item.id] = measurements.bigBox(for: item.id)
+            } else {
+                paint(around: item.anchor, for: item.id)
+                itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
+            }
         }
         refreshResults()
+    }
+
+    /// One frame of a light: the paint bucket from its tapped point, where the point is in this frame's picture.
+    private func paintSurface(of item: ScanItem, depth: DepthFrame, camera: CameraModel, floorY: Float) {
+        guard let pixel = DepthSampler.project(item.anchor, camera: camera) else { return }
+        let points = DepthGrouping.surface(fromNormalized: pixel / camera.imageResolution, depth: depth, camera: camera,
+                                           floorY: floorY)
+        measurements.addSurface(points: points, to: item.id, camera: camera)
     }
 
     /// The live results, and the values written onto the draft equipment as soon as they exist, so what a tag says
@@ -306,11 +348,17 @@ extension ScanViewModel {
         box(of: itemBounds[item.id], in: size)
     }
 
+    /// A10-106: the world box of every tapped item and the subject, drawn as 3D outlines in the camera view.
+    var outlineBoxes: [UUID: WorldBox] {
+        var boxes = itemBounds
+        if let subjectBounds { boxes[subjectID] = subjectBounds }
+        return boxes
+    }
+
     /// The green outline around the subject.
     func subjectBox(in size: CGSize) -> CGRect? {
         box(of: subjectBounds, in: size)
     }
-
     private func box(of bounds: WorldBox?, in size: CGSize) -> CGRect? {
         guard let camera, let bounds else { return nil }
         return ScanOverlay.screenBox(of: bounds.corners, camera: camera, screenSize: size)
@@ -529,22 +577,8 @@ extension ScanViewModel {
     }
 }
 
-/// An axis-aligned box in world space (metres).
-struct WorldBox: Equatable {
-    let min: SIMD3<Float>
-    let max: SIMD3<Float>
-
-    /// Its eight corners.
-    var corners: [SIMD3<Float>] {
-        (0..<8).map { index in
-            SIMD3(index & 1 == 0 ? min.x : max.x, index & 2 == 0 ? min.y : max.y, index & 4 == 0 ? min.z : max.z)
-        }
-    }
-}
-
 /// One tap that set something, with what it replaced, so Undo can put it back.
 private enum TapRecord: Equatable {
-    case floor(previousAnchor: SIMD3<Float>?, previousHeight: Float?)
     case subject(previous: SIMD3<Float>?)
     case item(UUID)
 }
