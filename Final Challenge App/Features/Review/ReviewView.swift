@@ -10,7 +10,6 @@ struct ReviewView: View {
 
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
@@ -88,11 +87,6 @@ struct ReviewView: View {
         .onAppear {
             if !isFromLoadingScreen && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
-            }
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .background {
-                viewModel.discardSetup()
             }
         }
         .onChange(of: viewModel.nodes) { _, newNodes in

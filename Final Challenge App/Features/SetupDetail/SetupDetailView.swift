@@ -103,11 +103,6 @@ struct SetupDetailView: View {
                 }
             }
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .background {
-                viewModel.reviewViewModel.discardEdits(undoManager: undoManager)
-            }
-        }
         .toolbar {
             toolbarContent
         }
