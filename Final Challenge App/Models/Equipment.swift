@@ -87,9 +87,9 @@ extension Equipment {
 
     /// Updates `distance` string as a clean number (e.g. "2.50") from (positionX, positionY)
     func syncDistanceFromPosition() {
-        let dx = positionX
-        let dy = positionY
-        let distanceInPoints = sqrt(dx * dx + dy * dy)
+        let deltaX = positionX
+        let deltaY = positionY
+        let distanceInPoints = sqrt(deltaX * deltaX + deltaY * deltaY)
         let distanceInMeters = distanceInPoints / Self.pointsPerMeter
         self.distance = String(format: "%.2f", distanceInMeters)
     }
@@ -178,14 +178,14 @@ extension Equipment {
 
     /// Rotate every node pointing to subject (0,0)
     func pointToSubject() {
-            let dx = -positionX
-            let dy = -positionY
+        let deltaX = -positionX
+        let deltaY = -positionY
 
-            // Guard against division by zero if node is right on the subject center
-            guard hypot(dx, dy) > 0.001 else { return }
+        // Guard against division by zero if node is right on the subject center
+        guard hypot(deltaX, deltaY) > 0.001 else { return }
 
-            // In screen coordinates (+Y is down), adding 90° aligns front pointer with target vector
-            var targetAngle = (atan2(dy, dx) * 180.0 / .pi) + 90.0
+        // In screen coordinates (+Y is down), adding 90° aligns front pointer with target vector
+        var targetAngle = (atan2(deltaY, deltaX) * 180.0 / .pi) + 90.0
 
             // Normalize angle to [0, 360) range
             targetAngle = targetAngle.truncatingRemainder(dividingBy: 360.0)

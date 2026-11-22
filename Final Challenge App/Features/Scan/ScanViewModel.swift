@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ARKit
 import CoreGraphics
 import MeasureKit
@@ -24,11 +25,12 @@ struct ScanItem: Identifiable {
 }
 
 /// The scan (LiDAR only, no object detection: the team chose taps after usability testing, 19 Nov 2026).
-/// A guided sequence (Sketch UT Review T01–T10): the photographer taps the floor, the subject, the camera and each light,
-/// and each tap sets the next thing still missing (`ScanStep`); a coaching panel explains each step on the first scan. A tap picks a LiDAR point; its vertical column
-/// (10 cm radius, from 3 cm above the floor to 3 m) is collected on every frame (the A10-41 painted items), and Finish
-/// writes distance, height and plan position onto the draft equipment, ready to edit in the lighting plan. While
-/// scanning, tips say when tracking, light or distance goes badly (A10-69).
+/// A guided sequence (Sketch UT Review T01–T10): the photographer taps the floor, the subject, the camera and
+/// each light, and each tap sets the next thing still missing (`ScanStep`); a coaching panel explains each step on
+/// the first scan. A tap picks a LiDAR point; its vertical column (10 cm radius, from 3 cm above the floor to 3 m)
+/// is collected on every frame (the A10-41 painted items), and Finish writes distance, height and plan position onto
+/// the draft equipment, ready to edit in the lighting plan. While scanning, tips say when tracking, light or
+/// distance goes badly (A10-69).
 @Observable
 final class ScanViewModel {
     private(set) var screen = ScanScreen.starting
@@ -289,7 +291,10 @@ final class ScanViewModel {
         }
         write(results)
     }
+}
 
+// MARK: - Overlay & Tags
+extension ScanViewModel {
     /// Where a tag for `spot` goes on a screen of `size`; nil when the spot is not on the screen.
     func tagPosition(of spot: SIMD3<Float>, in size: CGSize) -> CGPoint? {
         camera.flatMap { ScanOverlay.screenPoint(of: spot, camera: $0, screenSize: size) }
@@ -419,7 +424,10 @@ final class ScanViewModel {
     private static func metres(_ value: Float) -> String {
         String(format: "%.2f", value)
     }
+}
 
+// MARK: - Session Lifecycle & Guidance
+extension ScanViewModel {
     private func stopListening() {
         stateTask?.cancel()
         framesTask?.cancel()

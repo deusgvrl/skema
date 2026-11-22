@@ -48,8 +48,8 @@ struct PhotoPager: UIViewControllerRepresentable {
         coordinator.parent = self
         guard !images.isEmpty else { return }
 
-        for vc in pvc.viewControllers ?? [] {
-            (vc as? ZoomablePhotoVC)?.fitInsets = fitInsets
+        for viewController in pvc.viewControllers ?? [] {
+            (viewController as? ZoomablePhotoVC)?.fitInsets = fitInsets
         }
 
         let target = min(max(selection, 0), images.count - 1)
@@ -82,15 +82,15 @@ struct PhotoPager: UIViewControllerRepresentable {
         }
 
         func pageViewController(_ pvc: UIPageViewController,
-                                viewControllerBefore vc: UIViewController) -> UIViewController? {
-            guard let pageIndex = (vc as? ZoomablePhotoVC)?.index, pageIndex > 0,
+                                viewControllerBefore viewController: UIViewController) -> UIViewController? {
+            guard let pageIndex = (viewController as? ZoomablePhotoVC)?.index, pageIndex > 0,
                   pageIndex - 1 < parent.images.count else { return nil }
             return page(at: pageIndex - 1)
         }
 
         func pageViewController(_ pvc: UIPageViewController,
-                                viewControllerAfter vc: UIViewController) -> UIViewController? {
-            guard let pageIndex = (vc as? ZoomablePhotoVC)?.index,
+                                viewControllerAfter viewController: UIViewController) -> UIViewController? {
+            guard let pageIndex = (viewController as? ZoomablePhotoVC)?.index,
                   pageIndex + 1 < parent.images.count else { return nil }
             return page(at: pageIndex + 1)
         }

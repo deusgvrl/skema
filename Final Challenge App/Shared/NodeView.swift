@@ -88,11 +88,11 @@ struct NodeView: View {
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 0, coordinateSpace: .global)
                                 .onChanged { value in
-                                    let dx = value.location.x - globalCenter.x
-                                    let dy = value.location.y - globalCenter.y
+                                    let deltaX = value.location.x - globalCenter.x
+                                    let deltaY = value.location.y - globalCenter.y
 
                                     // Screen-space distance (node is counter-scaled, so 1 unit == 1 screen point)
-                                    let fingerDistance = hypot(dx, dy)
+                                    let fingerDistance = hypot(deltaX, deltaY)
 
                                     if !isRotating {
                                         isRotating = true
@@ -226,16 +226,16 @@ struct NodeView: View {
     // MARK: - Cardinal Alignment & Auto-Snap Helper
 
     private func applyCardinalSnap(to rawPosition: CGPoint) -> CGPoint {
-        let dx = rawPosition.x
-        let dy = rawPosition.y
-        let radius = hypot(dx, dy)
+        let deltaX = rawPosition.x
+        let deltaY = rawPosition.y
+        let radius = hypot(deltaX, deltaY)
 
         guard radius > 15 else {
             lastCardinalSnap = nil
             return rawPosition
         }
 
-        var angle = atan2(dy, dx) * 180 / .pi
+        var angle = atan2(deltaY, deltaX) * 180 / .pi
         if angle < 0 { angle += 360 }
 
         let cardinalAngles = [0, 90, 180, 270]
@@ -251,22 +251,26 @@ struct NodeView: View {
             }
         }
 
-        if let cardinal = activeCardinal {
-            if lastCardinalSnap != cardinal {
-                lastCardinalSnap = cardinal
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            }
-
-            switch cardinal {
-            case 0:   return CGPoint(x: radius, y: 0)
-            case 90:  return CGPoint(x: 0, y: radius)
-            case 180: return CGPoint(x: -radius, y: 0)
-            case 270: return CGPoint(x: 0, y: -radius)
-            default:  return rawPosition
-            }
-        } else {
+        guard let cardinal = activeCardinal else {
             lastCardinalSnap = nil
             return rawPosition
+        }
+
+        if lastCardinalSnap != cardinal {
+            lastCardinalSnap = cardinal
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+
+        return pointForCardinal(cardinal, radius: radius, fallback: rawPosition)
+    }
+
+    private func pointForCardinal(_ cardinal: Int, radius: CGFloat, fallback: CGPoint) -> CGPoint {
+        switch cardinal {
+        case 0:   return CGPoint(x: radius, y: 0)
+        case 90:  return CGPoint(x: 0, y: radius)
+        case 180: return CGPoint(x: -radius, y: 0)
+        case 270: return CGPoint(x: 0, y: -radius)
+        default:  return fallback
         }
     }
 }
@@ -312,16 +316,11 @@ struct TopViewCameraShapeView: View {
                 .frame(width: 38, height: 26)
                 .overlay(
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(
-                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                            lineWidth: isSelected ? 2.0 : 1.5
-                        )
+                        .stroke(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                                lineWidth: isSelected ? 2.0 : 1.5)
                 )
-                .shadow(
-                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                    radius: isSelected ? 5 : 2,
-                    y: 2
-                )
+                .shadow(color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                        radius: isSelected ? 5 : 2, y: 2)
                 .offset(y: 12)
 
             RoundedRectangle(cornerRadius: 3)
@@ -331,7 +330,6 @@ struct TopViewCameraShapeView: View {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(isSelected ? DesignTokens.accentPrimary : Color.clear, lineWidth: 1)
                 )
-                .offset(y: 0)
         }
         .frame(width: 44, height: 44)
     }
@@ -347,16 +345,11 @@ struct TopViewLightShapeView: View {
                 .frame(width: 38, height: 22)
                 .overlay(
                     Trapezoid()
-                        .stroke(
-                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                            lineWidth: isSelected ? 2.0 : 1.5
-                        )
+                        .stroke(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                                lineWidth: isSelected ? 2.0 : 1.5)
                 )
-                .shadow(
-                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                    radius: isSelected ? 5 : 2,
-                    y: 2
-                )
+                .shadow(color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                        radius: isSelected ? 5 : 2, y: 2)
                 .offset(y: 2)
 
             Rectangle()
@@ -383,16 +376,11 @@ struct TopViewAccessoryShapeView: View {
                 .frame(width: 50, height: 11)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(
-                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                            lineWidth: isSelected ? 2.0 : 1.5
-                        )
+                        .stroke(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                                lineWidth: isSelected ? 2.0 : 1.5)
                 )
-                .shadow(
-                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                    radius: isSelected ? 5 : 2,
-                    y: 2
-                )
+                .shadow(color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                        radius: isSelected ? 5 : 2, y: 2)
                 .offset(y: 11)
 
             Rectangle()

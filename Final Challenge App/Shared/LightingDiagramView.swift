@@ -66,7 +66,11 @@ struct LightingDiagramView: View {
                 Path { path in
                     for node in viewModel.nodes {
                         path.move(to: subjectCenter)
-                        path.addLine(to: CGPoint(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y))
+                        let endPoint = CGPoint(
+                            x: subjectCenter.x + node.position.x,
+                            y: subjectCenter.y + node.position.y
+                        )
+                        path.addLine(to: endPoint)
                     }
                 }
                 .stroke(
@@ -91,13 +95,13 @@ struct LightingDiagramView: View {
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
 
                     if isExportedToPdf || distanceValue >= minDistanceThreshold {
-                        let dx = node.position.x
-                        let dy = node.position.y
-                        let posX = subjectCenter.x + dx * 0.5
-                        let posY = subjectCenter.y + dy * 0.5
+                        let deltaX = node.position.x
+                        let deltaY = node.position.y
+                        let posX = subjectCenter.x + deltaX * 0.5
+                        let posY = subjectCenter.y + deltaY * 0.5
 
                         let angle: Double = {
-                            var rawAngle = atan2(dy, dx) * 180 / .pi
+                            var rawAngle = atan2(deltaY, deltaX) * 180 / .pi
                             if rawAngle > 90 {
                                 rawAngle -= 180
                             } else if rawAngle < -90 {

@@ -45,7 +45,9 @@ struct ProjectDetailsView: View {
                         "Name",
                         text: $draftSetupName,
                         prompt: Text("Required")
-                            .foregroundStyle(viewModel.showsNameRequired ? DesignTokens.accentText : DesignTokens.textSecondary)
+                            .foregroundStyle(
+                                viewModel.showsNameRequired ? DesignTokens.accentText : DesignTokens.textSecondary
+                            )
                     )
                 }
             } header: {

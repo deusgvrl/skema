@@ -40,7 +40,14 @@ final class Setup {
     @Relationship(deleteRule: .cascade, inverse: \ReferenceImage.setup)
     var referenceImages: [ReferenceImage] = []
 
-    init(id: UUID = UUID(), setupName: String = "", client: String = "", project: String = "", notes: String = "", subjectHeight: String = "") {
+    init(
+        id: UUID = UUID(),
+        setupName: String = "",
+        client: String = "",
+        project: String = "",
+        notes: String = "",
+        subjectHeight: String = ""
+    ) {
         self.id = id
         self.setupName = setupName
         self.client = client
@@ -59,12 +66,12 @@ extension Setup {
     func alignAndOrientDiagram() {
         guard let firstCamera = nodes.first(where: { $0.category == .camera }) else { return }
 
-        let x1 = firstCamera.positionX
-        let y1 = firstCamera.positionY
-        guard abs(x1) > 0.001 || abs(y1) > 0.001 else { return }
+        let cameraPosX = firstCamera.positionX
+        let cameraPosY = firstCamera.positionY
+        guard abs(cameraPosX) > 0.001 || abs(cameraPosY) > 0.001 else { return }
 
         // In screen coordinates (+Y is down), 6 o'clock is +pi/2 radians (90 degrees)
-        let currentAngle = atan2(y1, x1)
+        let currentAngle = atan2(cameraPosY, cameraPosX)
         let deltaAngle = (Double.pi / 2.0) - currentAngle
 
         let cosDelta = cos(deltaAngle)
