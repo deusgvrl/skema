@@ -4,7 +4,8 @@
 //
 //  A10-106: a tapped light is measured from its grown box (cases 8, 12, 13, 15, 16; Amadeus, 20 Nov).
 //  Camera and screen as in ScanTapTests: the screen is the upright picture at scale 1, so a screen point (x, y) is the
-//  picture pixel (u = y, v = 1440 - x). Depth is a flat wall 2 m ahead, which the paint takes as one surface.
+//  picture pixel (u = y, v = 1440 - x). Depth is a flat wall 2 m ahead, which the paint takes as one surface. Every
+//  frame shows ARKit's floor 1 m below the phone, so the floor is found without a tap (A10-112).
 //
 
 import CoreGraphics
@@ -21,9 +22,6 @@ private let middle = CGPoint(x: 720, y: 960)
 private let cameraSpot = CGPoint(x: 720, y: 576)
 /// World (0.768, 0, -2): where the first light is tapped.
 private let lightSpot = CGPoint(x: 720, y: 1344)
-/// World (0, -1.42, -2): the screen's x moves the world height, so this is low on the wall. It is 0.42 m from the
-/// -1 m floor plane (more than the 0.15 m tolerance), so the floor is at -1.42 m, below every other tap.
-private let floorSpot = CGPoint(x: 10, y: 960)
 
 @MainActor
 @Suite("A10-106 grown box in the scan")
@@ -45,10 +43,9 @@ struct ScanGrownBoxTests {
         viewModel.tap(atScreen: point, screenSize: screen, in: try measuringFrame(at: time, metres: 2, planes: planes))
     }
 
-    /// Floor, subject and camera tapped: the next tap adds a light.
+    /// Subject and camera tapped (the floor is found from the frames): the next tap adds a light.
     private func scanWithCamera() throws -> ScanViewModel {
         let viewModel = makeViewModel()
-        try tap(viewModel, at: floorSpot)
         try tap(viewModel, at: middle)
         try tap(viewModel, at: cameraSpot)
         return viewModel
