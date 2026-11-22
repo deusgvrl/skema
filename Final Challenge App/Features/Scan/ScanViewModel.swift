@@ -1,4 +1,3 @@
-// swiftlint:disable file_length
 import ARKit
 import CoreGraphics
 import MeasureKit
