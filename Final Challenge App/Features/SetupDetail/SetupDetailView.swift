@@ -452,6 +452,8 @@ struct SetupDetailView: View {
                 if viewModel.reviewViewModel.hasPendingEdits {
                     showsDiscardChangesAlert = true
                 } else {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
                     withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
                 }
             }
@@ -487,6 +489,8 @@ struct SetupDetailView: View {
 
         ToolbarItem(placement: .confirmationAction) {
             Button("Save Changes", systemImage: "checkmark") {
+                selectedNodeId = nil
+                activeSheetContent = nil
                 withAnimation { viewModel.reviewViewModel.confirmEdits(undoManager: undoManager) }
             }
             .buttonStyle(.glassProminent)
@@ -517,6 +521,8 @@ struct SetupDetailView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button("Edit Project Details", systemImage: "pencil") {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
                     viewModel.isEditingProjectDetails = true
                 }
                 Button("Share", systemImage: "square.and.arrow.up") {
@@ -585,6 +591,8 @@ struct SetupDetailView: View {
     }
 
     private func shareTapped() {
+        selectedNodeId = nil
+        activeSheetContent = nil
         let base = PDFLayout.diagramCanvasSize
         let canvas = DiagramCanvas.size(fitting: viewModel.reviewViewModel.nodes.map(\.position), base: base)
         let diagram = LightingDiagramView(viewModel: viewModel.reviewViewModel, isReadOnly: true, isExportedToPdf: true)
