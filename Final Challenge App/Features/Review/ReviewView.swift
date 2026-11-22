@@ -68,7 +68,9 @@ struct ReviewView: View {
             .ignoresSafeArea(edges: .bottom)
 
             // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
-            if viewModel.isEditingDiagram, case .equipment(let nodeId) = activeSheetContent, quickActionsOpacity > 0.01 {
+            if viewModel.isEditingDiagram,
+               case .equipment(let nodeId) = activeSheetContent,
+               quickActionsOpacity > 0.01 {
                 nodeQuickActionsToolbar(for: nodeId)
                     .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
                     .opacity(quickActionsOpacity)            // Fades out continuously
@@ -134,9 +136,9 @@ struct ReviewView: View {
             activeSheetContent = nil
             selectedNodeId = nil
             selectedDetent = .height(76)
-        }) {
+        }, content: {
             unifiedSheetContent
-        }
+        })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
         }

@@ -110,7 +110,7 @@ struct NodeView: View {
                                     currentHandleDistance = max(defaultHandleDistance, fingerDistance - grabOffset)
 
                                     // Angle for front-positioned handle (-Y direction)
-                                    var visualAngle = (atan2(dy, dx) * 180 / .pi) + 90
+                                    var visualAngle = (atan2(deltaY, deltaX) * 180 / .pi) + 90
                                     if visualAngle < 0 { visualAngle += 360 }
 
                                     let step = 3.0

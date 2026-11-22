@@ -102,7 +102,10 @@ struct StorageControllerTests {
         let equipmentDescriptor = FetchDescriptor<Equipment>()
         let remainingEquipment = try storageController.context.fetch(equipmentDescriptor)
 
-        #expect(remainingEquipment.isEmpty, "All associated equipment should have been deleted automatically via cascade.")
+        #expect(
+            remainingEquipment.isEmpty,
+            "All associated equipment should have been deleted automatically via cascade."
+        )
     }
 
     @Test("Draft Flow: Create Equipment First, Then Setup, Then Save")
@@ -149,7 +152,10 @@ struct StorageControllerTests {
         let savedSetup = fetchedSetups.first
 
         #expect(savedSetup?.referenceImages.count == 1, "Setup should have exactly 1 reference image.")
-        #expect(savedSetup?.referenceImages.first?.imageData == dummyImageData, "The saved image data should match the uploaded data.")
+        #expect(
+            savedSetup?.referenceImages.first?.imageData == dummyImageData,
+            "The saved image data should match the uploaded data."
+        )
 
         // Make sure to get the exact image object from the database context
         guard let imageToDelete = savedSetup?.referenceImages.first else {
@@ -160,7 +166,10 @@ struct StorageControllerTests {
         storageController.deleteReferenceImage(imageToDelete)
 
         let setupsAfterDelete = storageController.fetchAllSetups()
-        #expect(setupsAfterDelete.first?.referenceImages.isEmpty == true, "The reference image array should be empty after deletion.")
+        #expect(
+            setupsAfterDelete.first?.referenceImages.isEmpty == true,
+            "The reference image array should be empty after deletion."
+        )
 
         // Verify the image is completely gone from the SwiftData context entirely
         let imageDescriptor = FetchDescriptor<ReferenceImage>()

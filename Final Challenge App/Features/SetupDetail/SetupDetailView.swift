@@ -134,9 +134,9 @@ struct SetupDetailView: View {
             activeSheetContent = nil
             selectedNodeId = nil
             selectedDetent = .height(76)
-        }) {
+        }, content: {
             unifiedSheetContent
-        }
+        })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(
                 viewModel: viewModel.reviewViewModel,
@@ -197,9 +197,9 @@ struct SetupDetailView: View {
                 openLibraryAfterDenied = false
                 showPhotoPicker = true
             }
-        }) {
+        }, content: {
             cameraDenied()
-        }
+        })
     }
 
     // MARK: - Floating Node Toolbar Component & Actions
