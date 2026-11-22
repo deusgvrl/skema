@@ -49,6 +49,13 @@ public struct EquipmentPoints: Sendable {
         }
         return Geometry.centres(of: points, isSubject: isSubject, rule: rule)
     }
+
+    /// A10-106 cases 26–29: only the status of `scanResult(isSubject:rule:)`, from how many points there are, with no
+    /// centres and no sorting. For an item measured from its big box, which needs nothing else from its points.
+    public var status: MeasurementStatus {
+        if points.isEmpty, sawPointsBeyondRange { return .outOfRange }
+        return points.count >= Geometry.minPointCount ? .measured : .tooFewPoints
+    }
 }
 
 /// The points of every piece of equipment in one scan, and what they say once the floor and the subject are known.
@@ -112,7 +119,13 @@ public struct ScanMeasurements: Sendable {
     private func centres(subject: UUID) -> [UUID: EquipmentCentres] {
         var centres: [UUID: EquipmentCentres] = [:]
         for (id, points) in equipment {
-            centres[id] = points.scanResult(isSubject: id == subject, rule: rules[id] ?? .topPoint)
+            // A10-106 commit 7: an item with a big box is measured from the box (`results`), so the centres of its
+            // points would be thrown away; only its status is worked out.
+            if boxes[id]?.isEmpty == false {
+                centres[id] = EquipmentCentres(status: points.status, baseCentre: nil, topCentre: nil)
+            } else {
+                centres[id] = points.scanResult(isSubject: id == subject, rule: rules[id] ?? .topPoint)
+            }
         }
         return centres
     }
