@@ -14,7 +14,7 @@ struct ReviewView: View {
 
     // Unified sheet content: either an equipment node or the subject
     @State private var activeSheetContent: DiagramSheetContent?
-    @State private var selectedNodeId: UUID? = nil
+    @State private var selectedNodeId: UUID?
     @State private var isAddingNode = false
     @State private var navigateToR07 = false
     @State private var showsSaveSetupAlert = false
@@ -68,7 +68,9 @@ struct ReviewView: View {
             .ignoresSafeArea(edges: .bottom)
 
             // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
-            if viewModel.isEditingDiagram, case .equipment(let nodeId) = activeSheetContent, quickActionsOpacity > 0.01 {
+            if viewModel.isEditingDiagram,
+               case .equipment(let nodeId) = activeSheetContent,
+               quickActionsOpacity > 0.01 {
                 nodeQuickActionsToolbar(for: nodeId)
                     .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
                     .opacity(quickActionsOpacity)            // Fades out continuously
@@ -134,9 +136,9 @@ struct ReviewView: View {
             activeSheetContent = nil
             selectedNodeId = nil
             selectedDetent = .height(76)
-        }) {
+        }, content: {
             unifiedSheetContent
-        }
+        })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
         }

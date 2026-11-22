@@ -14,59 +14,59 @@ final class EquipmentFormViewModel {
     var category: EquipmentCategory = .camera
     var name: String = ""
     var role: String = ""
-    
+
     // Light properties
     var power: String = ""
     var colorTemp: String = ""
-    
+
     // Camera properties
     var lens: String = ""
     var iso: String = ""
     var aperture: String = ""
     var shutterSpeed: String = ""
     var whiteBalance: String = ""
-    
+
     // Position & Direction
     var height: String = ""
     var tilt: String = ""
     var horizontalAim: String = ""
     var distance: String = ""
-    
+
     // Text areas
     var accessories: String = ""
     var notes: String = ""
-    
+
     var editingNodeId: UUID?
     private unowned let reviewViewModel: ReviewViewModel
-    
+
     var isEditing: Bool { editingNodeId != nil }
-    
+
     var isFormValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-    
+
     init(editingNodeId: UUID?, reviewViewModel: ReviewViewModel) {
         self.editingNodeId = editingNodeId
         self.reviewViewModel = reviewViewModel
         loadData()
     }
-    
+
     func switchToNode(id: UUID?) {
         self.editingNodeId = id
         loadData()
     }
-    
+
     // MARK: - Data Operations
-    
+
     func loadData() {
         guard let id = editingNodeId,
               let node = reviewViewModel.nodes.first(where: { $0.id == id }) else { return }
-        
+
         category = node.category
         name = node.name
         role = node.role
         power = node.power
-        
+
         // Strip unit suffixes so input fields hold clean numeric strings
         colorTemp = cleanNumericString(node.colorTemp)
         lens = node.lens
@@ -78,16 +78,16 @@ final class EquipmentFormViewModel {
         tilt = cleanNumericString(node.tilt)
         horizontalAim = cleanNumericString(node.horizontalAim)
         distance = cleanNumericString(node.distance)
-        
+
         accessories = node.accessories
         notes = node.notes
     }
-    
+
     func saveNode(undoManager: UndoManager?, completion: () -> Void) {
         let oldNodesSnapshot = reviewViewModel.nodes.map { $0.clone() }
         let sanitizedDistance = cleanNumericString(distance)
         let sanitizedAim = cleanNumericString(horizontalAim)
-        
+
         if let id = editingNodeId, let index = reviewViewModel.nodes.firstIndex(where: { $0.id == id }) {
             let node = reviewViewModel.nodes[index]
             node.category = category
@@ -106,11 +106,11 @@ final class EquipmentFormViewModel {
             node.distance = sanitizedDistance
             node.accessories = accessories
             node.notes = notes
-            
+
             // Synchronize diagram coordinates & heading rotation angle
             node.syncRotationFromHorizontalAim()
             node.syncPositionFromDistance()
-            
+
             reviewViewModel.updateEquipment(oldNodesSnapshot: oldNodesSnapshot, undoManager: undoManager)
         } else {
             let newNode = Equipment(
@@ -133,16 +133,16 @@ final class EquipmentFormViewModel {
                 accessories: accessories,
                 notes: notes
             )
-            
+
             newNode.syncRotationFromHorizontalAim()
             newNode.syncPositionFromDistance()
-            
+
             reviewViewModel.addEquipment(newNode, undoManager: undoManager)
         }
-        
+
         completion()
     }
-    
+
     func deleteNode(undoManager: UndoManager?, completion: () -> Void) {
         guard let id = editingNodeId else { return }
         let oldNodes = reviewViewModel.nodes
@@ -151,9 +151,9 @@ final class EquipmentFormViewModel {
         StorageController.shared.save()
         completion()
     }
-    
+
     // MARK: - Sanitization Helper
-    
+
     /// Sanitizes strings by stripping non-numeric unit characters, keeping pure numeric inputs (e.g. "2.50").
     private func cleanNumericString(_ input: String) -> String {
         let normalized = input.replacingOccurrences(of: ",", with: ".")

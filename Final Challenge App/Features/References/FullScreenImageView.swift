@@ -92,7 +92,10 @@ struct FullScreenImageView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: isSelected ? 8 : 4))
                                             .overlay(
                                                 RoundedRectangle(cornerRadius: isSelected ? 8 : 4)
-                                                    .stroke(isSelected ? DesignTokens.textPrimary : Color.clear, lineWidth: 2)
+                                                    .stroke(
+                                                        isSelected ? DesignTokens.textPrimary : Color.clear,
+                                                        lineWidth: 2
+                                                    )
                                             )
                                             .opacity(isSelected ? 1.0 : 0.5)
                                             .contentShape(Rectangle())
@@ -165,7 +168,9 @@ struct FullScreenImageView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    let displayIndex = viewModel.referenceImages.isEmpty ? 0 : min(selectedIndex + 1, viewModel.referenceImages.count)
+                    let displayIndex = viewModel.referenceImages.isEmpty
+                        ? 0
+                        : min(selectedIndex + 1, viewModel.referenceImages.count)
                     let currentRefImage = viewModel.sortedReferenceImages.indices.contains(selectedIndex)
                         ? viewModel.sortedReferenceImages[selectedIndex]
                         : nil
@@ -175,7 +180,9 @@ struct FullScreenImageView: View {
                         .foregroundStyle(DesignTokens.textPrimary)
 
                     if let currentRefImage {
-                        Text("\(displayIndex) of \(viewModel.referenceImages.count) · Added \(currentRefImage.formattedDateString)")
+                        let count = viewModel.referenceImages.count
+                        let dateText = currentRefImage.formattedDateString
+                        Text("\(displayIndex) of \(count) · Added \(dateText)")
                             .font(.caption)
                             .foregroundStyle(DesignTokens.textSecondary)
                     } else {

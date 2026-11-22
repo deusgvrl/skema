@@ -14,7 +14,8 @@ struct CoverImageTests {
     private func jpegData(width: CGFloat, height: CGFloat) -> Data {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
-        let image = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { context in
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format)
+        let image = renderer.image { context in
             UIColor.orange.setFill()
             context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         }

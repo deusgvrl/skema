@@ -6,10 +6,10 @@ import Foundation
 @MainActor
 final class StorageController {
     static let shared = StorageController()
-    
+
     let container: ModelContainer
     let context: ModelContext
-    
+
     init(inMemory: Bool = false) {
         do {
             let schema = Schema([Setup.self, Equipment.self, ReferenceImage.self])
@@ -20,7 +20,7 @@ final class StorageController {
             fatalError("Failed to initialize SwiftData ModelContainer: \(error.localizedDescription)")
         }
     }
-        
+
     func fetchAllSetups() -> [Setup] {
         // Setups in Recently Deleted are hidden everywhere else.
         let descriptor = FetchDescriptor<Setup>(
@@ -34,17 +34,17 @@ final class StorageController {
             return []
         }
     }
-    
+
     func addSetup(_ setup: Setup) {
         context.insert(setup)
         save()
     }
-    
+
     func deleteSetup(_ setup: Setup) {
         context.delete(setup)
         save()
     }
-        
+
     /// Hides a setup in Recently Deleted. Its data stays until `purgeExpiredSetups` removes it.
     func moveToRecentlyDeleted(_ setup: Setup, at date: Date) {
         setup.deletedDate = date
@@ -80,26 +80,26 @@ final class StorageController {
         setup.nodes.append(equipment)
         save()
     }
-    
+
     func deleteEquipment(_ equipment: Equipment) {
         context.delete(equipment)
         save()
     }
-    
+
     func updateEquipment(_ equipment: Equipment) {
         save()
     }
-        
+
     func addReferenceImage(_ image: ReferenceImage, to setup: Setup) {
         setup.referenceImages.append(image)
         save()
     }
-    
+
     func deleteReferenceImage(_ image: ReferenceImage) {
         context.delete(image)
         save()
     }
-        
+
     /// Saves when there are changes and tells the caller if it fails.
     func trySave() throws {
         if context.hasChanges {

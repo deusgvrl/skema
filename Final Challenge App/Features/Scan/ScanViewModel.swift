@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ARKit
 import CoreGraphics
 import MeasureKit
@@ -332,7 +333,10 @@ final class ScanViewModel {
         }
         write(results)
     }
+}
 
+// MARK: - Overlay & Tags
+extension ScanViewModel {
     /// Where a tag for `spot` goes on a screen of `size`; nil when the spot is not on the screen.
     func tagPosition(of spot: SIMD3<Float>, in size: CGSize) -> CGPoint? {
         camera.flatMap { ScanOverlay.screenPoint(of: spot, camera: $0, screenSize: size) }
@@ -468,7 +472,10 @@ final class ScanViewModel {
     private static func metres(_ value: Float) -> String {
         String(format: "%.2f", value)
     }
+}
 
+// MARK: - Session Lifecycle & Guidance
+extension ScanViewModel {
     private func stopListening() {
         stateTask?.cancel()
         framesTask?.cancel()

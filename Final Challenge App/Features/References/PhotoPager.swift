@@ -5,7 +5,6 @@
 //  Created by Satriya Handha Wibowo on 21/11/26.
 //
 
-
 import SwiftUI
 import UIKit
 
@@ -45,24 +44,24 @@ struct PhotoPager: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ pvc: UIPageViewController, context: Context) {
-        let c = context.coordinator
-        c.parent = self
+        let coordinator = context.coordinator
+        coordinator.parent = self
         guard !images.isEmpty else { return }
 
-        for vc in pvc.viewControllers ?? [] {
-            (vc as? ZoomablePhotoVC)?.fitInsets = fitInsets
+        for viewController in pvc.viewControllers ?? [] {
+            (viewController as? ZoomablePhotoVC)?.fitInsets = fitInsets
         }
 
         let target = min(max(selection, 0), images.count - 1)
-        let contentChanged = c.lastCount != images.count || c.lastKey != contentKey
-        c.lastCount = images.count
-        c.lastKey = contentKey
+        let contentChanged = coordinator.lastCount != images.count || coordinator.lastKey != contentKey
+        coordinator.lastCount = images.count
+        coordinator.lastKey = contentKey
 
         guard let currentVC = pvc.viewControllers?.first as? ZoomablePhotoVC,
               target != currentVC.index || contentChanged else { return }
 
         let distance = target - currentVC.index
-        pvc.setViewControllers([c.page(at: target)],
+        pvc.setViewControllers([coordinator.page(at: target)],
                                direction: distance >= 0 ? .forward : .reverse,
                                animated: !contentChanged && abs(distance) == 1)
     }
@@ -83,24 +82,24 @@ struct PhotoPager: UIViewControllerRepresentable {
         }
 
         func pageViewController(_ pvc: UIPageViewController,
-                                viewControllerBefore vc: UIViewController) -> UIViewController? {
-            guard let i = (vc as? ZoomablePhotoVC)?.index, i > 0,
-                  i - 1 < parent.images.count else { return nil }
-            return page(at: i - 1)
+                                viewControllerBefore viewController: UIViewController) -> UIViewController? {
+            guard let pageIndex = (viewController as? ZoomablePhotoVC)?.index, pageIndex > 0,
+                  pageIndex - 1 < parent.images.count else { return nil }
+            return page(at: pageIndex - 1)
         }
 
         func pageViewController(_ pvc: UIPageViewController,
-                                viewControllerAfter vc: UIViewController) -> UIViewController? {
-            guard let i = (vc as? ZoomablePhotoVC)?.index,
-                  i + 1 < parent.images.count else { return nil }
-            return page(at: i + 1)
+                                viewControllerAfter viewController: UIViewController) -> UIViewController? {
+            guard let pageIndex = (viewController as? ZoomablePhotoVC)?.index,
+                  pageIndex + 1 < parent.images.count else { return nil }
+            return page(at: pageIndex + 1)
         }
 
         func pageViewController(_ pvc: UIPageViewController, didFinishAnimating finished: Bool,
                                 previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
             guard completed,
-                  let i = (pvc.viewControllers?.first as? ZoomablePhotoVC)?.index else { return }
-            parent.selection = i
+                  let pageIndex = (pvc.viewControllers?.first as? ZoomablePhotoVC)?.index else { return }
+            parent.selection = pageIndex
         }
     }
 }
@@ -170,15 +169,15 @@ final class ZoomablePhotoVC: UIViewController, UIScrollViewDelegate {
 
     @objc private func singleTapped() { onSingleTap() }
 
-    @objc private func doubleTapped(_ g: UITapGestureRecognizer) {
+    @objc private func doubleTapped(_ gesture: UITapGestureRecognizer) {
         if scrollView.zoomScale > 1 {
             scrollView.setZoomScale(1, animated: true)
         } else {
-            let p = g.location(in: contentView)
+            let tapPoint = gesture.location(in: contentView)
             let scale: CGFloat = 2.5
             let size = CGSize(width: scrollView.bounds.width / scale,
                               height: scrollView.bounds.height / scale)
-            scrollView.zoom(to: CGRect(x: p.x - size.width / 2, y: p.y - size.height / 2,
+            scrollView.zoom(to: CGRect(x: tapPoint.x - size.width / 2, y: tapPoint.y - size.height / 2,
                                        width: size.width, height: size.height),
                             animated: true)
         }

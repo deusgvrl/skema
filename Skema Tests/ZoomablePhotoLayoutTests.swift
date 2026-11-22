@@ -146,21 +146,21 @@ struct PhotoPagerCoordinatorTests {
 
     @Test("The first photo has nothing before it, the last has nothing after it")
     func edges() {
-        let c = makeCoordinator(count: 3)
+        let coordinator = makeCoordinator(count: 3)
         let pvc = UIPageViewController()
 
-        #expect(c.pageViewController(pvc, viewControllerBefore: c.page(at: 0)) == nil)
-        #expect(c.pageViewController(pvc, viewControllerAfter: c.page(at: 2)) == nil)
+        #expect(coordinator.pageViewController(pvc, viewControllerBefore: coordinator.page(at: 0)) == nil)
+        #expect(coordinator.pageViewController(pvc, viewControllerAfter: coordinator.page(at: 2)) == nil)
     }
 
     @Test("Neighbouring pages carry the right index")
     func neighbours() {
-        let c = makeCoordinator(count: 3)
+        let coordinator = makeCoordinator(count: 3)
         let pvc = UIPageViewController()
-        let middle = c.page(at: 1)
+        let middle = coordinator.page(at: 1)
 
-        let before = c.pageViewController(pvc, viewControllerBefore: middle) as? ZoomablePhotoVC
-        let after = c.pageViewController(pvc, viewControllerAfter: middle) as? ZoomablePhotoVC
+        let before = coordinator.pageViewController(pvc, viewControllerBefore: middle) as? ZoomablePhotoVC
+        let after = coordinator.pageViewController(pvc, viewControllerAfter: middle) as? ZoomablePhotoVC
 
         #expect(before?.index == 0)
         #expect(after?.index == 2)
@@ -168,11 +168,11 @@ struct PhotoPagerCoordinatorTests {
 
     @Test("A single photo can't be paged in either direction")
     func singlePhoto() {
-        let c = makeCoordinator(count: 1)
+        let coordinator = makeCoordinator(count: 1)
         let pvc = UIPageViewController()
-        let only = c.page(at: 0)
+        let only = coordinator.page(at: 0)
 
-        #expect(c.pageViewController(pvc, viewControllerBefore: only) == nil)
-        #expect(c.pageViewController(pvc, viewControllerAfter: only) == nil)
+        #expect(coordinator.pageViewController(pvc, viewControllerBefore: only) == nil)
+        #expect(coordinator.pageViewController(pvc, viewControllerAfter: only) == nil)
     }
 }

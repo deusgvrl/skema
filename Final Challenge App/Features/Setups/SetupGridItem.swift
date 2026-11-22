@@ -59,7 +59,10 @@ private struct SetupArtwork: View {
                 }
             }
             .clipShape(.rect(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(DesignTokens.diagramSubjectBorder.opacity(0.5), lineWidth: 0.5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(DesignTokens.diagramSubjectBorder.opacity(0.5), lineWidth: 0.5)
+            )
             .accessibilityHidden(true)
     }
 }
