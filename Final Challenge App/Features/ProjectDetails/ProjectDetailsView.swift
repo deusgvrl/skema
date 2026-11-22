@@ -52,12 +52,6 @@ struct ProjectDetailsView: View {
                 }
             } header: {
                 FormSectionHeader("Setup")
-            } footer: {
-                if viewModel.showsNameRequired || (!isFormValid && draftSetupName.isEmpty) {
-                    Text("Add a name to save this setup.")
-                        .font(.footnote)
-                        .foregroundStyle(DesignTokens.accentText)
-                }
             }
             .listRowBackground(DesignTokens.formRowBackground)
 
