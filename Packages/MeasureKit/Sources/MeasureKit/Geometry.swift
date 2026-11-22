@@ -94,6 +94,34 @@ public enum Geometry {
         return acos(cosine) * 180 / .pi
     }
 
+    /// A10-106 cases 9–11: a grown box measured at its back, the side farthest from the subject (Amadeus, 20 Nov).
+    /// The base centre is the back point on the floor; the top centre is that point at the box's middle height.
+    /// Without a subject base, or with the subject straight under the box centre, the box centre stands in.
+    public static func backCentres(of box: WorldBox, subjectBase: SIMD2<Float>?) -> EquipmentCentres {
+        let back = subjectBase.map { backPoint(of: box, from: $0) } ?? floorCentre(of: box)
+        let middleY = (box.min.y + box.max.y) / 2
+        return EquipmentCentres(status: .measured, baseCentre: back, topCentre: SIMD3(back.x, middleY, back.y))
+    }
+
+    /// Where the line from `subject` (x, z) through the box centre leaves the box, on the floor.
+    public static func backPoint(of box: WorldBox, from subject: SIMD2<Float>) -> SIMD2<Float> {
+        let centre = floorCentre(of: box)
+        let away = centre - subject
+        let length = simd_length(away)
+        guard length > 1e-6 else { return centre }
+        let direction = away / length
+        let half = SIMD2(box.max.x - box.min.x, box.max.z - box.min.z) / 2
+        // The walk from the centre ends at the first side it reaches: x or z.
+        var steps: [Float] = []
+        if abs(direction.x) > 1e-6 { steps.append(half.x / abs(direction.x)) }
+        if abs(direction.y) > 1e-6 { steps.append(half.y / abs(direction.y)) }
+        return centre + direction * (steps.min() ?? 0)
+    }
+
+    private static func floorCentre(of box: WorldBox) -> SIMD2<Float> {
+        SIMD2((box.min.x + box.max.x) / 2, (box.min.z + box.max.z) / 2)
+    }
+
     /// Height of `point` above the horizontal floor plane at `floorY`.
     public static func heightAboveFloor(_ point: SIMD3<Float>, floorY: Float) -> Float {
         point.y - floorY

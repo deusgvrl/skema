@@ -29,7 +29,7 @@ struct ScanView: View {
             background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, floor: floorPoint)
+                    RoomScanView(session: session, floor: floorPoint, outlines: viewModel.outlineBoxes)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.tap(atScreen: tap, screenSize: geometry.size)
@@ -295,16 +295,10 @@ private struct ScanTagsView: View {
         .accessibilityHidden(true)
     }
 
-    /// The box, and the tag just above it (or at the tapped point while there is no box yet).
+    /// The tag just above the item's box (or at the tapped point while there is no box yet). The box itself is drawn
+    /// in 3D in the camera view (A10-106, `ScanOutlines`).
     @ViewBuilder
     private func marker(title: String, status: String?, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
-        if let box {
-            Rectangle()
-                .fill(ScanPalette.green.opacity(0.12))
-                .strokeBorder(ScanPalette.green, lineWidth: 2)
-                .frame(width: box.width, height: box.height)
-                .position(x: box.midX, y: box.midY)
-        }
         if let point = box.map({ CGPoint(x: $0.midX, y: $0.minY - 20) }) ?? anchor {
             ScanTag(title: title, status: status).position(clamped(point, in: size))
         }

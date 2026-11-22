@@ -190,6 +190,11 @@ final class ScanViewModel {
             subjectBounds = nil
             subject = anchor
         case .light, .camera:
+            // A10-106 case 12: a light tap inside a light's grown box is that light again, not a new one.
+            if kind == .light, let light = light(containing: anchor) {
+                message = "Already tapped: Light \(light.name.split(separator: " ").last ?? "")"
+                return
+            }
             addItem(kind, anchor: anchor)
         }
         completedStep = ScanStep(completing: kind)
@@ -207,6 +212,11 @@ final class ScanViewModel {
         draftSetup.nodes.append(equipment)
         // A light is measured at the middle of its head; a camera keeps the top-point rule for now.
         if kind == .light { measurements.setRule(.middle, for: equipment.id) }
+    }
+
+    /// The light whose grown box holds `point`, if any.
+    private func light(containing point: SIMD3<Float>) -> ScanItem? {
+        items.first { $0.kind == .light && measurements.bigBox(for: $0.id)?.contains(point) == true }
     }
 
     private func remove(_ id: UUID) {
@@ -273,10 +283,24 @@ final class ScanViewModel {
             subjectBounds = measurements.bounds(for: subjectID).map { WorldBox(min: $0.min, max: $0.max) }
         }
         for item in items {
-            paint(around: item.anchor, for: item.id)
-            itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
+            if item.kind == .light {
+                // A10-106: a light is the surface painted from its tap; its outline is its grown box.
+                paintSurface(of: item, depth: depth, camera: frame.camera, floorY: floorY)
+                itemBounds[item.id] = measurements.bigBox(for: item.id)
+            } else {
+                paint(around: item.anchor, for: item.id)
+                itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
+            }
         }
         refreshResults()
+    }
+
+    /// One frame of a light: the paint bucket from its tapped point, where the point is in this frame's picture.
+    private func paintSurface(of item: ScanItem, depth: DepthFrame, camera: CameraModel, floorY: Float) {
+        guard let pixel = DepthSampler.project(item.anchor, camera: camera) else { return }
+        let points = DepthGrouping.surface(fromNormalized: pixel / camera.imageResolution, depth: depth, camera: camera,
+                                           floorY: floorY)
+        measurements.addSurface(points: points, to: item.id, camera: camera)
     }
 
     /// The live results, and the values written onto the draft equipment as soon as they exist, so what a tag says
@@ -301,11 +325,17 @@ final class ScanViewModel {
         box(of: itemBounds[item.id], in: size)
     }
 
+    /// A10-106: the world box of every tapped item and the subject, drawn as 3D outlines in the camera view.
+    var outlineBoxes: [UUID: WorldBox] {
+        var boxes = itemBounds
+        if let subjectBounds { boxes[subjectID] = subjectBounds }
+        return boxes
+    }
+
     /// The green outline around the subject.
     func subjectBox(in size: CGSize) -> CGRect? {
         box(of: subjectBounds, in: size)
     }
-
     private func box(of bounds: WorldBox?, in size: CGSize) -> CGRect? {
         guard let camera, let bounds else { return nil }
         return ScanOverlay.screenBox(of: bounds.corners, camera: camera, screenSize: size)
@@ -517,19 +547,6 @@ extension ScanViewModel {
         case .sessionFailed(let description): description
         case .alreadyStarted: "The scan was already started."
         case .cameraDenied, .lidarUnsupported: ""
-        }
-    }
-}
-
-/// An axis-aligned box in world space (metres).
-struct WorldBox: Equatable {
-    let min: SIMD3<Float>
-    let max: SIMD3<Float>
-
-    /// Its eight corners.
-    var corners: [SIMD3<Float>] {
-        (0..<8).map { index in
-            SIMD3(index & 1 == 0 ? min.x : max.x, index & 2 == 0 ? min.y : max.y, index & 4 == 0 ? min.z : max.z)
         }
     }
 }
