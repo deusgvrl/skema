@@ -111,7 +111,8 @@ struct LightingDiagramView: View {
                         }()
 
                         Text("\(node.distance) m")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.caption2.weight(.semibold))
+                            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .foregroundStyle(DesignTokens.textSecondary)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)

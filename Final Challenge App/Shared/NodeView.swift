@@ -175,6 +175,8 @@ struct NodeView: View {
                 .fontWeight(isSelected ? .bold : .regular)
                 .foregroundStyle(DesignTokens.textPrimary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .fixedSize()
                 .offset(y: 20)
         }

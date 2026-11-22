@@ -71,7 +71,8 @@ private struct DiagramTipPill<TipType: Tip>: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundStyle(DesignTokens.textPrimary)
-                        .lineLimit(2)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     // Close Target
