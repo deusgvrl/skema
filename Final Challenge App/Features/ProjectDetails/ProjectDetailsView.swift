@@ -72,12 +72,14 @@ struct ProjectDetailsView: View {
             } header: {
                 FormSectionHeader("Notes")
             } footer: {
-                Text("""
-                    Camera settings live with each camera in Equipment. \
-                    You can add reference photos from the shoot later in References.
-                    """)
-                    .font(.footnote)
-                    .foregroundStyle(DesignTokens.textSecondary)
+                if setup.firstSavedDate == nil {
+                    Text("""
+                        Camera settings live with each camera in Equipment. \
+                        You can add reference photos from the shoot later in References.
+                        """)
+                        .font(.footnote)
+                        .foregroundStyle(DesignTokens.textSecondary)
+                }
             }
             .listRowBackground(DesignTokens.formRowBackground)
         }

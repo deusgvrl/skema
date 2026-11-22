@@ -273,15 +273,7 @@ private extension EquipmentFormView {
         @Bindable var formViewModel = formViewModel
 
         if formViewModel.category != .accessory {
-            Section(
-                header: FormSectionHeader("Position & Direction"),
-                footer: Text(isReadOnly ? "Viewing equipment details from read-only mode." : """
-                    It's placed next to the subject for now. You can drag it to the right spot \
-                    on the diagram, or change these values anytime later.
-                    """)
-                    .font(.footnote)
-                    .foregroundStyle(DesignTokens.textSecondary)
-            ) {
+            Section {
                 HStack {
                     Text("Height")
                     Spacer()
@@ -331,6 +323,17 @@ private extension EquipmentFormView {
                         .disabled(isReadOnly)
                     Text("m")
                         .foregroundStyle(DesignTokens.textSecondary)
+                }
+            } header: {
+                FormSectionHeader("Position & Direction")
+            } footer: {
+                if viewModel.draftSetup.firstSavedDate == nil {
+                    Text(isReadOnly ? "Viewing equipment details from read-only mode." : """
+                        It's placed next to the subject for now. You can drag it to the right spot \
+                        on the diagram, or change these values anytime later.
+                        """)
+                    .font(.footnote)
+                    .foregroundStyle(DesignTokens.textSecondary)
                 }
             }
             .listRowBackground(DesignTokens.formRowBackground)
