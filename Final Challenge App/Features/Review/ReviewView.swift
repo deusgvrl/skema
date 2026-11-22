@@ -346,6 +346,8 @@ struct ReviewView: View {
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save Changes", systemImage: "checkmark") {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
                     viewModel.confirmEdits(undoManager: undoManager)
                     if !isFromLoadingScreen { dismiss() }
                 }
@@ -355,7 +357,11 @@ struct ReviewView: View {
             }
         } else {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Next", systemImage: "chevron.right") { navigateToR07 = true }
+                Button("Next", systemImage: "chevron.right") {
+                    selectedNodeId = nil
+                    activeSheetContent = nil
+                    navigateToR07 = true
+                }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
             }
@@ -401,6 +407,8 @@ struct ReviewView: View {
         if viewModel.hasPendingEdits {
             showsDiscardChangesAlert = true
         } else {
+            selectedNodeId = nil
+            activeSheetContent = nil
             viewModel.discardEdits(undoManager: undoManager)
             if !isFromLoadingScreen { dismiss() }
         }
