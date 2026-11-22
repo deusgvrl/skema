@@ -6,6 +6,8 @@ struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.undoManager) private var undoManager
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
+
 
     @State private var viewModel: SetupDetailViewModel
     
@@ -15,6 +17,12 @@ struct SetupDetailView: View {
     @State private var showCamera = false
     @State private var showPhotoPicker = false
     @State private var photoPickerSelection: [PhotosPickerItem] = []
+    
+    // Camera capture access
+    @State private var showCameraDenied = false
+    @State private var openLibraryAfterDenied = false
+    private let cameraPermission: CameraPermission = SystemCameraPermission()
+
     
     // Selection & Preview State
     @State private var selectedPreviewIndex: Int = 0
@@ -186,6 +194,14 @@ struct SetupDetailView: View {
         } message: {
             Text("It will be removed from this setup's references.")
         }
+        .fullScreenCover(isPresented: $showCameraDenied, onDismiss: {
+            if openLibraryAfterDenied {
+                openLibraryAfterDenied = false
+                showPhotoPicker = true
+            }
+        }) {
+            cameraDenied()
+        }
     }
     
     // MARK: - Floating Node Toolbar Component & Actions
@@ -254,7 +270,6 @@ struct SetupDetailView: View {
             }
             .pickerStyle(.segmented)
             .controlSize(.large)
-            .glassEffect(.regular.interactive())
             .padding(.horizontal)
             .padding(.bottom, 8)
         }
@@ -537,7 +552,7 @@ struct SetupDetailView: View {
         } else if !isEditing && viewModel.selectedTab == 1 {
             ToolbarItem(placement: .bottomBar) {
                 Menu {
-                    Button("Take Photo", systemImage: "camera") { showCamera = true }
+                    Button("Take Photo", systemImage: "camera") { takePhotoTapped() }
                     Button("Choose from Library", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
                 } label: {
                     Label("Add Image", systemImage: "plus")
@@ -592,6 +607,69 @@ struct SetupDetailView: View {
             Add any photos from the shoot, like the final shot, the product, or the set, \
             so you can match this setup next time. Tap + to add a reference.
             """)
+        }
+    }
+    
+    private func takePhotoTapped() {
+        // No camera hardware (simulator): CameraPicker already falls back to the photo library.
+        guard CameraService.shared.isCameraAvailable else {
+            showCamera = true
+            return
+        }
+
+        switch cameraPermission.status {
+        case .authorized:
+            showCamera = true
+        case .denied:
+            showCameraDenied = true
+        case .notDetermined:
+            Task {
+                if await cameraPermission.request() {
+                    showCamera = true
+                } else {
+                    showCameraDenied = true
+                }
+            }
+        }
+    }
+    
+    // MARK: - Camera Denied
+
+    @ViewBuilder
+    private func cameraDenied() -> some View {
+        NavigationStack {
+            ScanMessageView(title: "Camera Access Is Off", systemImage: "video.slash", message:  Text("""
+                        Lighting Memory needs the camera to take reference photos. \
+                        Turn it on in Settings, or choose a photo from your library.
+                        """))
+            {
+                
+                ScanPrimaryButton(title: "Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+                
+                Button("Choose From Library") {
+                    openLibraryAfterDenied = true
+                    showCameraDenied = false
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DesignTokens.accentText)
+                
+            }
+            .padding(.horizontal, 24)
+
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", systemImage: "xmark") { showCameraDenied = false }
+                }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, cameraPermission.status == .authorized {
+                showCameraDenied = false
+            }
         }
     }
 }

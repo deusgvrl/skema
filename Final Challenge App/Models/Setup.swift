@@ -51,10 +51,12 @@ final class Setup {
 }
 
 extension Setup {
+    
     /// Rotates all equipment around the subject (0, 0) so that the first camera sits at 6 o'clock.
     /// All other equipment follows with relative positions and distances preserved.
     /// Called once upon scan completion to establish the initial camera baseline.
-    func alignFirstCameraToSixOClock() {
+    /// Rotate every equipment pointing to subject
+    func alignAndOrientDiagram() {
         guard let firstCamera = nodes.first(where: { $0.category == .camera }) else { return }
         
         let x1 = firstCamera.positionX
@@ -80,6 +82,10 @@ extension Setup {
             node.positionY = newY
             
             node.syncDistanceFromPosition()
+        }
+        
+        for node in nodes {
+            node.pointToSubject()
         }
     }
 }

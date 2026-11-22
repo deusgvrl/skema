@@ -15,7 +15,6 @@ struct ScanMessageView<Actions: View>: View {
     let message: Text
     @ViewBuilder let actions: () -> Actions
 
-    @ScaledMetric(relativeTo: .largeTitle) private var iconCircleSize: CGFloat = 80
 
     var body: some View {
         // Scrolls only when large Dynamic Type no longer fits on screen.
@@ -32,10 +31,8 @@ struct ScanMessageView<Actions: View>: View {
     private var content: some View {
         VStack(spacing: 0) {
             Image(systemName: systemImage)
-                .font(.system(size: 32, weight: .regular))
+                .font(.system(size: 56, weight: .regular)) 
                 .foregroundStyle(DesignTokens.textPrimary)
-                .frame(width: iconCircleSize, height: iconCircleSize)
-                .glassEffect(.regular.tint(DesignTokens.glassControlFill), in: .circle)
                 .accessibilityHidden(true)
 
             Text(title)
