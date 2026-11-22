@@ -89,7 +89,7 @@ struct EquipmentFormView: View {
                             .disabled(!formViewModel.isFormValid)
                         } else {
                             // Compact / Medium Mode: Show Pencil to Expand Fullscreen
-                            Button("Edit Details", systemImage: "pencil") {
+                            Button("Edit Details", systemImage: "pencil.and.list.clipboard") {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .large
                                 }
