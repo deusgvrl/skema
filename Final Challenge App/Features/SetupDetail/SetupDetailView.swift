@@ -1,31 +1,15 @@
+// swiftlint:disable type_body_length
 import SwiftUI
-import PhotosUI
 import QuickLook
 
 struct SetupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.openURL) private var openURL
 
     @State private var viewModel: SetupDetailViewModel
+    @State private var referencesViewModel = ReferencesViewModel()
 
     private static let diagramImageScale: CGFloat = 3
-
-    // Photo Pickers State
-    @State private var showCamera = false
-    @State private var showPhotoPicker = false
-    @State private var photoPickerSelection: [PhotosPickerItem] = []
-
-    // Camera capture access
-    @State private var showCameraDenied = false
-    @State private var openLibraryAfterDenied = false
-    private let cameraPermission: CameraPermission = SystemCameraPermission()
-
-    // Selection & Preview State
-    @State private var selectedPreviewIndex: Int = 0
-    @State private var showReferenceDetail: Bool = false
-    @State private var imageIndexToDelete: Int?
 
     // Unified diagram sheet state
     @State private var activeSheetContent: DiagramSheetContent?
@@ -34,10 +18,7 @@ struct SetupDetailView: View {
     @State private var showsDiscardChangesAlert = false
 
     @State private var selectedDetent: PresentationDetent = .height(76)
-
     @State private var currentSheetHeight: CGFloat = 76
-
-    @Namespace private var zoomNamespace
 
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
 
@@ -71,7 +52,10 @@ struct SetupDetailView: View {
                 if isEditing || viewModel.selectedTab == 0 {
                     diagramContent
                 } else {
-                    referencesContent
+                    ReferencesView(
+                        viewModel: viewModel,
+                        referencesViewModel: referencesViewModel
+                    )
                 }
             }
 
@@ -105,25 +89,6 @@ struct SetupDetailView: View {
         }
         .toolbar {
             toolbarContent
-        }
-        .photosPicker(isPresented: $showPhotoPicker, selection: $photoPickerSelection, matching: .images)
-        .task(id: photoPickerSelection) {
-            guard !photoPickerSelection.isEmpty else { return }
-            await viewModel.addReferenceImages(from: photoPickerSelection)
-            photoPickerSelection.removeAll()
-        }
-        .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker(images: $viewModel.referenceImages) { capturedImage in
-                viewModel.addReferenceImage(capturedImage)
-            }
-            .ignoresSafeArea()
-        }
-        .navigationDestination(isPresented: $showReferenceDetail) {
-            FullScreenImageView(
-                viewModel: viewModel,
-                selectedIndex: selectedPreviewIndex,
-                namespace: zoomNamespace
-            )
         }
         .sheet(isPresented: unifiedSheetBinding, onDismiss: {
             activeSheetContent = nil
@@ -166,27 +131,6 @@ struct SetupDetailView: View {
         } message: {
             Text(viewModel.deleteMessage)
         }
-        .alert("Delete This Photo?", isPresented: $viewModel.isDeleteImageAlertPresented) {
-                    Button("Cancel", role: .cancel) {
-                imageIndexToDelete = nil
-            }
-            Button("Delete", role: .destructive) {
-                if let index = imageIndexToDelete {
-                    viewModel.deleteReferenceImage(at: index)
-                }
-                imageIndexToDelete = nil
-            }
-        } message: {
-            Text("It will be removed from this setup's references.")
-        }
-        .fullScreenCover(isPresented: $showCameraDenied, onDismiss: {
-            if openLibraryAfterDenied {
-                openLibraryAfterDenied = false
-                showPhotoPicker = true
-            }
-        }, content: {
-            cameraDenied()
-        })
     }
 
     // MARK: - Floating Node Toolbar Component & Actions
@@ -278,63 +222,6 @@ struct SetupDetailView: View {
         .ignoresSafeArea(edges: .bottom)
     }
 
-    @ViewBuilder
-    private var referencesContent: some View {
-        ZStack {
-            if viewModel.referenceImages.isEmpty {
-                referencesEmptyState
-            } else {
-                ScrollView {
-                    let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
-                    LazyVGrid(columns: columns, spacing: 2) {
-                        ForEach(0..<viewModel.referenceImages.count, id: \.self) { index in
-                            if viewModel.referenceImages.indices.contains(index) {
-                                referenceImageCell(at: index)
-                                    .accessibilityLabel("Reference \(index + 1)")
-                                    .accessibilityAddTraits(.isButton)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func referenceImageCell(at index: Int) -> some View {
-
-        ZStack(alignment: .topTrailing) {
-            Image(uiImage: viewModel.referenceImages[index])
-                .resizable()
-                .scaledToFill()
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                .aspectRatio(1, contentMode: .fit)
-                .clipped()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            selectedPreviewIndex = index
-            showReferenceDetail = true
-        }
-        .contextMenu {
-            Button {
-                viewModel.setAsCoverImage(at: index)
-            } label: {
-                Label("Set as Cover Photo", systemImage: "photo.artframe")
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                imageIndexToDelete = index
-                viewModel.isDeleteImageAlertPresented = true
-            } label: {
-                Label("Delete Photo", systemImage: "trash")
-            }
-        }
-        .matchedTransitionSource(id: index, in: zoomNamespace)
-    }
-
     // MARK: - Unified Sheet
 
     private var unifiedSheetBinding: Binding<Bool> {
@@ -353,54 +240,54 @@ struct SetupDetailView: View {
     }
 
     @ViewBuilder
-        private var unifiedSheetContent: some View {
-            Group {
-                switch activeSheetContent {
-                case .equipment(let nodeId):
-                    EquipmentFormView(
-                        viewModel: viewModel.reviewViewModel,
-                        editingNodeId: nodeId,
-                        undoManager: isEditing ? undoManager : nil,
-                        isReadOnly: !isEditing,
-                        selectedDetent: $selectedDetent
-                    )
-                case .subject:
-                    SubjectFormView(
-                        viewModel: viewModel.reviewViewModel,
-                        undoManager: isEditing ? undoManager : nil,
-                        isReadOnly: !isEditing,
-                        selectedDetent: $selectedDetent
-                    )
-                case .none:
-                    EmptyView()
-                }
+    private var unifiedSheetContent: some View {
+        Group {
+            switch activeSheetContent {
+            case .equipment(let nodeId):
+                EquipmentFormView(
+                    viewModel: viewModel.reviewViewModel,
+                    editingNodeId: nodeId,
+                    undoManager: isEditing ? undoManager : nil,
+                    isReadOnly: !isEditing,
+                    selectedDetent: $selectedDetent
+                )
+            case .subject:
+                SubjectFormView(
+                    viewModel: viewModel.reviewViewModel,
+                    undoManager: isEditing ? undoManager : nil,
+                    isReadOnly: !isEditing,
+                    selectedDetent: $selectedDetent
+                )
+            case .none:
+                EmptyView()
             }
-            // Track live sheet height frame-by-frame for top action buttons
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onChange(of: proxy.size.height, initial: true) { _, newHeight in
-                            currentSheetHeight = newHeight
-                        }
-                }
-            }
-            .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
-            .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
-            .interactiveDismissDisabled(true)
-            .presentationDragIndicator(.visible)
-            .presentationBackground {
-                if selectedDetent == .large {
-                    DesignTokens.sheetBackground
-                } else {
-                    if #available(iOS 26, *) {
-                        Color.clear
-                            .glassEffect(.clear, in: .rect)
-                    } else {
-                        Rectangle().fill(.regularMaterial)
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onChange(of: proxy.size.height, initial: true) { _, newHeight in
+                        currentSheetHeight = newHeight
                     }
+            }
+        }
+        .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
+        .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
+        .interactiveDismissDisabled(true)
+        .presentationDragIndicator(.visible)
+        .presentationBackground {
+            if selectedDetent == .large {
+                DesignTokens.sheetBackground
+            } else {
+                if #available(iOS 26, *) {
+                    Color.clear
+                        .glassEffect(.clear, in: .rect)
+                } else {
+                    Rectangle().fill(.regularMaterial)
                 }
             }
         }
+    }
+
     // MARK: - Tap Handlers
 
     private func handleNodeTap(_ node: Equipment) {
@@ -456,7 +343,6 @@ struct SetupDetailView: View {
                     withAnimation { viewModel.reviewViewModel.discardEdits(undoManager: undoManager) }
                 }
             }
-            // A popover on the X (like Reminders); tapping outside it keeps editing.
             .confirmationDialog(
                 "Are you sure you want to discard your changes to this diagram?",
                 isPresented: $showsDiscardChangesAlert,
@@ -553,8 +439,8 @@ struct SetupDetailView: View {
         } else if !isEditing && viewModel.selectedTab == 1 {
             ToolbarItem(placement: .bottomBar) {
                 Menu {
-                    Button("Take Photo", systemImage: "camera") { takePhotoTapped() }
-                    Button("Choose from Library", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
+                    Button("Take Photo", systemImage: "camera") { referencesViewModel.takePhotoTapped() }
+                    Button("Choose from Library", systemImage: "photo.on.rectangle") { referencesViewModel.showPhotoPicker = true }
                 } label: {
                     Label("Add Image", systemImage: "plus")
                 }
@@ -600,79 +486,6 @@ struct SetupDetailView: View {
         let renderer = ImageRenderer(content: diagram)
         renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
         viewModel.shareTapped(diagram: renderer.uiImage)
-    }
-
-    private var referencesEmptyState: some View {
-        ContentUnavailableView {
-            Label("No References Yet", systemImage: "photo")
-        } description: {
-            Text("""
-            Add any photos from the shoot, like the final shot, the product, or the set, \
-            so you can match this setup next time. Tap + to add a reference.
-            """)
-        }
-    }
-
-    private func takePhotoTapped() {
-        // No camera hardware (simulator): CameraPicker already falls back to the photo library.
-        guard CameraService.shared.isCameraAvailable else {
-            showCamera = true
-            return
-        }
-
-        switch cameraPermission.status {
-        case .authorized:
-            showCamera = true
-        case .denied:
-            showCameraDenied = true
-        case .notDetermined:
-            Task {
-                if await cameraPermission.request() {
-                    showCamera = true
-                } else {
-                    showCameraDenied = true
-                }
-            }
-        }
-    }
-
-    // MARK: - Camera Denied
-
-    @ViewBuilder
-    private func cameraDenied() -> some View {
-        NavigationStack {
-            ScanMessageView(title: "Camera Access Is Off", systemImage: "video.slash", message: Text("""
-                        Lighting Memory needs the camera to take reference photos. \
-                        Turn it on in Settings, or choose a photo from your library.
-                        """)) {
-
-                ScanPrimaryButton(title: "Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(url)
-                    }
-                }
-
-                Button("Choose From Library") {
-                    openLibraryAfterDenied = true
-                    showCameraDenied = false
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(DesignTokens.accentText)
-
-            }
-            .padding(.horizontal, 24)
-
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") { showCameraDenied = false }
-                }
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active, cameraPermission.status == .authorized {
-                showCameraDenied = false
-            }
-        }
     }
 }
 
