@@ -15,7 +15,7 @@ struct ReviewView: View {
     @State private var activeSheetContent: DiagramSheetContent?
     @State private var selectedNodeId: UUID?
     @State private var isAddingNode = false
-    @State private var navigateToR07 = false
+    @State private var navigateToProjectDetails = false
     @State private var showsSaveSetupAlert = false
     @State private var showsDiscardChangesAlert = false
     @State private var selectedDetent: PresentationDetent = .height(76)
@@ -98,7 +98,7 @@ struct ReviewView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $navigateToR07) {
+        .navigationDestination(isPresented: $navigateToProjectDetails) {
             ProjectDetailsView(
                 setup: viewModel.draftSetup,
                 isPresentedModally: false,
@@ -293,7 +293,7 @@ struct ReviewView: View {
                 isPresented: $showsSaveSetupAlert,
                 titleVisibility: .visible
             ) {
-                Button("Save Setup") { navigateToR07 = true }
+                Button("Save Setup") { navigateToProjectDetails = true }
                     .keyboardShortcut(.defaultAction)
                 Button("Discard", role: .destructive) {
                     viewModel.discardSetup()
@@ -359,7 +359,7 @@ struct ReviewView: View {
                 Button("Next", systemImage: "chevron.right") {
                     selectedNodeId = nil
                     activeSheetContent = nil
-                    navigateToR07 = true
+                    navigateToProjectDetails = true
                 }
                 .buttonStyle(.glassProminent)
                 .tint(DesignTokens.accentPrimary)
