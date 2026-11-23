@@ -32,7 +32,7 @@ struct ScanView: View {
             background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, outlines: viewModel.outlineBoxes,
+                    RoomScanView(session: session, outlines: viewModel.outlineBoxes, usedPoints: viewModel.usedPoints,
                                  onCoachingChange: { coaching in withAnimation { isCoaching = coaching } })
                         .ignoresSafeArea()
                         .onTapGesture { tap in
@@ -45,6 +45,10 @@ struct ScanView: View {
                 .ignoresSafeArea()
                 ScanTagsView(viewModel: viewModel)
                     .ignoresSafeArea()
+                if viewModel.showsUsedPoints {
+                    UsedPointsTagsView(viewModel: viewModel)
+                        .ignoresSafeArea()
+                }
                 // Measure's look: one instruction; while Apple's coaching screen shows, it is the only one.
                 if !isCoaching {
                     ScanInstructionView(instruction: viewModel.instruction)
@@ -92,6 +96,11 @@ struct ScanView: View {
             }
             if viewModel.screen == .scanning {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button(viewModel.showsUsedPoints ? "Hide Centres" : "Show Centres", systemImage: "scope") {
+                        viewModel.showsUsedPoints.toggle()
+                    }
+                    .tint(viewModel.showsUsedPoints ? .green : nil)
+                    .accessibilityHint("Shows where each item's top and base centre land, for debugging")
                     Button("Undo", systemImage: "arrow.uturn.backward") {
                         withAnimation { viewModel.undoTapped() }
                     }

@@ -55,6 +55,10 @@ final class ScanViewModel {
     private(set) var itemBounds: [UUID: WorldBox] = [:]
     /// The subject's collected points, as a world box.
     private(set) var subjectBounds: WorldBox?
+    /// The "Centres" debug view (`ScanViewModel+UsedPoints.swift`): where each item's centres land. Off by default.
+    var showsUsedPoints = false { didSet { usedPointsSwitched() } }
+    /// What the "Centres" view draws; empty while it is off.
+    var usedPoints: [UsedPoints] = []
 
     @ObservationIgnored private let makeScan: () -> ScanSession
     @ObservationIgnored private let cameraPermission: any CameraPermission
@@ -63,8 +67,9 @@ final class ScanViewModel {
     @ObservationIgnored private var stateTask: Task<Void, Never>?
     @ObservationIgnored private var framesTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
-    @ObservationIgnored private var measurements = ScanMeasurements()
-    @ObservationIgnored private let subjectID = UUID()
+    @ObservationIgnored var measurements = ScanMeasurements()
+    /// Stands for the subject in `measurements`.
+    @ObservationIgnored let subjectID = UUID()
     @ObservationIgnored private var kindCounts: [ScanTapKind: Int] = [:]
     @ObservationIgnored private var latestFrame: ScanFrame?
     /// The floor ARKit found (`FloorPicker`: its lowest floor plane); nil until it finds one. Step 1 (A10-112).
@@ -78,6 +83,8 @@ final class ScanViewModel {
     private var history: [TapRecord] = []
     @ObservationIgnored private var lastCollect: Double?
     @ObservationIgnored private var guidanceHold = GuidanceHold()
+    /// When the "Centres" list was last rebuilt (frame time), to keep it at twice a second.
+    @ObservationIgnored var lastUsedRefresh: Double?
 
     /// The painted column (the A10-41 debug screen's rule): 10 cm around the tapped axis, from 3 cm above the floor
     /// up to 3 m above it.
@@ -179,6 +186,7 @@ final class ScanViewModel {
         if kind == .light || kind == .camera, let hit = item(atScreen: point, screenSize: screenSize) {
             remove(hit)
             advance()
+            refreshUsedPoints(at: nil)
             return
         }
         guard hasFloor else {
@@ -210,6 +218,7 @@ final class ScanViewModel {
         completedStep = ScanStep(completing: kind)
         advance()
         collect(from: frame)
+        refreshUsedPoints(at: nil)
     }
 
     private func addItem(_ kind: ScanTapKind, anchor: SIMD3<Float>) {
@@ -259,6 +268,7 @@ final class ScanViewModel {
         }
         refreshResults()
         advance()
+        refreshUsedPoints(at: nil)
     }
 
     /// How close (in points) a tap must be to an item's tag spot to count as a tap on it.
@@ -304,6 +314,7 @@ final class ScanViewModel {
         }
         refreshResults()
         checkTappedStatus(at: frame.timestamp)
+        refreshUsedPoints(at: frame.timestamp)
     }
 
     /// Once `statusCheckDelay` has passed since the newest tap, what it set is looked at once: still out of range, or

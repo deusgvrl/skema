@@ -130,6 +130,26 @@ public struct ScanMeasurements: Sendable {
         return centres
     }
 
+    /// The centres each item is measured from, exactly as `results` uses them (the scan's "Centres" debug view): an
+    /// item with a grown box (A10-106) at the box's back, any other item from its points. An item that cannot be
+    /// measured has no centres.
+    public func usedCentres(subject: UUID) -> [UUID: EquipmentCentres] {
+        used(centres(subject: subject), subject: subject)
+    }
+
+    /// `centres` with each grown box's back centres in place of the item's own.
+    private func used(_ centres: [UUID: EquipmentCentres], subject: UUID) -> [UUID: EquipmentCentres] {
+        let subjectBase = centres[subject]?.baseCentre
+        var used = centres
+        for (id, found) in centres where found.status == .measured {
+            // A10-106: an item with a grown box is measured at the middle height of the box's back.
+            if let box = bigBox(for: id) {
+                used[id] = Geometry.backCentres(of: box, subjectBase: id == subject ? nil : subjectBase)
+            }
+        }
+        return used
+    }
+
     /// The result for every piece of equipment, measured against the floor at `floorY` and the equipment `subject`.
     ///
     /// A distance or floor position needs both the equipment and the subject to be measured, so without a measured
@@ -138,12 +158,7 @@ public struct ScanMeasurements: Sendable {
         let centres = centres(subject: subject)
         let subjectCentres = centres[subject]
         var results: [UUID: EquipmentResult] = [:]
-        for (id, found) in centres {
-            // A10-106: an item with a grown box is measured at the middle height of the box's back.
-            var own = found
-            if own.status == .measured, let box = bigBox(for: id) {
-                own = Geometry.backCentres(of: box, subjectBase: id == subject ? nil : subjectCentres?.baseCentre)
-            }
+        for (id, own) in used(centres, subject: subject) {
             results[id] = EquipmentResult(
                 status: own.status,
                 distanceToSubject: subjectCentres.flatMap { Geometry.floorDistance(from: $0, to: own) },

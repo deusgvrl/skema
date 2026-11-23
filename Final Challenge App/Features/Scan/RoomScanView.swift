@@ -8,6 +8,7 @@
 //  grid cost memory on the main thread).
 //  A10-106: RealityKit's ARView (it was SceneKit's ARSCNView), so the 3D outline can hide behind real surfaces.
 //  Apple's coaching screen (as in Measure) sits on it while tracking starts or is lost.
+//  The "Centres" debug view's centre dots, when it is on.
 //
 
 import Foundation
@@ -20,6 +21,8 @@ struct RoomScanView: UIViewRepresentable {
     let session: ARSession
     /// A10-106: the world box of each tapped item, drawn as a 3D dashed box.
     var outlines: [UUID: WorldBox] = [:]
+    /// The "Centres" debug view's items; empty draws nothing.
+    var usedPoints: [UsedPoints] = []
     /// Apple's coaching screen showed (true) or went (false); the scan's own instruction steps aside meanwhile.
     var onCoachingChange: (Bool) -> Void = { _ in }
 
@@ -31,6 +34,7 @@ struct RoomScanView: UIViewRepresentable {
         view.scene.addAnchor(root)
         context.coordinator.root = root
         context.coordinator.outlines = ScanOutlines(root: root)
+        context.coordinator.usedPoints = UsedPointsEntities(root: root)
         view.subviews.compactMap { $0 as? ARCoachingOverlayView }.first?.delegate = context.coordinator
         return view
     }
@@ -39,6 +43,7 @@ struct RoomScanView: UIViewRepresentable {
         context.coordinator.onCoachingChange = onCoachingChange
         context.coordinator.outlines?.show(outlines, cameraPosition: view.cameraTransform.translation,
                                            focalLength: Self.focalLength(of: view))
+        context.coordinator.usedPoints?.show(usedPoints)
     }
 
     /// The camera view on the scan's own session. ScanSession configures and runs it and stays its delegate, so the
@@ -77,6 +82,7 @@ struct RoomScanView: UIViewRepresentable {
     final class Coordinator: NSObject, ARCoachingOverlayViewDelegate {
         var root: AnchorEntity?
         var outlines: ScanOutlines?
+        var usedPoints: UsedPointsEntities?
         var onCoachingChange: (Bool) -> Void = { _ in }
 
         func coachingOverlayViewWillActivate(_ coachingOverlayView: ARCoachingOverlayView) {
