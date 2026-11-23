@@ -18,7 +18,7 @@ struct EquipmentFormView: View {
     @State private var isSwitchingNode: Bool = false
 
     private var editingTitle: String? {
-        viewModel.nodes.first { $0.id == editingNodeId }?.displayName
+        viewModel.nodes.first { $0.id == editingNodeId }?.name
     }
 
     init(
@@ -52,9 +52,32 @@ struct EquipmentFormView: View {
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
             .background(selectedDetent == .large ? DesignTokens.sheetBackground : Color.clear)
-            .navigationTitle(formViewModel.isEditing ? (editingTitle ?? "Equipment Details") : "Add Equipment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+
+                // MARK: - Navigation Title (Principal)
+                ToolbarItem(placement: .principal) {
+                    if formViewModel.isEditing && selectedDetent == .height(76) {
+                        VStack(spacing: 2) {
+                            Text(formViewModel.name.isEmpty ? (editingTitle ?? "Equipment") : formViewModel.name)
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(DesignTokens.textPrimary)
+                                .lineLimit(1)
+
+                            if !formViewModel.role.isEmpty {
+                                Text(formViewModel.role)
+                                    .font(.subheadline)
+                                    .foregroundStyle(DesignTokens.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    } else {
+                        Text(formViewModel.isEditing ? (editingTitle ?? "Equipment Details") : "Add Equipment")
+                            .font(.headline)
+                            .foregroundStyle(DesignTokens.textPrimary)
+                    }
+                }
+
                 ToolbarItem(placement: .cancellationAction) {
                     Button(isReadOnly ? "Close" : "Cancel", systemImage: "xmark") {
                         if !isReadOnly && isDirty {
