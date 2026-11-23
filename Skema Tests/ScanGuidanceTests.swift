@@ -16,24 +16,38 @@ struct ScanGuidanceTests {
     let near = makeDepth(width: 8, height: 8, depth: 1)
     let far = makeDepth(width: 8, height: 8, depth: 6)
 
-    @Test("Each tracking problem has its tip", arguments: [
-        (ScanTracking.limited(.initializing), ScanGuidance?.some(.keepMoving)),
-        (.limited(.excessiveMotion), .moveSlower),
-        (.limited(.relocalizing), .goBack),
-        (.limited(.insufficientFeatures), .aimAtDetail),
-        (.limited(.other), nil),
-        (.notAvailable, nil),
-        (.normal, nil)
-    ])
-    func tracking(tracking: ScanTracking, expected: ScanGuidance?) {
-        let tip = ScanGuidance.guidance(tracking: tracking, ambientIntensity: 1000, depth: near)
+    @Test("Tracking that goes well in a lit room with the set near gives no tip")
+    func allGood() {
+        let tip = ScanGuidance.guidance(tracking: .normal, ambientIntensity: 1000, depth: near)
 
-        #expect(tip == expected)
+        #expect(tip == nil)
     }
 
-    @Test("A dark room asks for more light", arguments: [ScanTracking.normal, .limited(.insufficientFeatures)])
-    func dark(tracking: ScanTracking) {
-        let tip = ScanGuidance.guidance(tracking: tracking, ambientIntensity: 100, depth: near)
+    @Test("While tracking is limited in a lit room there is no tip, even far: Apple's coaching screen shows instead",
+          arguments: [
+            ScanTracking.limited(.initializing), .limited(.excessiveMotion), .limited(.relocalizing),
+            .limited(.insufficientFeatures), .limited(.other), .notAvailable
+          ])
+    func limitedTracking(tracking: ScanTracking) {
+        let tip = ScanGuidance.guidance(tracking: tracking, ambientIntensity: 1000, depth: far)
+
+        #expect(tip == nil)
+    }
+
+    @Test("A dark room asks for more light whatever the tracking, so the tip stays up while tracking comes and goes",
+          arguments: [
+            ScanTracking.normal, .limited(.initializing), .limited(.excessiveMotion), .limited(.relocalizing),
+            .limited(.insufficientFeatures), .limited(.other), .notAvailable
+          ])
+    func darkInEveryTrackingState(tracking: ScanTracking) {
+        let tip = ScanGuidance.guidance(tracking: tracking, ambientIntensity: 100, depth: far)
+
+        #expect(tip == .moreLight)
+    }
+
+    @Test("A dark room asks for more light")
+    func dark() {
+        let tip = ScanGuidance.guidance(tracking: .normal, ambientIntensity: 100, depth: near)
 
         #expect(tip == .moreLight)
     }
@@ -68,17 +82,17 @@ struct ScanGuidanceTests {
         #expect(tip == nil)
     }
 
-    @Test("Moving too fast wins over dark and far")
+    @Test("Dark wins over far")
     func priority() {
-        let tip = ScanGuidance.guidance(tracking: .limited(.excessiveMotion), ambientIntensity: 100, depth: far)
+        let tip = ScanGuidance.guidance(tracking: .normal, ambientIntensity: 100, depth: far)
 
-        #expect(tip == .moveSlower)
+        #expect(tip == .moreLight)
     }
 
-    @Test("The tips from the Jira story read as written", arguments: [
-        (ScanGuidance.moveSlower, "Move slower"),
-        (.moreLight, "More light"),
-        (.moveCloser, "Move closer")
+    @Test("The tips read as approved for the centred instruction (23 Nov)", arguments: [
+        (ScanGuidance.moreLight, "More light needed"),
+        (.moveCloser, "Move closer"),
+        (.floorNotFound, "Floor not found yet")
     ])
     func messages(tip: ScanGuidance, expected: String) {
         #expect(tip.message == expected)
@@ -92,25 +106,25 @@ struct GuidanceHoldTests {
     func showsAfterHold() {
         var hold = GuidanceHold()
 
-        let early = hold.update(.moveSlower, at: 0)
-        let stillEarly = hold.update(.moveSlower, at: 0.4)
-        let shown = hold.update(.moveSlower, at: 0.5)
+        let early = hold.update(.moveCloser, at: 0)
+        let stillEarly = hold.update(.moveCloser, at: 0.4)
+        let shown = hold.update(.moveCloser, at: 0.5)
 
         #expect(early == nil)
         #expect(stillEarly == nil)
-        #expect(shown == .moveSlower)
+        #expect(shown == .moveCloser)
     }
 
     @Test("The tip goes 0.5 s after tracking recovers")
     func hidesAfterRecovery() {
         var hold = GuidanceHold()
-        _ = hold.update(.moveSlower, at: 0)
-        _ = hold.update(.moveSlower, at: 0.5)
+        _ = hold.update(.moveCloser, at: 0)
+        _ = hold.update(.moveCloser, at: 0.5)
 
         let stillShown = hold.update(nil, at: 1.0)
         let hidden = hold.update(nil, at: 1.5)
 
-        #expect(stillShown == .moveSlower)
+        #expect(stillShown == .moveCloser)
         #expect(hidden == nil)
     }
 
@@ -118,7 +132,7 @@ struct GuidanceHoldTests {
     func briefProblemIgnored() {
         var hold = GuidanceHold()
 
-        _ = hold.update(.moveSlower, at: 0)
+        _ = hold.update(.moveCloser, at: 0)
         _ = hold.update(nil, at: 0.2)
         let later = hold.update(nil, at: 1)
 
@@ -140,13 +154,13 @@ struct GuidanceHoldTests {
     @Test("A different tip replaces the shown one after 0.5 s")
     func switchesTips() {
         var hold = GuidanceHold()
-        _ = hold.update(.moveSlower, at: 0)
-        _ = hold.update(.moveSlower, at: 0.5)
+        _ = hold.update(.moveCloser, at: 0)
+        _ = hold.update(.moveCloser, at: 0.5)
 
         let before = hold.update(.moreLight, at: 1)
         let after = hold.update(.moreLight, at: 1.5)
 
-        #expect(before == .moveSlower)
+        #expect(before == .moveCloser)
         #expect(after == .moreLight)
     }
 }

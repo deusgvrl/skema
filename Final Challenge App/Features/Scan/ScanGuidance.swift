@@ -10,21 +10,35 @@ import MeasureKit
 
 nonisolated enum ScanGuidance: Equatable, Sendable {
 
-    case keepMoving
-    case moveSlower
     case moreLight
     case moveCloser
-    case aimAtDetail
-    case goBack
+    /// No floor yet after `ScanViewModel.floorWaitBeforeTip` seconds (A10-112). Set by the floor search, never by
+    /// `guidance(tracking:ambientIntensity:depth:)`.
+    case floorNotFound
 
+    /// The centred instruction's line for this problem (copy approved 23 Nov 2026).
     var message: String {
         switch self {
-        case .keepMoving: "Move your iPhone slowly to start"
-        case .moveSlower: "Move slower"
-        case .moreLight: "More light"
+        case .moreLight: "More light needed"
         case .moveCloser: "Move closer"
-        case .aimAtDetail: "Point at the set, not a blank wall"
-        case .goBack: "Point back where you were"
+        case .floorNotFound: "Floor not found yet"
+        }
+    }
+
+    /// The SF Symbol shown above the line while the camera dims (Measure's coaching look).
+    var symbol: String {
+        switch self {
+        case .moreLight: "lightbulb.max.fill"
+        case .moveCloser: "figure.walk"
+        case .floorNotFound: "arrow.down.to.line"
+        }
+    }
+
+    /// The small line under it, when there is one.
+    var detail: String? {
+        switch self {
+        case .floorNotFound: "Tilt down and move closer to it"
+        case .moreLight, .moveCloser: nil
         }
     }
 
@@ -33,26 +47,16 @@ nonisolated enum ScanGuidance: Equatable, Sendable {
     /// When less than this share of the confident depth points is within range, the set is too far.
     static let minNearShare: Float = 0.1
 
-    /// The tip for one frame, or nil when the scan is going well.
-    /// Tracking problems come first, then light, then distance.
+    /// The tip for one frame, or nil when the scan is going well. A dark room comes first, whatever the tracking: in
+    /// the dark, tracking keeps dropping to limited and back, and the tip must stay up through that instead of
+    /// letting "Floor not found yet" or the step show in between. Otherwise there is a tip only while tracking is
+    /// normal (when it is limited, Apple's coaching screen in `RoomScanView` shows instead, as in Measure), then
+    /// distance.
     static func guidance(tracking: ScanTracking, ambientIntensity: Float?, depth: DepthFrame?) -> ScanGuidance? {
-        let isDark = ambientIntensity.map { $0 < darkBelow } ?? false
-        switch tracking {
-        case .limited(.initializing):
-            return .keepMoving
-        case .limited(.excessiveMotion):
-            return .moveSlower
-        case .limited(.relocalizing):
-            return .goBack
-        case .limited(.insufficientFeatures):
-            return isDark ? .moreLight : .aimAtDetail
-        case .limited(.other), .notAvailable:
-            return nil
-        case .normal:
-            if isDark { return .moreLight }
-            if let depth, nearShare(of: depth) < minNearShare { return .moveCloser }
-            return nil
-        }
+        if let ambientIntensity, ambientIntensity < darkBelow { return .moreLight }
+        guard tracking == .normal else { return nil }
+        if let depth, nearShare(of: depth) < minNearShare { return .moveCloser }
+        return nil
     }
 
     /// Share of the confident depth points (every 4th pixel) that are within `DepthSampler.maxRange`.
