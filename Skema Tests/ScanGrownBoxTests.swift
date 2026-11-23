@@ -35,8 +35,7 @@ struct ScanGrownBoxTests {
                 ScanSession(session: arSession, frameInterval: 1.0 / 15.0, supportsLiDAR: { true })
             },
             camera: FakeCameraPermission(status: .authorized),
-            storageController: StorageController(inMemory: true),
-            tutorial: nil)
+            storageController: StorageController(inMemory: true))
     }
 
     private func tap(_ viewModel: ScanViewModel, at point: CGPoint, at time: Double = 0) throws {
@@ -74,7 +73,7 @@ struct ScanGrownBoxTests {
         #expect(try #require(width(of: viewModel.itemBounds[camera.id])) <= 0.2 + 1e-4)
     }
 
-    @Test("Case 12: a light tap inside Light 1's big box makes no new item and says Already tapped: Light 1")
+    @Test("Case 12: a light tap inside Light 1's big box makes no new item and says Light 1 already added")
     func secondTapOnTheSameLight() throws {
         let viewModel = try scanWithCamera()
         try tap(viewModel, at: lightSpot)
@@ -84,7 +83,8 @@ struct ScanGrownBoxTests {
 
         #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
         #expect(viewModel.draftSetup.nodes.count == 2)
-        #expect(viewModel.message == "Already tapped: Light 1")
+        #expect(viewModel.feedback == .alreadyAdded(light: 1))
+        #expect(viewModel.instruction.main == "Light 1 already added")
     }
 
     @Test("Case 13: a light tap inside a camera's box makes a new light")
@@ -106,6 +106,6 @@ struct ScanGrownBoxTests {
         try tap(viewModel, at: lightSpot)
 
         #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
-        #expect(viewModel.message == nil)
+        #expect(viewModel.feedback == nil)
     }
 }

@@ -246,17 +246,17 @@ struct ScanViewModelTests {
         #expect(arSession.pauseCount == 1)
     }
 
-    @Test("A tracking problem that lasts shows its tip, and recovering hides it")
+    @Test("A problem that lasts (a dark room) shows its tip, and a lit room hides it again")
         func guidanceFromFrames() throws {
             let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
 
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, ambientIntensity: 100))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, ambientIntensity: 100))
             let shown = viewModel.guidance
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2, tracking: .normal))
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2.5, tracking: .normal))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2.5))
 
-            #expect(shown == .moveSlower)
+            #expect(shown == .moreLight)
             #expect(viewModel.guidance == nil)
         }
 
@@ -264,8 +264,8 @@ struct ScanViewModelTests {
         func finishClearsGuidance() async throws {
             let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
             await viewModel.start()
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, ambientIntensity: 100))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, ambientIntensity: 100))
 
             viewModel.finishTapped()
 
@@ -276,8 +276,8 @@ struct ScanViewModelTests {
         func closeClearsGuidance() async throws {
             let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))
             await viewModel.start()
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, tracking: .limited(.excessiveMotion)))
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, tracking: .limited(.excessiveMotion)))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1, ambientIntensity: 100))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, ambientIntensity: 100))
 
             viewModel.closeTapped()
 
@@ -342,14 +342,15 @@ struct ScanViewModelTests {
     }
 }
 
-func makeTrackingFrame(timestamp: TimeInterval, tracking: ScanTracking) throws -> ScanFrame {
+func makeTrackingFrame(timestamp: TimeInterval, tracking: ScanTracking = .normal,
+                       ambientIntensity: Float = 1000) throws -> ScanFrame {
     let frame = try makeScanFrame(timestamp: timestamp)
     return ScanFrame(
         timestamp: timestamp,
         camera: frame.camera,
         depth: makeDepth(width: 8, height: 8, depth: 1),
         tracking: tracking,
-        ambientIntensity: 1000,
+        ambientIntensity: ambientIntensity,
         planes: []
     )
 }

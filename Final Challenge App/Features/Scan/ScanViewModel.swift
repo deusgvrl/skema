@@ -25,7 +25,7 @@ struct ScanItem: Identifiable {
 /// The scan (LiDAR only, no object detection: the team chose taps after usability testing, 19 Nov 2026).
 /// A guided sequence (Sketch UT Review T01–T10): the photographer points the phone at the floor until ARKit finds it
 /// (A10-112, no tap), then taps the subject, the camera and each light; each tap sets the next thing still missing
-/// (`ScanStep`), and a coaching panel explains each step on the first scan. A tap picks a LiDAR point; its vertical
+/// (`ScanStep`), and one centred instruction says what to do (`instruction`). A tap picks a LiDAR point; its vertical
 /// column (10 cm radius, from 3 cm above the floor to 3 m) is collected on every frame (the A10-41 painted items), and
 /// Finish writes distance, height and plan position onto the draft equipment, ready to edit in the lighting plan.
 /// While scanning, tips say when tracking, light or distance goes badly (A10-69).
@@ -40,14 +40,15 @@ final class ScanViewModel {
     /// The subject's anchor, nil until it is tapped.
     private(set) var subject: SIMD3<Float>?
     private(set) var subjectResult: EquipmentResult?
-    /// A short hint after a tap that did nothing. Cleared by the next tap.
-    private(set) var message: String?
+    /// What the last tap did when it set nothing new, shown for a moment in the centred instruction. Cleared by the
+    /// next tap, by Undo, and after 2 s by the view (`clearFeedback`).
+    private(set) var feedback: ScanFeedback?
+    /// No floor after `floorWaitBeforeTip` seconds; the instruction then says so until the floor is found (A10-112).
+    private(set) var isFloorMissing = false
     /// The newest camera, to lay the tags over the picture. Nil before the first frame.
     private(set) var camera: CameraModel?
     /// The tip shown while scanning ("Move slower", "More light"…), nil when the scan goes well (A10-69).
     private(set) var guidance: ScanGuidance?
-    /// The coaching panel (first scan, or after ?); a hint pill shows instead when it is hidden.
-    private(set) var isTutorialVisible: Bool
     /// The step whose tap just landed, for the panel's short "done" state. The view clears it.
     private(set) var completedStep: ScanStep?
     /// Each item's collected points, as a world box, for its green outline.
@@ -70,7 +71,9 @@ final class ScanViewModel {
     private var planeFloorY: Float?
     /// The time of the first frame without a floor, for the "Floor not found yet" tip.
     @ObservationIgnored private var floorSearchStart: Double?
-    @ObservationIgnored private let tutorial: ScanGuideSettings?
+    /// The newest tap that set something (the subject's or an item's id) and its frame time: checked once,
+    /// `statusCheckDelay` later, for "Too far to measure" or "Need a closer look".
+    @ObservationIgnored private var pendingCheck: (id: UUID, time: Double)?
     /// Every tap that set something, newest last, for Undo.
     private var history: [TapRecord] = []
     @ObservationIgnored private var lastCollect: Double?
@@ -87,14 +90,11 @@ final class ScanViewModel {
     init(
         makeScan: @escaping () -> ScanSession = { ScanSession() },
         camera: any CameraPermission = SystemCameraPermission(),
-        storageController: StorageController? = nil,
-        tutorial: ScanGuideSettings? = nil
+        storageController: StorageController? = nil
     ) {
         self.makeScan = makeScan
         self.cameraPermission = camera
         self.storageController = storageController ?? StorageController.shared
-        self.tutorial = tutorial
-        self.isTutorialVisible = !(tutorial?.isTutorialDone ?? false)
     }
 
     /// The floor's height: ARKit's floor. Nil until it is found.
@@ -104,8 +104,9 @@ final class ScanViewModel {
 
     /// How long (seconds of frames) the scan looks for the floor before the tip shows (A10-112).
     static let floorWaitBeforeTip: Double = 5
-    static let pointAtFloorText = "Point the phone down at the floor first."
-    static let floorNotFoundText = "Floor not found yet. Tilt down and move closer to the floor."
+    /// How long after a tap the scan looks at what it set: points keep arriving (5 frames a second), so a status right
+    /// at the tap would often be "too few" for nothing.
+    static let statusCheckDelay: Double = 1.5
 
     /// Undo is on once a tap set something.
     var canUndo: Bool { !history.isEmpty }
@@ -115,19 +116,6 @@ final class ScanViewModel {
         ScanStep.current(hasFloor: hasFloor, hasSubject: subject != nil,
                          cameras: items.filter { $0.kind == .camera }.count,
                          lights: items.filter { $0.kind == .light }.count)
-    }
-
-    // MARK: Tutorial
-
-    /// Skip: hides the panel for this and every later scan.
-    func skipTutorial() {
-        isTutorialVisible = false
-        tutorial?.isTutorialDone = true
-    }
-
-    /// ?: shows the panel again, at the current step.
-    func replayTutorial() {
-        isTutorialVisible = true
     }
 
     func clearCompletedStep() {
@@ -145,19 +133,18 @@ final class ScanViewModel {
         guard hasFloor else {
             let start = floorSearchStart ?? frame.timestamp
             floorSearchStart = start
-            if frame.timestamp - start >= Self.floorWaitBeforeTip { message = Self.floorNotFoundText }
+            if frame.timestamp - start >= Self.floorWaitBeforeTip { isFloorMissing = true }
             return false
         }
         guard !hadFloor else { return false }
-        if message == Self.floorNotFoundText { message = nil }
+        isFloorMissing = false
         completedStep = .floor
         return true
     }
 
-    /// After a tap: the next tap sets what is still missing, and reaching Finish counts as doing the tutorial.
+    /// After a tap: the next tap sets what is still missing.
     private func advance() {
         kind = currentStep.tapKind ?? .subject
-        if currentStep == .finish { tutorial?.isTutorialDone = true }
     }
 
     var arSession: ARSession? { scan?.session as? ARSession }
@@ -182,7 +169,8 @@ final class ScanViewModel {
 
     /// Same as `tap(atScreen:screenSize:)`, on a given frame. Internal so tests can call it.
     func tap(atScreen point: CGPoint, screenSize: CGSize, in frame: ScanFrame) {
-        message = nil
+        feedback = nil
+        pendingCheck = nil
         camera = frame.camera
         updateFloor(from: frame)
         guard let picture = ScanOverlay.picturePoint(fromScreen: point, camera: frame.camera, screenSize: screenSize)
@@ -194,13 +182,13 @@ final class ScanViewModel {
             return
         }
         guard hasFloor else {
-            message = Self.pointAtFloorText
+            feedback = .pointAtFloorFirst
             return
         }
         guard let depth = frame.depth,
               let anchor = DepthSampler.nearestPoint(toNormalized: SIMD2(Float(picture.x), Float(picture.y)),
                                                      depth: depth, camera: frame.camera) else {
-            message = "No LiDAR depth there"
+            feedback = .cannotMeasure
             return
         }
         switch kind {
@@ -209,13 +197,15 @@ final class ScanViewModel {
             measurements.remove(subjectID)
             subjectBounds = nil
             subject = anchor
+            pendingCheck = (subjectID, frame.timestamp)
         case .light, .camera:
             // A10-106 case 12: a light tap inside a light's grown box is that light again, not a new one.
             if kind == .light, let light = light(containing: anchor) {
-                message = "Already tapped: Light \(light.name.split(separator: " ").last ?? "")"
+                feedback = .alreadyAdded(light: Int(light.name.split(separator: " ").last ?? "") ?? 1)
                 return
             }
             addItem(kind, anchor: anchor)
+            pendingCheck = items.last.map { ($0.id, frame.timestamp) }
         }
         completedStep = ScanStep(completing: kind)
         advance()
@@ -251,7 +241,8 @@ final class ScanViewModel {
     /// missing again. The floor is not a tap, so Undo never takes it back.
     func undoTapped() {
         guard let last = history.popLast() else { return }
-        message = nil
+        feedback = nil
+        pendingCheck = nil
         completedStep = nil
         switch last {
         case .subject(let previous):
@@ -312,6 +303,21 @@ final class ScanViewModel {
             }
         }
         refreshResults()
+        checkTappedStatus(at: frame.timestamp)
+    }
+
+    /// Once `statusCheckDelay` has passed since the newest tap, what it set is looked at once: still out of range, or
+    /// still too few points, and the instruction says so for a moment (the tags no longer carry a reason line).
+    private func checkTappedStatus(at time: Double) {
+        guard let check = pendingCheck, time - check.time >= Self.statusCheckDelay else { return }
+        pendingCheck = nil
+        let status = check.id == subjectID ? subjectResult?.status
+            : items.first { $0.id == check.id }?.result?.status
+        switch status {
+        case .outOfRange: feedback = .tooFar
+        case .tooFewPoints: feedback = .needsCloserLook
+        case .measured, nil: break
+        }
     }
 
     /// One frame of a light: the paint bucket from its tapped point, where the point is in this frame's picture.
@@ -336,6 +342,18 @@ final class ScanViewModel {
 
 // MARK: - Overlay & Tags
 extension ScanViewModel {
+    /// The one centred instruction (like Apple's Measure): what the last tap did, a step just done, a problem, or the
+    /// current step, always with its small line when it has one.
+    var instruction: ScanInstruction {
+        ScanInstruction.current(step: currentStep, completed: completedStep,
+                                problem: guidance ?? (isFloorMissing ? .floorNotFound : nil), feedback: feedback)
+    }
+
+    /// The view's timer: what a tap did has been shown long enough.
+    func clearFeedback() {
+        feedback = nil
+    }
+
     /// Where a tag for `spot` goes on a screen of `size`; nil when the spot is not on the screen.
     func tagPosition(of spot: SIMD3<Float>, in size: CGSize) -> CGPoint? {
         camera.flatMap { ScanOverlay.screenPoint(of: spot, camera: $0, screenSize: size) }
@@ -379,37 +397,11 @@ extension ScanViewModel {
         return "\(item.name) · \(Self.metres(values.distance)) m · \(Self.metres(height)) m"
     }
 
-    /// The line under an item's name: whether its values are saved on the equipment, or why not.
-    func statusText(for item: ScanItem) -> String {
-        guard let result = item.result else { return "Measuring…" }
-        switch result.status {
-        case .tooFewPoints: return Self.tooFewPointsText
-        case .outOfRange: return Self.outOfRangeText
-        case .measured:
-            if Self.values(of: result, hasFloor: floorY != nil) != nil { return Self.savedText }
-            return subject == nil ? "Waiting for the subject" : "Subject not measured, see its tag"
-        }
-    }
-
     func isSaved(_ item: ScanItem) -> Bool {
         Self.values(of: item.result, hasFloor: floorY != nil) != nil
     }
 
-    /// The line under the subject's name.
-    var subjectStatusText: String {
-        guard let result = subjectResult else { return "Measuring…" }
-        switch result.status {
-        case .tooFewPoints: return Self.tooFewPointsText
-        case .outOfRange: return Self.outOfRangeText
-        case .measured: return Self.savedText
-        }
-    }
-
     var subjectIsSaved: Bool { subjectResult?.status == .measured }
-
-    static let savedText = "Saved"
-    static let tooFewPointsText = "Not enough LiDAR points, tap again"
-    static let outOfRangeText = "Too far, over 5 m"
 
     /// What is written onto an item's equipment: the one rule for "measured" that the tag and the writing share.
     private static func values(of result: EquipmentResult?, hasFloor: Bool) -> SavedValues? {

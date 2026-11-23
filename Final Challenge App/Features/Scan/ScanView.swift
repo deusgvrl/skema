@@ -2,11 +2,12 @@ import SwiftUI
 
 /// The scan screen (LiDAR only, no object detection), guided step by step (Sketch UT Review T01–T10): point at the
 /// floor until it is found (A10-112, no tap), then tap the product, the camera and each light; each tap sets the next
-/// thing still missing. A coaching panel explains each step on the first scan (Skip hides it, ? brings it back); later
-/// scans show a short hint instead. Undo takes back the last tap. Each tapped item gets a box and tag; the floor is not
-/// drawn. Tips show when the scan goes badly, ✕ asks before throwing the
-/// taps away, and Finish Scan opens the lighting diagram, where everything can still be edited. Without camera access
-/// or LiDAR it shows a message with "Add Equipment Manually" (Sketch R02–R04x).
+/// thing still missing. One instruction in the middle of the screen says what to do, like Apple's Measure
+/// (`ScanInstruction`): the step, a short "done" line, a problem, or what the last tap did; on the first scan (or
+/// after ?) it adds a small line saying why. Undo takes back the last tap. Each tapped item gets a box and tag; the
+/// floor is not drawn. ✕ asks before throwing the taps away, and Finish Scan opens the lighting diagram, where
+/// everything can still be edited. Without camera access or LiDAR it shows a message with "Add Equipment Manually"
+/// (Sketch R02–R04x).
 struct ScanView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -16,9 +17,11 @@ struct ScanView: View {
     @State private var viewModel: ScanViewModel
     @State private var reviewViewModel: ReviewViewModel?
     @State private var showsLeaveAlert = false
+    /// Apple's coaching screen (`RoomScanView`) is showing: our instruction steps aside.
+    @State private var isCoaching = false
     var onDismissToSetups: (() -> Void)?
 
-    init(viewModel: ScanViewModel = ScanViewModel(tutorial: ScanGuideSettings()),
+    init(viewModel: ScanViewModel = ScanViewModel(),
          onDismissToSetups: (() -> Void)? = nil) {
         _viewModel = State(initialValue: viewModel)
         self.onDismissToSetups = onDismissToSetups
@@ -29,7 +32,8 @@ struct ScanView: View {
             background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, outlines: viewModel.outlineBoxes)
+                    RoomScanView(session: session, outlines: viewModel.outlineBoxes,
+                                 onCoachingChange: { coaching in withAnimation { isCoaching = coaching } })
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.tap(atScreen: tap, screenSize: geometry.size)
@@ -41,17 +45,16 @@ struct ScanView: View {
                 .ignoresSafeArea()
                 ScanTagsView(viewModel: viewModel)
                     .ignoresSafeArea()
+                // Measure's look: one instruction; while Apple's coaching screen shows, it is the only one.
+                if !isCoaching {
+                    ScanInstructionView(instruction: viewModel.instruction)
+                        .animation(.default, value: viewModel.instruction)
+                }
             }
             content.padding(.horizontal, 24)
         }
-        .overlay(alignment: .top) {
-            if viewModel.screen == .scanning {
-                topBar
-            }
-        }
         .overlay(alignment: .bottom) {
             bottomControls
-                .animation(.default, value: viewModel.guidance)
         }
         .environment(\.colorScheme, usesCameraAppearance ? .dark : systemColorScheme)
         .fullScreenCover(item: $reviewViewModel) { reviewModel in
@@ -94,11 +97,6 @@ struct ScanView: View {
                     }
                     .disabled(!viewModel.canUndo)
                     .accessibilityHint("Takes back the last tap")
-                    if !viewModel.isTutorialVisible {
-                        Button("Show Tips", systemImage: "questionmark") {
-                            withAnimation { viewModel.replayTutorial() }
-                        }
-                    }
                 }
             }
         }
@@ -106,9 +104,15 @@ struct ScanView: View {
         .task { await viewModel.start() }
         .task(id: viewModel.completedStep) {
             guard viewModel.completedStep != nil else { return }
-            try? await Task.sleep(for: .seconds(1.2))
+            try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
             withAnimation { viewModel.clearCompletedStep() }
+        }
+        .task(id: viewModel.feedback) {
+            guard viewModel.feedback != nil else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            withAnimation { viewModel.clearFeedback() }
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
@@ -144,37 +148,9 @@ struct ScanView: View {
         reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup, storageController: viewModel.storageController)
     }
 
-    private var topBar: some View {
-        VStack(spacing: 8) {
-            if viewModel.isTutorialVisible {
-                ScanCoachingPanel(step: viewModel.currentStep, completed: viewModel.completedStep) {
-                    withAnimation { viewModel.skipTutorial() }
-                }
-                .padding(.horizontal, 16)
-                .transition(.opacity)
-            } else {
-                ScanHintPill(step: viewModel.currentStep, completed: viewModel.completedStep)
-                    .transition(.opacity)
-            }
-            if let message = viewModel.message {
-                Text(message)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
-            }
-        }
-        .padding(.top, 8)
-    }
-
     private var bottomControls: some View {
         VStack(spacing: 16) {
             if viewModel.screen == .scanning {
-                if let guidance = viewModel.guidance {
-                    ScanGuidanceView(guidance: guidance)
-                        .transition(.opacity)
-                }
                 ScanStatusChips(
                     hasFloor: viewModel.hasFloor,
                     hasSubject: viewModel.subject != nil,
@@ -262,8 +238,8 @@ struct ScanView: View {
 }
 
 /// What is drawn over the camera for each tap (Sketch T02–T09): a green box with a tag above it for the subject and
-/// each camera and light (the floor has no tag since A10-112). A tag is green once its values are saved; until then it
-/// says why not ("Measuring…", "Too far, over 5 m").
+/// each camera and light (the floor has no tag since A10-112). A tag is green once its values are saved; why it is not
+/// yet is said by the instruction ("Too far to measure", "Need a closer look").
 private struct ScanTagsView: View {
     let viewModel: ScanViewModel
 
@@ -272,13 +248,13 @@ private struct ScanTagsView: View {
             let size = geometry.size
             ZStack {
                 if let subject = viewModel.subject {
-                    marker(title: "Subject", status: viewModel.subjectIsSaved ? nil : viewModel.subjectStatusText,
+                    marker(title: "Subject", isSaved: viewModel.subjectIsSaved,
                            box: viewModel.subjectBox(in: size),
                            anchor: viewModel.tagPosition(of: subject, in: size), size: size)
                 }
                 ForEach(viewModel.items) { item in
                     marker(title: viewModel.shortTitle(for: item),
-                           status: viewModel.isSaved(item) ? nil : viewModel.statusText(for: item),
+                           isSaved: viewModel.isSaved(item),
                            box: viewModel.box(for: item, in: size),
                            anchor: viewModel.tagPosition(of: item.anchor, in: size), size: size)
                 }
@@ -291,9 +267,9 @@ private struct ScanTagsView: View {
     /// The tag just above the item's box (or at the tapped point while there is no box yet). The box itself is drawn
     /// in 3D in the camera view (A10-106, `ScanOutlines`).
     @ViewBuilder
-    private func marker(title: String, status: String?, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
+    private func marker(title: String, isSaved: Bool, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
         if let point = box.map({ CGPoint(x: $0.midX, y: $0.minY - 20) }) ?? anchor {
-            ScanTag(title: title, status: status).position(clamped(point, in: size))
+            ScanTag(title: title, isSaved: isSaved).position(clamped(point, in: size))
         }
     }
 
@@ -303,26 +279,21 @@ private struct ScanTagsView: View {
     }
 }
 
-/// "Light ✓" in black on green once saved; otherwise the title over the reason, on dark glass.
+/// "Light ✓" in black on green once saved; until then just the title on dark glass. Why it is not saved yet is said by
+/// the scan's instruction, not on the tag.
 struct ScanTag: View {
     let title: String
-    /// Why the values are not saved yet; nil once they are.
-    let status: String?
+    let isSaved: Bool
 
     var body: some View {
         Group {
-            if let status {
-                VStack(spacing: 1) {
-                    Text(title)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.white)
-                    Text(status)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.orange)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
+            if !isSaved {
+                Text(title)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .frame(height: 26)
+                    .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
             } else {
                 Text("\(title) ✓")
                     .font(.footnote.weight(.semibold))

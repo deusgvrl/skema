@@ -17,9 +17,7 @@ enum ScanStep: Int, CaseIterable {
     case light
     case finish
 
-    /// "STEP 1 OF 5", on the coaching panel.
-    var positionLabel: String { "STEP \(rawValue + 1) OF \(Self.allCases.count)" }
-
+    /// The centred instruction's line for this step (copy approved 23 Nov 2026).
     var title: String {
         switch self {
         case .floor: "Point at the floor"
@@ -30,13 +28,14 @@ enum ScanStep: Int, CaseIterable {
         }
     }
 
-    var message: String {
+    /// The small line under it: why the step matters, or what to do first.
+    var detail: String {
         switch self {
-        case .floor: "Point the phone down at the floor until it's found. Heights are measured from it."
-        case .subject: "Point at the product and tap it. Every distance is measured from it."
-        case .camera: "Walk up to the camera and tap it. You can add more cameras in the plan."
-        case .light: "Walk up to a light and tap it. Tap every light in the setup."
-        case .finish: "Tap any other lights first, then finish."
+        case .floor: "Heights are measured from it"
+        case .subject: "Distances are measured from it"
+        case .camera: "Walk up to it first"
+        case .light: "Walk up to each one"
+        case .finish: "Or tap another light first"
         }
     }
 
@@ -49,11 +48,6 @@ enum ScanStep: Int, CaseIterable {
         case .light: "Light added"
         case .finish: nil
         }
-    }
-
-    /// The pill shown instead of the panel once the tutorial is done.
-    var hint: String {
-        self == .floor ? "Point at the floor to start" : title
     }
 
     /// What a tap sets in this step: nothing on the floor step (the floor is found, not tapped). After the first light,

@@ -49,7 +49,7 @@ final class SetupsViewModel {
         self.fetchSetups()
     }
 
-    /// + opens the scan straight away; the tutorial runs inside it (Sketch UT Review T01).
+    /// + opens the scan straight away; its instruction guides each step (Sketch UT Review T01).
     func newSetupTapped() {
         isShowingScan = true
     }
