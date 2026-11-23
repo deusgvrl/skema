@@ -17,7 +17,7 @@ struct NodeView: View {
     @State private var globalCenter: CGPoint = .zero
     @State private var dragStartPosition: CGPoint = .zero
 
-    // Dynamic Handle Distance State (Stretches on drag, snaps back on release)
+    // Dynamic Handle Distance State
     private let defaultHandleDistance: CGFloat = 72.0
 
     // Rotation Haptic State
@@ -25,7 +25,7 @@ struct NodeView: View {
     @State private var feedbackGenerator: UISelectionFeedbackGenerator?
 
     @State private var currentHandleDistance: CGFloat = 72.0
-    @State private var grabOffset: CGFloat = 0   // NEW
+    @State private var grabOffset: CGFloat = 0
 
     // Cardinal Alignment Drag Haptic State (12, 3, 6, 9 o'clock)
     @State private var lastCardinalSnap: Int?
@@ -35,35 +35,27 @@ struct NodeView: View {
             // 1. Rotating Equipment Shape, Directional Arrow & Rotate Handle
             ZStack {
                 switch node.category {
-                case .camera:
-                    TopViewCameraShapeView(isSelected: isSelected)
-
-                case .light:
-                    TopViewLightShapeView(isSelected: isSelected)
-
-                case .accessory:
-                    TopViewAccessoryShapeView(isSelected: isSelected)
+                case .camera: TopViewCameraShapeView(isSelected: isSelected)
+                case .light: TopViewLightShapeView(isSelected: isSelected)
+                case .accessory: TopViewAccessoryShapeView(isSelected: isSelected)
                 }
 
                 // Directional Pointer Ray & Front Rotate Handle
                 if isSelected && !isReadOnly {
                     let lineLength = max(10, currentHandleDistance - 48)
 
-                    // Dashed Line extending forward from the node
                     DashedLine()
                         .stroke(DesignTokens.accentPrimary, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                         .frame(width: 2, height: lineLength)
                         .offset(y: -(currentHandleDistance + 4) / 2)
                         .shadow(color: DesignTokens.accentPrimary.opacity(0.3), radius: 2)
 
-                    // Directional Chevron Arrowhead (placed right below rotation handle)
                     Image(systemName: "chevron.up")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(DesignTokens.accentPrimary)
                         .offset(y: -currentHandleDistance + 20)
                         .shadow(color: DesignTokens.accentPrimary.opacity(0.4), radius: 2)
 
-                    // Stretchable Rotation Handle Button (positioned at the top tip)
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(DesignTokens.accentPrimary)
@@ -73,63 +65,10 @@ struct NodeView: View {
                                 .fill(DesignTokens.diagramNodeFill)
                                 .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
                         )
-                        .overlay(
-                            Circle()
-                                .stroke(DesignTokens.accentPrimary, lineWidth: 1.5)
-                        )
+                        .overlay(Circle().stroke(DesignTokens.accentPrimary, lineWidth: 1.5))
                         .offset(y: -currentHandleDistance)
                         .transition(.scale.combined(with: .opacity))
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                                .onChanged { value in
-                                    let deltaX = value.location.x - globalCenter.x
-                                    let deltaY = value.location.y - globalCenter.y
-
-                                    // Screen-space distance (node is counter-scaled, so 1 unit == 1 screen point)
-                                    let fingerDistance = hypot(deltaX, deltaY)
-
-                                    if !isRotating {
-                                        isRotating = true
-                                        onGestureStart()
-
-                                        // Remember where on the handle the finger grabbed, so there's no jump
-                                        grabOffset = fingerDistance - currentHandleDistance
-
-                                        feedbackGenerator = UISelectionFeedbackGenerator()
-                                        feedbackGenerator?.prepare()
-                                        lastHapticAngle = node.rotationAngle
-                                    }
-
-                                    // Stretch: same feel at every zoom level
-                                    currentHandleDistance = max(defaultHandleDistance, fingerDistance - grabOffset)
-
-                                    // Angle for front-positioned handle (-Y direction)
-                                    var visualAngle = (atan2(deltaY, deltaX) * 180 / .pi) + 90
-                                    if visualAngle < 0 { visualAngle += 360 }
-
-                                    let step = 3.0
-                                    if Int(visualAngle / step) != Int(lastHapticAngle / step) {
-                                        feedbackGenerator?.selectionChanged()
-                                        feedbackGenerator?.prepare()
-                                        lastHapticAngle = visualAngle
-                                    }
-
-                                    node.rotationAngle = visualAngle
-                                    node.syncHorizontalAimFromRotation()
-                                }
-                                .onEnded { _ in
-                                    guard isRotating else { return }
-                                    isRotating = false
-                                    grabOffset = 0
-                                    onGestureEnd()
-                                    feedbackGenerator = nil
-
-                                    // Snap back only after the handle is released
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                        currentHandleDistance = defaultHandleDistance
-                                    }
-                                }
-                        )
+                        .highPriorityGesture(rotationGesture)
                 }
             }
             .rotationEffect(.degrees(node.rotationAngle))
@@ -144,8 +83,12 @@ struct NodeView: View {
         .background {
             if node.category == .light {
                 Circle()
-                    .fill(RadialGradient(colors: [DesignTokens.diagramGlow, .clear], center: .center,
-                                         startRadius: 0, endRadius: 55))
+                    .fill(RadialGradient(
+                        colors: [DesignTokens.diagramGlow, .clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 55
+                    ))
                     .frame(width: 110, height: 110)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
@@ -154,13 +97,8 @@ struct NodeView: View {
         .background(
             GeometryReader { geo in
                 Color.clear
-                    .onAppear {
-                        let frame = geo.frame(in: .global)
-                        globalCenter = CGPoint(x: frame.midX, y: frame.midY)
-                    }
-                    .onChange(of: geo.frame(in: .global)) { _, newFrame in
-                        globalCenter = CGPoint(x: newFrame.midX, y: newFrame.midY)
-                    }
+                    .onAppear { updateGlobalCenter(geo) }
+                    .onChange(of: geo.frame(in: .global)) { _, _ in updateGlobalCenter(geo) }
             }
         )
         .overlay(alignment: .bottom) {
@@ -175,48 +113,9 @@ struct NodeView: View {
                 .offset(y: 20)
         }
         .scaleEffect(1 / zoomScale)
-        .position(
-            x: subjectCenter.x + node.position.x,
-            y: subjectCenter.y + node.position.y
-        )
-        .highPriorityGesture(
-            TapGesture().onEnded {
-                if !isRotating { onTap() }
-            }
-        )
-        .gesture(
-            isReadOnly ? nil :
-            DragGesture(coordinateSpace: .global)
-                .onChanged { value in
-                    guard !isReadOnly, !isRotating else { return }
-
-                    if !isDragging {
-                        isDragging = true
-                        dragStartPosition = node.position
-                        onGestureStart()
-                    }
-
-                    let canvasDeltaX = value.translation.width / zoomScale
-                    let canvasDeltaY = value.translation.height / zoomScale
-
-                    let rawX = dragStartPosition.x + canvasDeltaX
-                    let rawY = dragStartPosition.y + canvasDeltaY
-                    let rawPosition = CGPoint(x: rawX, y: rawY)
-
-                    let snappedPosition = applyCardinalSnap(to: rawPosition)
-
-                    node.position = snappedPosition
-                    node.syncDistanceFromPosition()
-                }
-                .onEnded { _ in
-                    guard !isReadOnly else { return }
-                    if isDragging {
-                        isDragging = false
-                        lastCardinalSnap = nil
-                        onGestureEnd()
-                    }
-                }
-        )
+        .position(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
+        .highPriorityGesture(TapGesture().onEnded { if !isRotating { onTap() } })
+        .gesture(isReadOnly ? nil : dragGesture)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(node.displayName)
         .accessibilityValue(
@@ -234,40 +133,98 @@ struct NodeView: View {
             node.rotationAngle = (node.rotationAngle - 45 + 360).truncatingRemainder(dividingBy: 360)
             node.syncHorizontalAimFromRotation()
         }
-        .accessibilityAction(named: "Point to subject") {
-            node.pointToSubject()
-        }
+        .accessibilityAction(named: "Point to subject") { node.pointToSubject() }
     }
 
-    // MARK: - Cardinal Alignment & Auto-Snap Helper
+    // MARK: - Gestures & Helpers
+
+    private var rotationGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                let deltaX = value.location.x - globalCenter.x
+                let deltaY = value.location.y - globalCenter.y
+                let fingerDistance = hypot(deltaX, deltaY)
+
+                if !isRotating {
+                    isRotating = true
+                    onGestureStart()
+                    grabOffset = fingerDistance - currentHandleDistance
+                    feedbackGenerator = UISelectionFeedbackGenerator()
+                    feedbackGenerator?.prepare()
+                    lastHapticAngle = node.rotationAngle
+                }
+
+                currentHandleDistance = max(defaultHandleDistance, fingerDistance - grabOffset)
+
+                var visualAngle = (atan2(deltaY, deltaX) * 180 / .pi) + 90
+                if visualAngle < 0 { visualAngle += 360 }
+
+                let step = 3.0
+                if Int(visualAngle / step) != Int(lastHapticAngle / step) {
+                    feedbackGenerator?.selectionChanged()
+                    feedbackGenerator?.prepare()
+                    lastHapticAngle = visualAngle
+                }
+
+                node.rotationAngle = visualAngle
+                node.syncHorizontalAimFromRotation()
+            }
+            .onEnded { _ in
+                guard isRotating else { return }
+                isRotating = false
+                grabOffset = 0
+                onGestureEnd()
+                feedbackGenerator = nil
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    currentHandleDistance = defaultHandleDistance
+                }
+            }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(coordinateSpace: .global)
+            .onChanged { value in
+                guard !isReadOnly, !isRotating else { return }
+
+                if !isDragging {
+                    isDragging = true
+                    dragStartPosition = node.position
+                    onGestureStart()
+                }
+
+                let canvasDeltaX = value.translation.width / zoomScale
+                let canvasDeltaY = value.translation.height / zoomScale
+
+                let rawPosition = CGPoint(x: dragStartPosition.x + canvasDeltaX, y: dragStartPosition.y + canvasDeltaY)
+                node.position = applyCardinalSnap(to: rawPosition)
+                node.syncDistanceFromPosition()
+            }
+            .onEnded { _ in
+                guard !isReadOnly else { return }
+                if isDragging {
+                    isDragging = false
+                    lastCardinalSnap = nil
+                    onGestureEnd()
+                }
+            }
+    }
+
+    private func updateGlobalCenter(_ geo: GeometryProxy) {
+        let frame = geo.frame(in: .global)
+        globalCenter = CGPoint(x: frame.midX, y: frame.midY)
+    }
 
     private func applyCardinalSnap(to rawPosition: CGPoint) -> CGPoint {
-        let deltaX = rawPosition.x
-        let deltaY = rawPosition.y
-        let radius = hypot(deltaX, deltaY)
-
+        let radius = hypot(rawPosition.x, rawPosition.y)
         guard radius > 15 else {
             lastCardinalSnap = nil
             return rawPosition
         }
 
-        var angle = atan2(deltaY, deltaX) * 180 / .pi
+        var angle = atan2(rawPosition.y, rawPosition.x) * 180 / .pi
         if angle < 0 { angle += 360 }
 
-        let cardinalAngles = [0, 90, 180, 270]
-        let tolerance: Double = 1.0
-
-        var activeCardinal: Int?
-        for cardinal in cardinalAngles {
-            let diff = abs(angle - Double(cardinal))
-            let minDiff = min(diff, 360 - diff)
-            if minDiff <= tolerance {
-                activeCardinal = cardinal
-                break
-            }
-        }
-
-        guard let cardinal = activeCardinal else {
+        guard let cardinal = closestCardinalAngle(for: angle, tolerance: 1.0) else {
             lastCardinalSnap = nil
             return rawPosition
         }
@@ -277,16 +234,20 @@ struct NodeView: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
 
-        return pointForCardinal(cardinal, radius: radius, fallback: rawPosition)
-    }
-
-    private func pointForCardinal(_ cardinal: Int, radius: CGFloat, fallback: CGPoint) -> CGPoint {
         switch cardinal {
         case 0:   return CGPoint(x: radius, y: 0)
         case 90:  return CGPoint(x: 0, y: radius)
         case 180: return CGPoint(x: -radius, y: 0)
         case 270: return CGPoint(x: 0, y: -radius)
-        default:  return fallback
+        default:  return rawPosition
+        }
+    }
+
+    private func closestCardinalAngle(for angle: Double, tolerance: Double) -> Int? {
+        let cardinalAngles = [0, 90, 180, 270]
+        return cardinalAngles.first { cardinal in
+            let diff = abs(angle - Double(cardinal))
+            return min(diff, 360 - diff) <= tolerance
         }
     }
 }
@@ -302,16 +263,14 @@ struct DashedLine: Shape {
     }
 }
 
-// MARK: - 1. Custom Shapes for Top-View Rendering
+// MARK: - Custom Shapes & Top-View Equipment Components
 
 struct Trapezoid: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let topWidth = rect.width
-        let bottomWidth = rect.width * 0.45
-        let inset = (topWidth - bottomWidth) / 2.0
-
-        path.move(to: CGPoint(x: 0, y: 0))
+        let inset = (topWidth - rect.width * 0.45) / 2.0
+        path.move(to: .zero)
         path.addLine(to: CGPoint(x: topWidth, y: 0))
         path.addLine(to: CGPoint(x: topWidth - inset, y: rect.height))
         path.addLine(to: CGPoint(x: inset, y: rect.height))
@@ -319,8 +278,6 @@ struct Trapezoid: Shape {
         return path
     }
 }
-
-// MARK: - 2. Top-View Equipment Components
 
 struct TopViewCameraShapeView: View {
     let isSelected: Bool
@@ -332,11 +289,16 @@ struct TopViewCameraShapeView: View {
                 .frame(width: 38, height: 26)
                 .overlay(
                     RoundedRectangle(cornerRadius: 5)
-                        .stroke(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                                lineWidth: isSelected ? 2.0 : 1.5)
+                        .stroke(
+                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                            lineWidth: isSelected ? 2.0 : 1.5
+                        )
                 )
-                .shadow(color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                        radius: isSelected ? 5 : 2, y: 2)
+                .shadow(
+                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                    radius: isSelected ? 5 : 2,
+                    y: 2
+                )
                 .offset(y: 12)
 
             RoundedRectangle(cornerRadius: 3)
@@ -361,11 +323,16 @@ struct TopViewLightShapeView: View {
                 .frame(width: 38, height: 22)
                 .overlay(
                     Trapezoid()
-                        .stroke(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                                lineWidth: isSelected ? 2.0 : 1.5)
+                        .stroke(
+                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                            lineWidth: isSelected ? 2.0 : 1.5
+                        )
                 )
-                .shadow(color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                        radius: isSelected ? 5 : 2, y: 2)
+                .shadow(
+                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                    radius: isSelected ? 5 : 2,
+                    y: 2
+                )
                 .offset(y: 2)
 
             Rectangle()
@@ -392,11 +359,16 @@ struct TopViewAccessoryShapeView: View {
                 .frame(width: 50, height: 11)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                                lineWidth: isSelected ? 2.0 : 1.5)
+                        .stroke(
+                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
+                            lineWidth: isSelected ? 2.0 : 1.5
+                        )
                 )
-                .shadow(color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                        radius: isSelected ? 5 : 2, y: 2)
+                .shadow(
+                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
+                    radius: isSelected ? 5 : 2,
+                    y: 2
+                )
                 .offset(y: 11)
 
             Rectangle()

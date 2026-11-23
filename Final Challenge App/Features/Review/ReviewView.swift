@@ -15,7 +15,7 @@ struct ReviewView: View {
     @State private var activeSheetContent: DiagramSheetContent?
     @State private var selectedNodeId: UUID?
     @State private var isAddingNode = false
-    @State private var navigateToR07 = false
+    @State private var navigateToProjectDetails = false
     @State private var showsSaveSetupAlert = false
     @State private var showsDiscardChangesAlert = false
     @State private var selectedDetent: PresentationDetent = .height(76)
@@ -70,8 +70,8 @@ struct ReviewView: View {
             if viewModel.isEditingDiagram,
                case .equipment(let nodeId) = activeSheetContent,
                quickActionsOpacity > 0.01 {
-                nodeQuickActionsToolbar(for: nodeId)
-                    .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
+                NodeQuickActionsToolbar(nodeId: nodeId, onDelete: quickDeleteNode(id:))
+                        .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
                     .opacity(quickActionsOpacity)            // Fades out continuously
                     .scaleEffect(quickActionsScale)
                     .allowsHitTesting(quickActionsOpacity > 0.5)
@@ -82,7 +82,29 @@ struct ReviewView: View {
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            toolbarContent
+            ReviewToolbarContent(
+                viewModel: viewModel,
+                undoManager: undoManager,
+                isFromLoadingScreen: isFromLoadingScreen,
+                activeSheetContent: $activeSheetContent,
+                selectedNodeId: $selectedNodeId,
+                isAddingNode: $isAddingNode,
+                navigateToProjectDetails: $navigateToProjectDetails,
+                showsSaveSetupAlert: $showsSaveSetupAlert,
+                showsDiscardChangesAlert: $showsDiscardChangesAlert,
+                onClose: {
+                    if viewModel.isEditingDiagram {
+                        closeEditMode()
+                    } else {
+                        closeReview()
+                    }
+                },
+                onDiscardSetup: {
+                    viewModel.discardSetup()
+                    dismissAll()
+                },
+                onDismiss: { dismiss() }
+            )
         }
         .onAppear {
             if (!isFromLoadingScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
@@ -98,7 +120,7 @@ struct ReviewView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $navigateToR07) {
+        .navigationDestination(isPresented: $navigateToProjectDetails) {
             ProjectDetailsView(
                 setup: viewModel.draftSetup,
                 isPresentedModally: false,
@@ -111,32 +133,23 @@ struct ReviewView: View {
             selectedNodeId = nil
             selectedDetent = .height(76)
         }, content: {
-            unifiedSheetContent
+            DiagramSheetView(
+                activeSheetContent: activeSheetContent,
+                reviewViewModel: viewModel,
+                isEditing: viewModel.isEditingDiagram,
+                undoManager: undoManager,
+                selectedDetent: $selectedDetent,
+                currentSheetHeight: $currentSheetHeight
+            )
         })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
+                .presentationDetents([.large])
+                .presentationBackground(DesignTokens.sheetBackground)
         }
     }
 
-    // MARK: - Floating Node Toolbar Component & Actions
-
-    @ViewBuilder
-    private func nodeQuickActionsToolbar(for nodeId: UUID) -> some View {
-        HStack(spacing: 16) {
-            Button(role: .destructive) {
-                quickDeleteNode(id: nodeId)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.red)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-    }
+    // MARK: - Node Actions
 
     private func duplicateNode(id: UUID) {
         guard let original = viewModel.nodes.first(where: { $0.id == id }) else { return }
@@ -173,7 +186,7 @@ struct ReviewView: View {
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
     }
 
-    // MARK: - Unified Sheet
+    // MARK: - Unified Sheet Binding
 
     private var unifiedSheetBinding: Binding<Bool> {
         Binding(
@@ -188,56 +201,6 @@ struct ReviewView: View {
                 }
             }
         )
-    }
-
-    @ViewBuilder
-    private var unifiedSheetContent: some View {
-        Group {
-            switch activeSheetContent {
-            case .equipment(let nodeId):
-                EquipmentFormView(
-                    viewModel: viewModel,
-                    editingNodeId: nodeId,
-                    undoManager: viewModel.isEditingDiagram ? undoManager : nil,
-                    isReadOnly: !viewModel.isEditingDiagram,
-                    selectedDetent: $selectedDetent
-                )
-            case .subject:
-                SubjectFormView(
-                    viewModel: viewModel,
-                    undoManager: viewModel.isEditingDiagram ? undoManager : nil,
-                    isReadOnly: !viewModel.isEditingDiagram,
-                    selectedDetent: $selectedDetent
-                )
-            case .none:
-                EmptyView()
-            }
-        }
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .onChange(of: proxy.size.height, initial: true) { _, newHeight in
-                        currentSheetHeight = newHeight
-                    }
-            }
-        }
-        .presentationDetents([.height(76), .medium, .large], selection: $selectedDetent)
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(76)))
-        .interactiveDismissDisabled(true)
-        .presentationDragIndicator(.visible)
-        // Liquid glass effect for 76pt & Medium detents, solid color for Large
-        .presentationBackground {
-            if selectedDetent == .large {
-                DesignTokens.sheetBackground
-            } else {
-                if #available(iOS 26, *) {
-                    Color.clear
-                        .glassEffect(.clear, in: .rect)
-                } else {
-                    Rectangle().fill(.regularMaterial)
-                }
-            }
-        }
     }
 
     // MARK: - Tap Handlers
@@ -263,132 +226,6 @@ struct ReviewView: View {
             selectedNodeId = nil
             activeSheetContent = nil
             selectedDetent = .height(76)
-        }
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarSpacer(placement: .bottomBar)
-
-        // Hide floating button when sheet is present
-        if activeSheetContent == nil {
-            ToolbarItem(placement: .bottomBar) {
-                floatingButton
-            }
-        }
-
-        ToolbarItem(placement: .cancellationAction) {
-            Button("Close", systemImage: "xmark") {
-                if viewModel.isEditingDiagram {
-                    closeEditMode()
-                } else {
-                    closeReview()
-                }
-            }
-            // Popovers on the X (like Reminders); tapping outside one keeps the user here.
-            .confirmationDialog(
-                "Save this setup? If you leave now, this scan and its diagram will be lost.",
-                isPresented: $showsSaveSetupAlert,
-                titleVisibility: .visible
-            ) {
-                Button("Save Setup") { navigateToR07 = true }
-                    .keyboardShortcut(.defaultAction)
-                Button("Discard", role: .destructive) {
-                    viewModel.discardSetup()
-                    dismissAll()
-                }
-            }
-            .confirmationDialog(
-                "Are you sure you want to discard your changes to this diagram?",
-                isPresented: $showsDiscardChangesAlert,
-                titleVisibility: .visible
-            ) {
-                Button("Discard Changes", role: .destructive) {
-                    viewModel.discardEdits(undoManager: undoManager)
-                    if !isFromLoadingScreen { dismiss() }
-                }
-            }
-        }
-
-        ToolbarItem(placement: .principal) {
-            VStack(spacing: 2) {
-                Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
-                    .font(.headline)
-                    .foregroundStyle(DesignTokens.textPrimary)
-                Text(viewModel.layoutSubtitle)
-                    .font(.caption)
-                    .foregroundStyle(DesignTokens.textSecondary)
-            }
-            .accessibilityElement(children: .combine)
-        }
-
-        if viewModel.isEditingDiagram {
-            ToolbarItem(placement: .confirmationAction) {
-                HStack(spacing: 4) {
-                    Button("Undo", systemImage: "arrow.uturn.backward") {
-                        undoManager?.undo()
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    }
-                    .disabled(!viewModel.canUndo)
-
-                    Button("Redo", systemImage: "arrow.uturn.forward") {
-                        undoManager?.redo()
-                        viewModel.updateUndoState(undoManager: undoManager)
-                    }
-                    .disabled(!viewModel.canRedo)
-                }
-            }
-
-            ToolbarSpacer(.fixed, placement: .confirmationAction)
-
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save Changes", systemImage: "checkmark") {
-                    selectedNodeId = nil
-                    activeSheetContent = nil
-                    viewModel.confirmEdits(undoManager: undoManager)
-                    if !isFromLoadingScreen { dismiss() }
-                }
-                .buttonStyle(.glassProminent)
-                .tint(DesignTokens.accentPrimary)
-                .disabled(!viewModel.hasPendingEdits)
-            }
-        } else {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Next", systemImage: "chevron.right") {
-                    selectedNodeId = nil
-                    activeSheetContent = nil
-                    navigateToR07 = true
-                }
-                .buttonStyle(.glassProminent)
-                .tint(DesignTokens.accentPrimary)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var floatingButton: some View {
-        if viewModel.isEditingDiagram {
-            Button {
-                isAddingNode = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.glassProminent)
-            .tint(DesignTokens.accentPrimary)
-        } else {
-            Button {
-                viewModel.beginEditing(undoManager: undoManager)
-            } label: {
-                Image(systemName: "pencil")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.glassProminent)
-            .tint(DesignTokens.accentPrimary)
         }
     }
 
