@@ -78,7 +78,7 @@ struct ReviewView: View {
                         isAddingNode = true
                     }
                 )
-                
+
                 .padding(.bottom, currentSheetHeight + 8)
                 .opacity(quickActionsOpacity)
                 .scaleEffect(quickActionsScale)
@@ -212,7 +212,7 @@ struct ReviewView: View {
     }
 
     // MARK: - Tap Handlers
-    
+
     func resetSheetState() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedNodeId = nil

@@ -197,7 +197,7 @@ private extension SetupDetailView {
                 viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
             }
         }
-        
+
         selectedNodeId = node.id
         activeSheetContent = .equipment(node.id)
     }
