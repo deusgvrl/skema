@@ -144,6 +144,8 @@ struct ReviewView: View {
         })
         .sheet(isPresented: $isAddingNode) {
             EquipmentFormView(viewModel: viewModel, editingNodeId: nil, undoManager: undoManager, isReadOnly: false)
+                .presentationDetents([.large])
+                .presentationBackground(DesignTokens.sheetBackground)
         }
     }
 

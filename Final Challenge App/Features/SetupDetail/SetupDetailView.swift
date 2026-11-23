@@ -108,6 +108,8 @@ struct SetupDetailView: View {
                 undoManager: undoManager,
                 isReadOnly: false
             )
+            .presentationDetents([.large])
+            .presentationBackground(DesignTokens.sheetBackground)
         }
         .sheet(isPresented: $viewModel.isEditingProjectDetails) {
             NavigationStack {
