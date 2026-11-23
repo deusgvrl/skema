@@ -185,8 +185,14 @@ private extension SetupDetailView {
     }
 
     func handleNodeTap(_ node: Equipment) {
+        if !isEditing {
+            withAnimation {
+                viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedDetent = .height(76)
+            selectedDetent = .height(240)
         }
         selectedNodeId = node.id
         activeSheetContent = .equipment(node.id)
