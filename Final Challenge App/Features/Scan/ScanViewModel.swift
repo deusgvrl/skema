@@ -149,7 +149,7 @@ final class ScanViewModel {
 
     var arSession: ARSession? { scan?.session as? ARSession }
 
-    /// ✕ asks "Cancel This Scan?" first only while scanning; the message screens leave straight away.
+    /// ✕ asks "Leave this scan?" first only while scanning; the message screens leave straight away.
     var asksBeforeLeaving: Bool { screen == .scanning }
 
     /// Finish Scan: a subject, one camera and one light (`ScanOverlay.canFinish`).
@@ -215,7 +215,8 @@ final class ScanViewModel {
     private func addItem(_ kind: ScanTapKind, anchor: SIMD3<Float>) {
         let number = (kindCounts[kind] ?? 0) + 1
         kindCounts[kind] = number
-        let name = (kind == .camera ? "Camera" : "Studio Lighting") + " \(number)"
+        // The same name on the tag, in the instruction and on the saved setup (24 Nov): one camera, numbered lights.
+        let name = kind == .camera ? "Camera" : "Light \(number)"
         let equipment = Equipment(category: kind == .camera ? .camera : .light, name: name)
         items.append(ScanItem(id: equipment.id, kind: kind, name: name, anchor: anchor))
         history.append(.item(equipment.id))
@@ -381,15 +382,7 @@ extension ScanViewModel {
         return ScanOverlay.screenBox(of: bounds.corners, camera: camera, screenSize: size)
     }
 
-    /// The tag's title (Sketch T09): "Camera", "Light", numbered only when there is more than one of the kind.
-    func shortTitle(for item: ScanItem) -> String {
-        let base = item.kind == .camera ? "Camera" : "Light"
-        let sameKind = items.filter { $0.kind == item.kind }
-        guard sameKind.count > 1, let index = sameKind.firstIndex(where: { $0.id == item.id }) else { return base }
-        return "\(base) \(index + 1)"
-    }
-
-    /// "Studio Lighting 1 · 1.52 m · 1.20 m" once measured; just the name before that.
+    /// "Light 1 · 1.52 m · 1.20 m" once measured; just the name before that.
     func tagText(for item: ScanItem) -> String {
         guard let values = Self.values(of: item.result, hasFloor: floorY != nil), let height = values.height else {
             return "\(item.name) ✓"
@@ -417,6 +410,18 @@ extension ScanViewModel {
     }
 
     // MARK: Finish and the plan
+
+    /// Finish Scan's tap: finishes when it can; before that, sets nothing and says what to add first.
+    /// - Returns: true when the scan finished.
+    @discardableResult
+    func tryFinish() -> Bool {
+        guard canFinish else {
+            feedback = currentStep.tapKind.map(ScanFeedback.addFirst) ?? .pointAtFloorFirst
+            return false
+        }
+        finishTapped()
+        return true
+    }
 
     func finishTapped() {
         insertDraftSetup()
@@ -476,7 +481,7 @@ extension ScanViewModel {
     /// The tip for this frame, shown only once it held for a moment (`GuidanceHold`). Internal so tests can call it.
     func updateGuidance(for frame: ScanFrame) {
         let tip = ScanGuidance.guidance(tracking: frame.tracking, ambientIntensity: frame.ambientIntensity,
-                                        depth: frame.depth)
+                                        depth: frame.depth, current: guidance)
         guidance = guidanceHold.update(tip, at: frame.timestamp)
     }
 }

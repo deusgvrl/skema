@@ -2,7 +2,7 @@
 //  ScanTutorial.swift
 //  Final Challenge App
 //
-//  The guided tap scan (Sketch UT Review T01–T10): the floor, the product, the camera, each light, then Finish.
+//  The guided tap scan (Sketch UT Review T01–T10): the floor, the subject, the camera, each light, then Finish.
 //  The floor is found by pointing the phone at it (A10-112, no tap); each tap then sets the next thing still missing,
 //  so the photographer never picks what a tap means.
 //
@@ -17,14 +17,14 @@ enum ScanStep: Int, CaseIterable {
     case light
     case finish
 
-    /// The centred instruction's line for this step (copy approved 23 Nov 2026).
+    /// The instruction's line for this step (copy decided 24 Nov 2026).
     var title: String {
         switch self {
         case .floor: "Point at the floor"
-        case .subject: "Tap your product"
+        case .subject: "Tap the subject"
         case .camera: "Tap the camera"
-        case .light: "Tap each light"
-        case .finish: "Tap Finish Scan"
+        case .light: "Tap a light"
+        case .finish: "Tap the next light"
         }
     }
 
@@ -32,10 +32,8 @@ enum ScanStep: Int, CaseIterable {
     var detail: String {
         switch self {
         case .floor: "Heights are measured from it"
-        case .subject: "Distances are measured from it"
-        case .camera: "Walk up to it first"
-        case .light: "Walk up to each one"
-        case .finish: "Or tap another light first"
+        case .subject, .camera, .light: "Walk up to it first"
+        case .finish: "Or tap Finish Scan if that's all"
         }
     }
 

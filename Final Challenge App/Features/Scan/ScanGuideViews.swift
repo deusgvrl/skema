@@ -19,42 +19,81 @@ enum ScanPalette {
     static let glassTint = Color.black.opacity(0.35)
 }
 
-/// Floor · Subject · Camera · Light, each with a dot that turns green once it is tapped.
-struct ScanStatusChips: View {
-    let hasFloor: Bool
-    let hasSubject: Bool
-    let hasCamera: Bool
-    let hasLight: Bool
+/// One of the progress chips above Finish Scan, in step order.
+enum ScanChip: Int, CaseIterable {
+    case floor
+    case subject
+    case camera
+    case lights
 
-    var body: some View {
-        HStack(spacing: 8) {
-            chip("Floor", isDone: hasFloor)
-            chip("Subject", isDone: hasSubject)
-            chip("Camera", isDone: hasCamera)
-            chip("Light", isDone: hasLight)
-        }
+    /// Done (green, with a checkmark), now (white) or still to do (glass): never colour alone (Apple HIG, Color).
+    enum State: Equatable {
+        case done
+        case now
+        case todo
     }
 
-    private func chip(_ title: String, isDone: Bool) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(isDone ? ScanPalette.green : Color.white.opacity(0.5))
-                .frame(width: 8, height: 8)
-            Text(title)
-                .font(.footnote)
-                .foregroundStyle(.white)
-                .lineLimit(1)
+    /// The chips before the current step are done, the current step's is now, the rest are still to do.
+    func state(at step: ScanStep) -> State {
+        if rawValue < step.rawValue { return .done }
+        return rawValue == step.rawValue ? .now : .todo
+    }
+
+    /// "Floor", "Subject", "Camera"; the lights chip counts the lights once there are any ("2 Lights").
+    func title(lights: Int) -> String {
+        switch self {
+        case .floor: "Floor"
+        case .subject: "Subject"
+        case .camera: "Camera"
+        case .lights: lights == 0 ? "Lights" : "\(lights) Light\(lights == 1 ? "" : "s")"
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(isDone ? "Done" : "Not yet")
     }
 }
 
-/// Finish Scan: dim glass until it can finish, then white with a ring around it (Sketch T09).
+/// Floor · Subject · Camera · Lights: the whole chip turns green with a checkmark once its step is done, and the
+/// current step's chip is white, so the photographer sees at a glance where the scan is.
+struct ScanStatusChips: View {
+    let step: ScanStep
+    let lights: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(ScanChip.allCases, id: \.self) { chip($0) }
+        }
+    }
+
+    private func chip(_ chip: ScanChip) -> some View {
+        let state = chip.state(at: step)
+        let title = chip.title(lights: lights)
+        return HStack(spacing: 4) {
+            if state == .done {
+                Image(systemName: "checkmark")
+                    .font(.caption2.weight(.bold))
+            }
+            Text(title)
+                .font(.footnote.weight(state == .todo ? .regular : .semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(state == .todo ? Color.white : ScanPalette.onGreen)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background {
+            switch state {
+            case .done: Capsule().fill(ScanPalette.green)
+            case .now: Capsule().fill(.white)
+            case .todo: EmptyView()
+            }
+        }
+        .glassEffect(state == .todo ? .regular.tint(ScanPalette.glassTint) : .identity, in: .capsule)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(state == .done ? "Done" : state == .now ? "Now" : "Not yet")
+        .animation(.default, value: state)
+    }
+}
+
+/// Finish Scan: dim glass until it can finish, then white with a ring around it (Sketch T09). Always tappable: before
+/// the scan can finish, a tap says what to add first (HIG Feedback: say why a command can't be carried out).
 struct ScanFinishButton: View {
     let isEnabled: Bool
     let action: () -> Void
@@ -81,7 +120,7 @@ struct ScanFinishButton: View {
                 Capsule().strokeBorder(.white.opacity(0.7), lineWidth: 2)
             }
         }
-        .disabled(!isEnabled)
+        .accessibilityHint(isEnabled ? "" : "Says what to add first")
         .animation(.default, value: isEnabled)
     }
 }
@@ -98,7 +137,8 @@ private struct TrailingIconLabelStyle: LabelStyle {
 
 #Preview("Chips and Finish") {
     VStack(spacing: 16) {
-        ScanStatusChips(hasFloor: true, hasSubject: true, hasCamera: false, hasLight: false)
+        ScanStatusChips(step: .camera, lights: 0)
+        ScanStatusChips(step: .finish, lights: 2)
         ScanFinishButton(isEnabled: true) {}
         ScanFinishButton(isEnabled: false) {}
     }

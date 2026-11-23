@@ -79,15 +79,15 @@ struct ScanView: View {
                         leave()
                     }
                 }
-                // A popover on the X (like Reminders); tapping outside it keeps scanning.
-                .confirmationDialog(
-                    "Are you sure you want to cancel this scan? Everything you tapped so far will be lost.",
-                    isPresented: $showsLeaveAlert,
-                    titleVisibility: .visible
-                ) {
-                    Button("Cancel Scan", role: .destructive) {
+                // A popover on the X (like Reminders); tapping outside it keeps scanning. "Leave", not "Cancel", so the
+                // destructive button is never confused with the one that keeps the scan.
+                .confirmationDialog("Leave this scan?", isPresented: $showsLeaveAlert, titleVisibility: .visible) {
+                    Button("Leave Scan", role: .destructive) {
                         leave()
                     }
+                    Button("Keep Scanning", role: .cancel) {}
+                } message: {
+                    Text("Everything you tapped will be lost.")
                 }
             }
             if viewModel.screen == .scanning {
@@ -108,6 +108,10 @@ struct ScanView: View {
             guard !Task.isCancelled else { return }
             withAnimation { viewModel.clearCompletedStep() }
         }
+        // Feedback in more than one channel (HIG Feedback): a success tap when a step is done, a warning when a tap
+        // set nothing.
+        .sensoryFeedback(.success, trigger: viewModel.completedStep) { _, new in new != nil }
+        .sensoryFeedback(.warning, trigger: viewModel.feedback) { _, new in new != nil }
         .task(id: viewModel.feedback) {
             guard viewModel.feedback != nil else { return }
             try? await Task.sleep(for: .seconds(2))
@@ -151,16 +155,12 @@ struct ScanView: View {
     private var bottomControls: some View {
         VStack(spacing: 16) {
             if viewModel.screen == .scanning {
-                ScanStatusChips(
-                    hasFloor: viewModel.hasFloor,
-                    hasSubject: viewModel.subject != nil,
-                    hasCamera: viewModel.items.contains { $0.kind == .camera },
-                    hasLight: viewModel.items.contains { $0.kind == .light }
-                )
+                ScanStatusChips(step: viewModel.currentStep,
+                                lights: viewModel.items.filter { $0.kind == .light }.count)
             }
             if showsFinishScan {
                 ScanFinishButton(isEnabled: viewModel.canFinish) {
-                    viewModel.finishTapped()
+                    guard viewModel.tryFinish() else { return }
                     reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup,
                                                       storageController: viewModel.storageController)
                 }
@@ -253,7 +253,7 @@ private struct ScanTagsView: View {
                            anchor: viewModel.tagPosition(of: subject, in: size), size: size)
                 }
                 ForEach(viewModel.items) { item in
-                    marker(title: viewModel.shortTitle(for: item),
+                    marker(title: item.name,
                            isSaved: viewModel.isSaved(item),
                            box: viewModel.box(for: item, in: size),
                            anchor: viewModel.tagPosition(of: item.anchor, in: size), size: size)
@@ -279,8 +279,9 @@ private struct ScanTagsView: View {
     }
 }
 
-/// "Light ✓" in black on green once saved; until then just the title on dark glass. Why it is not saved yet is said by
-/// the scan's instruction, not on the tag.
+/// "Light 1" with a checkmark, in black on green, once saved; until then just the name on dark glass. Why it is not
+/// saved yet is said by the scan's instruction, not on the tag. The checkmark is a symbol, so VoiceOver reads only the
+/// name, and the state never rests on colour alone.
 struct ScanTag: View {
     let title: String
     let isSaved: Bool
@@ -295,7 +296,8 @@ struct ScanTag: View {
                     .frame(height: 26)
                     .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
             } else {
-                Text("\(title) ✓")
+                Label(title, systemImage: "checkmark")
+                    .labelStyle(.titleAndIcon)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(ScanPalette.onGreen)
                     .padding(.horizontal, 12)

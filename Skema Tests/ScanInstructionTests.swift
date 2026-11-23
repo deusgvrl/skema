@@ -21,10 +21,10 @@ struct ScanInstructionTests {
 
     @Test("Each step has its line and a small line saying why", arguments: [
         (ScanStep.floor, "Point at the floor", "Heights are measured from it"),
-        (.subject, "Tap your product", "Distances are measured from it"),
+        (.subject, "Tap the subject", "Walk up to it first"),
         (.camera, "Tap the camera", "Walk up to it first"),
-        (.light, "Tap each light", "Walk up to each one"),
-        (.finish, "Tap Finish Scan", "Or tap another light first")
+        (.light, "Tap a light", "Walk up to it first"),
+        (.finish, "Tap the next light", "Or tap Finish Scan if that's all")
     ])
     func steps(step: ScanStep, main: String, detail: String) {
         #expect(instruction(step: step) == ScanInstruction(main: main, detail: detail, style: .step))
@@ -42,8 +42,8 @@ struct ScanInstructionTests {
     // MARK: Problems
 
     @Test("Each problem has its lines", arguments: [
-        (ScanGuidance.moreLight, ["More light needed"]),
-        (.moveCloser, ["Move closer"]),
+        (ScanGuidance.moreLight, ["More light needed", "Turn on more lights in the room"]),
+        (.moveCloser, ["Move closer", "Everything is more than 5 m away"]),
         (.floorNotFound, ["Floor not found yet", "Tilt down and move closer to it"])
     ])
     func problems(problem: ScanGuidance, lines: [String]) {
@@ -60,7 +60,10 @@ struct ScanInstructionTests {
         (.alreadyAdded(light: 1), ["Light 1 already added"]),
         (.alreadyAdded(light: 3), ["Light 3 already added"]),
         (.tooFar, ["Too far to measure", "Walk closer, within 5 m"]),
-        (.needsCloserLook, ["Need a closer look", "Walk closer and hold still"])
+        (.needsCloserLook, ["Need a closer look", "Walk closer and hold still"]),
+        (.addFirst(.subject), ["Add the subject first"]),
+        (.addFirst(.camera), ["Add the camera first"]),
+        (.addFirst(.light), ["Add a light first"])
     ])
     func feedback(feedback: ScanFeedback, lines: [String]) {
         let shown = instruction(feedback: feedback)
@@ -89,7 +92,7 @@ struct ScanInstructionTests {
     @Test("Each tap message has its icon; steps and done lines have none", arguments: [
         (ScanFeedback.pointAtFloorFirst, "arrow.down.to.line"), (.cannotMeasure, "exclamationmark.triangle.fill"),
         (.alreadyAdded(light: 2), "checkmark.circle.fill"), (.tooFar, "figure.walk"),
-        (.needsCloserLook, "circle.dotted")
+        (.needsCloserLook, "circle.dotted"), (.addFirst(.camera), "plus.circle.fill")
     ])
     func feedbackSymbols(feedback: ScanFeedback, symbol: String) {
         #expect(instruction(feedback: feedback).symbol == symbol)
@@ -99,15 +102,15 @@ struct ScanInstructionTests {
 
     // MARK: Priority
 
-    @Test("Only one line shows: what a tap did, then done, then a problem, then the step")
+    @Test("Only one line shows: what a tap did, then a problem, then a done line, then the step (24 Nov ladder)")
     func priority() {
         let all = instruction(step: .camera, completed: .subject, problem: .moreLight, feedback: .cannotMeasure)
         let noFeedback = instruction(step: .camera, completed: .subject, problem: .moreLight)
-        let problemOnly = instruction(step: .camera, problem: .moreLight)
+        let doneOnly = instruction(step: .camera, completed: .subject)
 
         #expect(all.main == "Can't measure that spot")
-        #expect(noFeedback.main == "Subject set")
-        #expect(problemOnly.main == "More light needed")
+        #expect(noFeedback.main == "More light needed")
+        #expect(doneOnly.main == "Subject set")
         #expect(instruction(step: .camera).main == "Tap the camera")
     }
 }

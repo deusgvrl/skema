@@ -81,7 +81,7 @@ struct ScanGrownBoxTests {
         // 356 points from Light 1's tag, so it is not a tap on the tag; world x = 1.48 m, inside the wall's box.
         try tap(viewModel, at: CGPoint(x: 720, y: 1700))
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
         #expect(viewModel.draftSetup.nodes.count == 2)
         #expect(viewModel.feedback == .alreadyAdded(light: 1))
         #expect(viewModel.instruction.main == "Light 1 already added")
@@ -94,7 +94,7 @@ struct ScanGrownBoxTests {
         // 120 points from the camera's tag; world (-0.768, -0.24, -2), inside the camera's column.
         try tap(viewModel, at: CGPoint(x: 600, y: 576))
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
     }
 
     @Test("Case 15: after Undo removes Light 1, a tap on the same place makes a new light")
@@ -105,7 +105,7 @@ struct ScanGrownBoxTests {
         viewModel.undoTapped()
         try tap(viewModel, at: lightSpot)
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
         #expect(viewModel.feedback == nil)
     }
 }

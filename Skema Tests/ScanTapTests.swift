@@ -72,9 +72,9 @@ struct ScanTapTests {
 
         try tap(viewModel, .light)
 
-        #expect(viewModel.items.map(\.name) == ["Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Light 1"])
         #expect(viewModel.draftSetup.nodes.map(\.category) == [.light])
-        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Studio Lighting 1"])
+        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Light 1"])
     }
 
     @Test("Items are numbered per kind in tap order")
@@ -86,7 +86,7 @@ struct ScanTapTests {
         // A10-106: the second light is on a wall at 3 m, another surface than the first light's wall at 2 m.
         try tap(viewModel, .light, at: CGPoint(x: 720, y: 1344), metres: 3)
 
-        #expect(viewModel.items.map(\.name) == ["Studio Lighting 1", "Camera 1", "Studio Lighting 2"])
+        #expect(viewModel.items.map(\.name) == ["Light 1", "Camera", "Light 2"])
     }
 
     @Test("A tap on a spot with no LiDAR depth adds nothing and says so")
@@ -351,7 +351,7 @@ struct ScanTapTests {
         viewModel.finishTapped()
 
         let saved = try #require(storage.fetchAllSetups().first)
-        #expect(saved.nodes.map(\.name) == ["Studio Lighting 1"])
+        #expect(saved.nodes.map(\.name) == ["Light 1"])
     }
 
     @Test("Closing the scan removes the draft setup from storage")
@@ -364,5 +364,23 @@ struct ScanTapTests {
         viewModel.closeTapped()
 
         #expect(storage.fetchAllSetups().isEmpty)
+    }
+}
+
+extension ScanTapTests {
+    @Test("Finish Scan before the scan can finish sets nothing and says what to add first")
+    func finishTooEarly() throws {
+        let viewModel = makeViewModel()
+        #expect(!viewModel.tryFinish())
+        #expect(viewModel.feedback == .pointAtFloorFirst)
+
+        try tap(viewModel, .subject, metres: 3)
+        try tap(viewModel, .light, metres: 2)
+        #expect(!viewModel.tryFinish())
+        #expect(viewModel.feedback == .addFirst(.camera))
+        #expect(viewModel.instruction.main == "Add the camera first")
+
+        try tap(viewModel, .camera, at: leftOfMiddle, metres: 2)
+        #expect(viewModel.tryFinish())
     }
 }

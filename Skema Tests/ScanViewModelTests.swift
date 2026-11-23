@@ -254,9 +254,12 @@ struct ScanViewModelTests {
             viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 1.5, ambientIntensity: 100))
             let shown = viewModel.guidance
             viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2))
-            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 2.5))
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 3))
+            let stillShown = viewModel.guidance
+            viewModel.updateGuidance(for: try makeTrackingFrame(timestamp: 3.5))
 
             #expect(shown == .moreLight)
+            #expect(stillShown == .moreLight)
             #expect(viewModel.guidance == nil)
         }
 

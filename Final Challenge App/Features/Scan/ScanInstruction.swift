@@ -2,8 +2,8 @@
 //  ScanInstruction.swift
 //  Final Challenge App
 //
-//  The scan screen's one centred instruction, like Apple's Measure (copy approved 23 Nov 2026): the current step, a
-//  short "done" line after it, a problem while it lasts, or what the last tap did. One at a time.
+//  The scan screen's one instruction (layout A, 24 Nov 2026): what the last tap did, a problem while it lasts, a short
+//  "done" line, or the current step. One at a time, in that order (the priority ladder in the scan screen report).
 //
 
 import Foundation
@@ -20,6 +20,8 @@ enum ScanFeedback: Equatable {
     case tooFar
     /// 1.5 s after a tap, what it set still has too few LiDAR points.
     case needsCloserLook
+    /// Finish Scan before the scan can finish: what to add first.
+    case addFirst(ScanTapKind)
 
     var main: String {
         switch self {
@@ -28,6 +30,9 @@ enum ScanFeedback: Equatable {
         case .alreadyAdded(let light): "Light \(light) already added"
         case .tooFar: "Too far to measure"
         case .needsCloserLook: "Need a closer look"
+        case .addFirst(.subject): "Add the subject first"
+        case .addFirst(.camera): "Add the camera first"
+        case .addFirst(.light): "Add a light first"
         }
     }
 
@@ -36,7 +41,7 @@ enum ScanFeedback: Equatable {
         case .cannotMeasure: "Tap a spot nearer to you"
         case .tooFar: "Walk closer, within 5 m"
         case .needsCloserLook: "Walk closer and hold still"
-        case .pointAtFloorFirst, .alreadyAdded: nil
+        case .pointAtFloorFirst, .alreadyAdded, .addFirst: nil
         }
     }
 
@@ -48,6 +53,7 @@ enum ScanFeedback: Equatable {
         case .alreadyAdded: "checkmark.circle.fill"
         case .tooFar: "figure.walk"
         case .needsCloserLook: "circle.dotted"
+        case .addFirst: "plus.circle.fill"
         }
     }
 }
@@ -71,20 +77,20 @@ struct ScanInstruction: Hashable {
     /// Measure's coaching screen. Steps and done lines stay plain text, so the items stay easy to see and tap.
     var isBlocking: Bool { style == .problem || style == .feedback }
 
-    /// What shows now, in this order: what the last tap did, then a step that was just done, then a problem, then the
-    /// current step. Each keeps its small line, so the user always sees why or what to do first.
+    /// What shows now, in this order (24 Nov ladder): what the last tap did, then a problem, then a step that was just
+    /// done, then the current step. Each keeps its small line, so the user always sees why or what to do first.
     static func current(step: ScanStep, completed: ScanStep?, problem: ScanGuidance?,
                         feedback: ScanFeedback?) -> ScanInstruction {
         if let feedback {
             return ScanInstruction(main: feedback.main, detail: feedback.detail, style: .feedback,
                                    symbol: feedback.symbol)
         }
-        if let done = completed?.doneTitle {
-            return ScanInstruction(main: done, detail: nil, style: .done)
-        }
         if let problem {
             return ScanInstruction(main: problem.message, detail: problem.detail, style: .problem,
                                    symbol: problem.symbol)
+        }
+        if let done = completed?.doneTitle {
+            return ScanInstruction(main: done, detail: nil, style: .done)
         }
         return ScanInstruction(main: step.title, detail: step.detail, style: .step)
     }

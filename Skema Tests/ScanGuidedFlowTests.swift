@@ -20,12 +20,13 @@ private let middle = CGPoint(x: 720, y: 960)
 private let leftOfMiddle = CGPoint(x: 720, y: 576)
 private let belowMiddle = CGPoint(x: 720, y: 1344)
 
+@MainActor
 @Suite("Scan steps")
 struct ScanStepTests {
-    @Test("Five steps with the Sketch titles, in order")
+    @Test("Five steps with their lines, in order (copy decided 24 Nov 2026)")
     func titles() {
         #expect(ScanStep.allCases.map(\.title) == [
-            "Point at the floor", "Tap your product", "Tap the camera", "Tap each light", "Tap Finish Scan"
+            "Point at the floor", "Tap the subject", "Tap the camera", "Tap a light", "Tap the next light"
         ])
     }
 
@@ -39,9 +40,27 @@ struct ScanStepTests {
     @Test("Each step's small line says why, or what to do first")
     func details() {
         #expect(ScanStep.allCases.map(\.detail) == [
-            "Heights are measured from it", "Distances are measured from it", "Walk up to it first",
-            "Walk up to each one", "Or tap another light first"
+            "Heights are measured from it", "Walk up to it first", "Walk up to it first", "Walk up to it first",
+            "Or tap Finish Scan if that's all"
         ])
+    }
+
+    @Test("Chips: the steps before the current one are done, the current one is now, the rest are still to do",
+          arguments: [
+            (ScanStep.floor, [ScanChip.State.now, .todo, .todo, .todo]),
+            (.camera, [.done, .done, .now, .todo]),
+            (.light, [.done, .done, .done, .now]),
+            (.finish, [.done, .done, .done, .done])
+          ])
+    func chipStates(step: ScanStep, states: [ScanChip.State]) {
+        #expect(ScanChip.allCases.map { $0.state(at: step) } == states)
+    }
+
+    @Test("Chip titles: Floor, Subject, Camera, and the lights counted once there are any")
+    func chipTitles() {
+        #expect(ScanChip.allCases.map { $0.title(lights: 0) } == ["Floor", "Subject", "Camera", "Lights"])
+        #expect(ScanChip.lights.title(lights: 1) == "1 Light")
+        #expect(ScanChip.lights.title(lights: 2) == "2 Lights")
     }
 
     @Test("The step follows what is still missing, always in the same order", arguments: [
@@ -211,7 +230,7 @@ struct ScanGuidedFlowTests {
         #expect(viewModel.items.allSatisfy { viewModel.box(for: $0, in: screen) != nil })
     }
 
-    @Test("Tags say Camera and Light, numbered only when there are several; the subject gets a box too")
+    @Test("Items are called Camera, Light 1, Light 2: the same name on the tag, in the instruction and the setup")
     func shortTitles() throws {
         let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
@@ -220,7 +239,8 @@ struct ScanGuidedFlowTests {
         // A10-106: the second light is on a wall at 3 m; on the first light's wall it would be "Already tapped".
         try tap(viewModel, at: CGPoint(x: 300, y: 1700), metres: 3)
 
-        #expect(viewModel.items.map(viewModel.shortTitle(for:)) == ["Camera", "Light 1", "Light 2"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1", "Light 2"])
+        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera", "Light 1", "Light 2"])
         #expect(viewModel.subjectBox(in: screen) != nil)
     }
 
@@ -259,12 +279,12 @@ struct ScanGuidedFlowTests {
 
         viewModel.undoTapped()
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
-        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
+        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera", "Light 1"])
 
         try tap(viewModel, at: CGPoint(x: 300, y: 1700), metres: 4)
 
-        #expect(viewModel.items.last?.name == "Studio Lighting 2")
+        #expect(viewModel.items.last?.name == "Light 2")
     }
 
     @Test("Case 7: undo steps back one tap at a time; the subject is the last, and the floor stays found")

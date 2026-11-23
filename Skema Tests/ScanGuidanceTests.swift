@@ -52,6 +52,38 @@ struct ScanGuidanceTests {
         #expect(tip == .moreLight)
     }
 
+    @Test("Once dark, the room counts as lit again only above 350, so a value near 250 can't switch the tip back")
+    func darkHysteresis() {
+        let fresh = ScanGuidance.guidance(tracking: .normal, ambientIntensity: 300, depth: near)
+        let stays = ScanGuidance.guidance(tracking: .normal, ambientIntensity: 300, depth: near, current: .moreLight)
+        let goes = ScanGuidance.guidance(tracking: .normal, ambientIntensity: 360, depth: near, current: .moreLight)
+
+        #expect(fresh == nil)
+        #expect(stays == .moreLight)
+        #expect(goes == nil)
+    }
+
+    @Test("Once too far, the set counts as near again only when over 20% of the view is within 5 m")
+    func farHysteresis() throws {
+        let partly = mixedDepth(nearColumns: 15)
+        let mostly = mixedDepth(nearColumns: 30)
+        let share = ScanGuidance.nearShare(of: partly)
+        try #require(share > 0.1 && share < 0.2)
+
+        #expect(ScanGuidance.guidance(tracking: .normal, ambientIntensity: 1000, depth: partly) == nil)
+        #expect(ScanGuidance.guidance(tracking: .normal, ambientIntensity: 1000, depth: partly,
+                                      current: .moveCloser) == .moveCloser)
+        #expect(ScanGuidance.guidance(tracking: .normal, ambientIntensity: 1000, depth: mostly,
+                                      current: .moveCloser) == nil)
+    }
+
+    /// 100 × 4 pixels: the first `nearColumns` columns 1 m away, the rest 6 m (beyond the 5 m range).
+    private func mixedDepth(nearColumns: Int) -> DepthFrame {
+        let row = (0..<100).map { Float($0 < nearColumns ? 1 : 6) }
+        return DepthFrame(width: 100, height: 4, depth: Array([[Float]](repeating: row, count: 4).joined()),
+                          confidence: [UInt8](repeating: 2, count: 400))
+    }
+
     @Test("No light estimate is not dark")
     func noLightEstimate() {
         let tip = ScanGuidance.guidance(tracking: .normal, ambientIntensity: nil, depth: near)
@@ -115,17 +147,35 @@ struct GuidanceHoldTests {
         #expect(shown == .moveCloser)
     }
 
-    @Test("The tip goes 0.5 s after tracking recovers")
+    @Test("A shown tip stays at least 2 s, and goes once the problem has been gone 0.5 s")
     func hidesAfterRecovery() {
         var hold = GuidanceHold()
         _ = hold.update(.moveCloser, at: 0)
         _ = hold.update(.moveCloser, at: 0.5)
 
-        let stillShown = hold.update(nil, at: 1.0)
-        let hidden = hold.update(nil, at: 1.5)
+        _ = hold.update(nil, at: 1.0)
+        let goneLongEnough = hold.update(nil, at: 1.5)
+        let stillUnder2s = hold.update(nil, at: 2.4)
+        let hidden = hold.update(nil, at: 2.5)
 
-        #expect(stillShown == .moveCloser)
+        #expect(goneLongEnough == .moveCloser)
+        #expect(stillUnder2s == .moveCloser)
         #expect(hidden == nil)
+    }
+
+    @Test("A lower tip waits until the shown one has had its 2 s")
+    func lowerTipWaits() {
+        var hold = GuidanceHold()
+        _ = hold.update(.moreLight, at: 0)
+        _ = hold.update(.moreLight, at: 0.5)
+
+        let waiting = hold.update(.moveCloser, at: 1.5)
+        let stillWaiting = hold.update(.moveCloser, at: 2.4)
+        let replaced = hold.update(.moveCloser, at: 2.5)
+
+        #expect(waiting == .moreLight)
+        #expect(stillWaiting == .moreLight)
+        #expect(replaced == .moveCloser)
     }
 
     @Test("A problem shorter than 0.5 s never shows")
@@ -151,7 +201,7 @@ struct GuidanceHoldTests {
         #expect(shown == .moreLight)
     }
 
-    @Test("A different tip replaces the shown one after 0.5 s")
+    @Test("A higher tip replaces the shown one after its own 0.5 s, without waiting 2 s")
     func switchesTips() {
         var hold = GuidanceHold()
         _ = hold.update(.moveCloser, at: 0)
