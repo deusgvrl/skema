@@ -76,6 +76,7 @@ final class SetupsViewModel {
 
     func confirmDelete() {
         guard let setup = setupPendingDelete else { return }
+        self.setupPendingDelete = nil
         if setup.firstSavedDate == nil {
             // A draft was never saved by the user, so it skips Recently Deleted and has no Undo.
             storageController.deleteSetup(setup)
