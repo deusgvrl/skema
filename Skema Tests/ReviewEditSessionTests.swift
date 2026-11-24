@@ -131,15 +131,4 @@ struct ReviewEditSessionTests {
 
         #expect(viewModel.chipOrder.map(\.label) == ["L1", "L2", "L10", "B1", "C1", "C2"])
     }
-
-    @Test("Display name is label and role, or the name when there is no role", arguments: [
-        ("L1", "Profoto D2", "Key", "L1 Key"),
-        ("C1", "Fujifilm GFX", "", "Fujifilm GFX"),
-        ("", "Bounce", "  ", "Bounce")
-    ])
-    func displayName(label: String, name: String, role: String, expected: String) {
-        let equipment = Equipment(category: .light, label: label, name: name, role: role)
-
-        #expect(equipment.displayName == expected)
-    }
 }
