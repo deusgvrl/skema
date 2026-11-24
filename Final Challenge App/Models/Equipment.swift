@@ -229,7 +229,7 @@ extension EquipmentCategory {
         case .camera:
             return isSelected ? "icon_camera_selected" : "icon_camera_viewonly"
         case .light:
-            return isSelected ? "icon_light_selected" : "icon_light_view_only"
+            return isSelected ? "icon_light_selected" : "icon_light_viewonly"
         case .accessory:
             return isSelected ? "icon_acc_selected" : "icon_acc_viewonly"
         }
