@@ -3,6 +3,7 @@ import SwiftUI
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
+    var isExportedToPdf: Bool = false
     var undoManager: UndoManager?
 
     // Converted to Binding so parent controls selection lifecycle
@@ -27,6 +28,7 @@ struct LightingDiagramView: View {
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
+        isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
         selectedNodeId: Binding<UUID?> = .constant(nil),
         initialZoomScale: CGFloat = 1.0,
@@ -36,6 +38,7 @@ struct LightingDiagramView: View {
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
+        self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
         self._selectedNodeId = selectedNodeId
         self._zoomScale = State(initialValue: initialZoomScale)
@@ -49,6 +52,14 @@ struct LightingDiagramView: View {
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
             let currentScale = zoomScale * magnifyBy
             let gridConfig = GridConfig.config(for: currentScale)
+
+            // Dynamic distance threshold:
+            // Zooming IN (higher scale) lowers threshold -> reveals smaller distances.
+            // Zooming OUT (lower scale) raises threshold -> hides crowded labels.
+            let minDistanceThreshold: Double = {
+                if isExportedToPdf { return 0.05 }
+                return max(0.15, 0.75 / Double(currentScale))
+            }()
 
             ZStack {
                 // Background Grid (Hides when isReadOnly is true)
@@ -85,13 +96,11 @@ struct LightingDiagramView: View {
                     onSubjectTap?()
                 }
 
-                // Distance Labels: display down to 0.35 m so equipment at studio distances (< 1.5 m) keep labels
-                let minDistanceThreshold = 0.05
-
+                // Distance Labels
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
 
-                    // Skip distance label if node is placed directly on subject center
+                    // Evaluates dynamically against scale-dependent threshold
                     if node.position != .zero && distanceValue >= minDistanceThreshold {
                         let deltaX = node.position.x
                         let deltaY = node.position.y
@@ -112,12 +121,6 @@ struct LightingDiagramView: View {
                             .font(.caption2.weight(.semibold))
                             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .foregroundStyle(DesignTokens.textSecondary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(DesignTokens.pageBackground.opacity(0.9))
-                            )
                             .fixedSize()
                             .rotationEffect(.degrees(angle))
                             .scaleEffect(1 / currentScale)
@@ -125,6 +128,7 @@ struct LightingDiagramView: View {
                             .transition(.opacity)
                     }
                 }
+                .animation(.easeInOut(duration: 0.25), value: minDistanceThreshold)
 
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
@@ -232,8 +236,4 @@ struct LightingDiagramView: View {
             }
         }
     }
-}
-
-#Preview {
-    LightingDiagramView(viewModel: ReviewViewModel(), isReadOnly: false, undoManager: nil)
 }

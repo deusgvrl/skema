@@ -87,38 +87,78 @@ struct NodeView: View {
                     .onChange(of: geo.frame(in: .global)) { _, _ in updateGlobalCenter(geo) }
             }
         )
-        .overlay(alignment: .bottom) {
-            HStack(spacing: 4) {
-                // 1. Primary Name (e.g. "Sony" or "W100")
-                Text(node.name.isEmpty ? "Equipment" : node.name)
-                    .font(.caption)
-                    .fontWeight(isSelected ? .bold : .regular)
-                    .foregroundStyle(DesignTokens.textPrimary)
+        .overlay(alignment: .top) {
+            VStack(spacing: 2) {
+               Text(node.name.isEmpty ? "Equipment" : node.name)
+                   .font(.caption)
+                   .fontWeight(isSelected ? .bold : .regular)
+                   .foregroundStyle(DesignTokens.textPrimary)
 
-                // 2. Role Subtitle on the same level (e.g. "- Camera 2")
-                if zoomScale >= 1.75 && !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("•")
-                        .font(.caption)
-                        .foregroundStyle(DesignTokens.textPrimary)
-
-                    Text(node.role)
-                        .font(.caption)
-                        .fontWeight(isSelected ? .bold : .regular)
-                        .foregroundStyle(DesignTokens.textPrimary)
-                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
-                }
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-            .fixedSize()
-            .offset(y: 30)
-            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: zoomScale >= 1.75)
+               // 2. Secondary Specifications Subtitle (Visible when zoomed in)
+               if zoomScale >= 1.75 {
+                   categoryDetailsView
+                       .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
+               }
+           }
+           .lineLimit(1)
+           .minimumScaleFactor(0.8)
+           .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+           .fixedSize()
+           .offset(y: 54)
+           .animation(.spring(response: 0.25, dampingFraction: 0.8), value: zoomScale >= 1.75)
         }
         .scaleEffect(1 / zoomScale)
         .position(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
         .highPriorityGesture(TapGesture().onEnded { if !isRotating { onTap() } })
         .gesture(isReadOnly ? nil : dragGesture)
+    }
+
+    // MARK: - Category Details Subview
+
+    @ViewBuilder
+    private var categoryDetailsView: some View {
+        switch node.category {
+        case .camera:
+            let hasLens = !node.lens.trimmingCharacters(in: .whitespaces).isEmpty
+            let hasIso = !node.iso.trimmingCharacters(in: .whitespaces).isEmpty
+            let hasAperture = !node.aperture.trimmingCharacters(in: .whitespaces).isEmpty
+
+            if hasLens || hasIso || hasAperture {
+                HStack(spacing: 4) {
+                    if hasLens {
+                        Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens)mm")
+                    }
+                    if hasAperture {
+                        if hasLens {
+                            Text("•").foregroundStyle(DesignTokens.textSecondary)
+                        }
+                        Text(node.aperture)
+                    }
+                    if hasIso {
+                        if hasLens || hasAperture {
+                            Text("•").foregroundStyle(DesignTokens.textSecondary)
+                        }
+                        Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.textSecondary)
+            }
+
+        case .light:
+            if !node.power.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text(node.power)
+                    .font(.caption2)
+                    .foregroundStyle(DesignTokens.textSecondary)
+            }
+
+        case .accessory:
+            if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text(node.role)
+                    .font(.caption2)
+                    .foregroundStyle(DesignTokens.textSecondary)
+            }
+        }
     }
 
     // MARK: - Gestures & Helpers
@@ -263,7 +303,9 @@ struct NodeView: View {
             return min(diff, 360 - diff) <= tolerance
         }
     }
-}// MARK: - Helper Dashed Line Shape
+}
+
+// MARK: - Helper Dashed Line Shape
 
 struct DashedLine: Shape {
     func path(in rect: CGRect) -> Path {
