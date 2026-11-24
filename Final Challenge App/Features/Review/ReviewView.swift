@@ -54,6 +54,10 @@ struct ReviewView: View {
                 viewModel: viewModel,
                 undoManager: undoManager,
                 selectedNodeId: $selectedNodeId,
+                isSubjectSelected: {
+                    if case .subject = activeSheetContent { return true }
+                    return false
+                }(),
                 onNodeTap: { node in
                     handleNodeTap(node)
                 },
@@ -62,7 +66,8 @@ struct ReviewView: View {
                 },
                 onEmptyTap: {
                     handleEmptyTap()
-                }
+                },
+                onNodeDragStart: { node in handleNodeDragStart(node) }
             )
             .ignoresSafeArea(edges: .bottom)
 
@@ -259,6 +264,14 @@ struct ReviewView: View {
             activeSheetContent = nil
             selectedDetent = .height(76)
         }
+    }
+
+    func handleNodeDragStart(_ node: Equipment) {
+        // Only switch if a different item is currently active
+        if case .equipment(let id) = activeSheetContent, id == node.id { return }
+
+        selectedNodeId = node.id
+        activeSheetContent = .equipment(node.id)
     }
 
     // MARK: - Helpers

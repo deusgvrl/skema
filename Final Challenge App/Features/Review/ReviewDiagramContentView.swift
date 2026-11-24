@@ -14,10 +14,12 @@ struct ReviewDiagramContentView: View {
     @Bindable var viewModel: ReviewViewModel
     var undoManager: UndoManager?
     @Binding var selectedNodeId: UUID?
+    var isSubjectSelected: Bool = false
 
     var onNodeTap: (Equipment) -> Void
     var onSubjectTap: () -> Void
     var onEmptyTap: (() -> Void)?
+    var onNodeDragStart: ((Equipment) -> Void)?
 
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
@@ -30,9 +32,11 @@ struct ReviewDiagramContentView: View {
                     isReadOnly: !viewModel.isEditingDiagram,
                     undoManager: undoManager,
                     selectedNodeId: $selectedNodeId,
+                    isSubjectSelected: isSubjectSelected,
                     onNodeTap: onNodeTap,
                     onSubjectTap: onSubjectTap,
-                    onEmptyTap: onEmptyTap
+                    onEmptyTap: onEmptyTap,
+                    onNodeDragStart: onNodeDragStart
                 )
 
                 if !viewModel.nodes.isEmpty {

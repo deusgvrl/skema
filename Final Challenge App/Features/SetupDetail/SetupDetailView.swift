@@ -170,9 +170,14 @@ private extension SetupDetailView {
             viewModel: viewModel.reviewViewModel,
             undoManager: undoManager,
             selectedNodeId: $selectedNodeId,
+            isSubjectSelected: {
+                if case .subject = activeSheetContent { return true }
+                return false
+            }(),
             onNodeTap: { node in handleNodeTap(node) },
             onSubjectTap: { handleSubjectTap() },
-            onEmptyTap: { handleEmptyTap() }
+            onEmptyTap: { handleEmptyTap() },
+            onNodeDragStart: { node in handleNodeDragStart(node) }
         )
         .ignoresSafeArea(edges: .bottom)
     }
@@ -224,6 +229,13 @@ private extension SetupDetailView {
 
     func handleEmptyTap() {
         resetSheetState()
+    }
+
+    func handleNodeDragStart(_ node: Equipment) {
+        if case .equipment(let id) = activeSheetContent, id == node.id { return }
+
+        selectedNodeId = node.id
+        activeSheetContent = .equipment(node.id)
     }
 
     func quickDeleteNode(id: UUID) {

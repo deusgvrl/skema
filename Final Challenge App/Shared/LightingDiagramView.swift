@@ -8,12 +8,14 @@ struct LightingDiagramView: View {
 
     // Converted to Binding so parent controls selection lifecycle
     @Binding var selectedNodeId: UUID?
+    var isSubjectSelected: Bool = false
 
     var onNodeTap: ((Equipment) -> Void)?
     var onSubjectTap: (() -> Void)?
     var onEmptyTap: (() -> Void)?
 
     @State private var nodesSnapshot: [Equipment] = []
+    @State private var subjectRotationStart: Double = 0
 
     // Smooth Zoom & Pan States
     @State private var zoomScale: CGFloat = 1.0
@@ -24,6 +26,7 @@ struct LightingDiagramView: View {
     // Scale Meter Visibility State
     @State private var showScaleMeter: Bool = false
     @State private var hideScaleMeterTask: Task<Void, Never>?
+    var onNodeDragStart: ((Equipment) -> Void)?
 
     init(
         viewModel: ReviewViewModel,
@@ -31,20 +34,24 @@ struct LightingDiagramView: View {
         isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
         selectedNodeId: Binding<UUID?> = .constant(nil),
+        isSubjectSelected: Bool = false,
         initialZoomScale: CGFloat = 1.0,
         onNodeTap: ((Equipment) -> Void)? = nil,
         onSubjectTap: (() -> Void)? = nil,
-        onEmptyTap: (() -> Void)? = nil
+        onEmptyTap: (() -> Void)? = nil,
+        onNodeDragStart: ((Equipment) -> Void)? = nil,
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
         self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
         self._selectedNodeId = selectedNodeId
+        self.isSubjectSelected = isSubjectSelected
         self._zoomScale = State(initialValue: initialZoomScale)
         self.onNodeTap = onNodeTap
         self.onSubjectTap = onSubjectTap
         self.onEmptyTap = onEmptyTap
+        self.onNodeDragStart = onNodeDragStart
     }
 
     var body: some View {
@@ -91,10 +98,26 @@ struct LightingDiagramView: View {
                     title: "Subject",
                     icon: "person.fill",
                     position: subjectCenter,
-                    currentScale: currentScale
-                ) {
-                    onSubjectTap?()
-                }
+                    currentScale: currentScale,
+                    isSelected: isSubjectSelected,
+                    isReadOnly: isReadOnly,
+                    rotationAngle: $viewModel.draftSetup.subjectRotationAngle,
+                    onTap: { onSubjectTap?() },
+                    onGestureStart: {
+                        subjectRotationStart = viewModel.draftSetup.subjectRotationAngle
+                    },
+                    onGestureEnd: {
+                        guard !isReadOnly else { return }
+                        let finalAngle = viewModel.draftSetup.subjectRotationAngle
+                        // Reset to the start value so the undo registration captures the real old value
+                        viewModel.draftSetup.subjectRotationAngle = subjectRotationStart
+                        viewModel.updateSubjectRotation(
+                            oldValue: subjectRotationStart,
+                            newValue: finalAngle,
+                            undoManager: undoManager
+                        )
+                    }
+                )
 
                 // Distance Labels
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
@@ -150,6 +173,7 @@ struct LightingDiagramView: View {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     selectedNodeId = node.id
                                 }
+                                onNodeDragStart?(node)
                                 nodesSnapshot = viewModel.nodes.map { $0.clone() }
                             }
                         },
