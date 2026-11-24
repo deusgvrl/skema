@@ -39,7 +39,7 @@ struct LightingDiagramView: View {
         onNodeTap: ((Equipment) -> Void)? = nil,
         onSubjectTap: (() -> Void)? = nil,
         onEmptyTap: (() -> Void)? = nil,
-        onNodeDragStart: ((Equipment) -> Void)? = nil,
+        onNodeDragStart: ((Equipment) -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
@@ -60,9 +60,7 @@ struct LightingDiagramView: View {
             let currentScale = zoomScale * magnifyBy
             let gridConfig = GridConfig.config(for: currentScale)
 
-            // Dynamic distance threshold:
-            // Zooming IN (higher scale) lowers threshold -> reveals smaller distances.
-            // Zooming OUT (lower scale) raises threshold -> hides crowded labels.
+            // Dynamic distance threshold evaluated cleanly per gesture frame
             let minDistanceThreshold: Double = {
                 if isExportedToPdf { return 0.05 }
                 return max(0.15, 0.75 / Double(currentScale))
@@ -123,7 +121,6 @@ struct LightingDiagramView: View {
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
 
-                    // Evaluates dynamically against scale-dependent threshold
                     if node.position != .zero && distanceValue >= minDistanceThreshold {
                         let deltaX = node.position.x
                         let deltaY = node.position.y
@@ -151,7 +148,6 @@ struct LightingDiagramView: View {
                             .transition(.opacity)
                     }
                 }
-                .animation(.easeInOut(duration: 0.25), value: minDistanceThreshold)
 
                 // Draggable Nodes
                 ForEach($viewModel.nodes) { $node in
@@ -244,7 +240,6 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
-        // Scale Meter Overlay (Only visible when isReadOnly is false)
         .overlay(alignment: .topLeading) {
             if !isReadOnly {
                 let activeScale = zoomScale * magnifyBy
