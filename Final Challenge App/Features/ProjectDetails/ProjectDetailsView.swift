@@ -57,7 +57,7 @@ struct ProjectDetailsView: View {
 
             Section(header: FormSectionHeader("Organization · Optional")) {
                 DetailsRow("Client") {
-                    TextField("Client", text: $draftClient, prompt: Text("None"))
+                    ClientField(client: $draftClient, savedClients: viewModel.savedClients)
                 }
                 DetailsRow("Project") {
                     TextField("Project", text: $draftProject, prompt: Text("None"))
@@ -111,6 +111,7 @@ struct ProjectDetailsView: View {
             draftClient = setup.client
             draftProject = setup.project
             draftNotes = setup.notes
+            viewModel.loadClients()
         }
         .onChange(of: draftSetupName) { _, newName in
             viewModel.nameChanged(newName)
