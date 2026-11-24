@@ -97,7 +97,7 @@ struct PDFRendererTests {
         }
     }
 
-    @Test("Case 3: page 2 lists the equipment in display order and no subject or backdrop")
+    @Test("Case 3: page 2 has the subject, camera, lighting and accessories tables, in that order")
     func equipmentPage() throws {
         // Arrange
         let setup = baseSetup()
@@ -106,14 +106,15 @@ struct PDFRendererTests {
         let page2 = text(of: try document(setup), page: 1)
 
         // Assert
-        for expected in ["Equipment Details", "2 lights · 1 accessory · 1 camera", "Skema Photo"] {
+        for expected in ["Equipment Details", "1 camera · 2 lights · 1 accessory", "Skema Photo"] {
             #expect(page2.contains(expected), "Page 2 should contain \"\(expected)\".")
         }
-        let positions = ["L1", "L2", "A1", "C1"].map { page2.range(of: $0)?.lowerBound }
-        #expect(!positions.contains(nil), "All four labels should be on page 2.")
-        let offsets = positions.compactMap { $0.map { page2.distance(from: page2.startIndex, to: $0) } }
-        #expect(offsets == offsets.sorted(), "The labels should appear in the order L1, L2, A1, C1.")
-        #expect(!page2.contains("Subject"), "There is no subject row.")
+        let inOrder = [
+            "SUBJECT", "CAMERA", "Camera body", "LIGHTING", "Key light", "Fill light", "ACCESSORIES", "Softbox"
+        ]
+        let positions = inOrder.compactMap { page2.range(of: $0)?.lowerBound }
+        #expect(positions.count == inOrder.count, "Every table title and item should be on page 2.")
+        #expect(positions == positions.sorted(), "The tables and their items should be in order.")
         #expect(!page2.contains("Backdrop"), "There is no backdrop row.")
     }
 
@@ -151,21 +152,21 @@ struct PDFRendererTests {
         }
     }
 
-    @Test("Case 6: 6 photos make 3 pages, 4 photos per page")
-    func sixPhotosThreePages() throws {
+    @Test("Case 6: 7 photos start on their own page, 6 photos per page")
+    func sevenPhotosFourPages() throws {
         // Arrange
-        let setup = baseSetup(photoCount: 6)
+        let setup = baseSetup(photoCount: 7)
 
         // Act
         let pdf = try document(setup)
 
         // Assert
-        #expect(pdf.pageCount == 3, "6 photos should make 3 pages.")
-        let page2 = text(of: pdf, page: 1)
+        #expect(pdf.pageCount == 4, "The tables fill page 2, so 7 photos need pages 3 and 4.")
         let page3 = text(of: pdf, page: 2)
-        #expect(page3.contains("Reference 5") && page3.contains("Reference 6"), "Page 3 should have photos 5 and 6.")
-        #expect(page2.contains("Reference 4"), "Page 2 should have photo 4.")
-        #expect(!page2.contains("Reference 5"), "Page 2 should not have photo 5.")
+        let page4 = text(of: pdf, page: 3)
+        #expect(page3.contains("Reference 1") && page3.contains("Reference 6"), "Page 3 should have photos 1 to 6.")
+        #expect(!page3.contains("Reference 7"), "Page 3 should not have photo 7.")
+        #expect(page4.contains("Reference 7"), "Page 4 should have photo 7.")
     }
 
     @Test("Case 7: long notes continue on the next page and equipment starts after them")
@@ -189,18 +190,20 @@ struct PDFRendererTests {
     func tableSpansPagesAtNineOrMore() throws {
         // Arrange
         let setup = baseSetup()
-        setup.nodes = (1...60).map { Equipment(category: .light, label: "L\($0)", name: "Light \($0)", role: "Key") }
+        setup.nodes = (1...60).map { Equipment(category: .light, name: "Light \($0)", role: "Key") }
 
         // Act
         let pdf = try document(setup)
 
         // Assert
         let pages = (0..<pdf.pageCount).map { text(of: pdf, page: $0) }
-        let firstPage = pages.firstIndex { $0.contains("L1") && $0.contains("Equipment Details") }
-        let lastPage = pages.firstIndex { $0.contains("L60") }
-        #expect(firstPage != nil && lastPage != nil, "Both the first and the last label should be found.")
+        let firstPage = pages.firstIndex { $0.contains("Light 1") && $0.contains("Equipment Details") }
+        let lastPage = pages.firstIndex { $0.contains("Light 60") }
+        #expect(firstPage != nil && lastPage != nil, "Both the first and the last light should be found.")
         if let firstPage, let lastPage {
             #expect(lastPage > firstPage, "The last row should be on a later page than the first.")
+            #expect(pages[lastPage].contains("LIGHTING (continued)"), "A later page should repeat the table title.")
+            #expect(pages[lastPage].contains("Power"), "A later page should repeat the column titles.")
         }
         var sizes: [CGFloat] = []
         for index in 0..<pdf.pageCount {
@@ -230,15 +233,15 @@ struct PDFRendererTests {
     @Test("Case 10: every page says its own number out of the total")
     func pageNumbers() throws {
         // Arrange
-        let setup = baseSetup(photoCount: 6)
+        let setup = baseSetup(photoCount: 7)
 
         // Act
         let pdf = try document(setup)
 
         // Assert
-        #expect(pdf.pageCount == 3, "This data should make 3 pages.")
+        #expect(pdf.pageCount == 4, "This data should make 4 pages.")
         for index in 0..<pdf.pageCount {
-            let expected = "Page \(index + 1) of 3"
+            let expected = "Page \(index + 1) of 4"
             #expect(text(of: pdf, page: index).contains(expected), "Page \(index + 1) should say \"\(expected)\".")
         }
     }
@@ -253,5 +256,111 @@ struct PDFRendererTests {
 
         // Assert
         #expect(!page1.contains("Saved"), "Page 1 should not have a Saved line.")
+    }
+
+    @Test("Case 12: the notes box is a tenth of page 1")
+    func notesBoxHeight() {
+        #expect(abs(PDFLayout.notesBoxHeight - 84.2) < 0.01)
+    }
+
+    @Test("Case 14: a row of photos and its gaps is exactly as wide as the page content")
+    func photoRowWidth() {
+        let columns = CGFloat(PDFLayout.photoColumns)
+        let row = columns * PDFLayout.photoColumnWidth + (columns - 1) * PDFLayout.spacing
+
+        #expect(abs(row - PDFLayout.contentWidth) < 0.01)
+    }
+
+    @Test("Case 13: the footer says what heights and distances are measured from")
+    func footer() throws {
+        let page1 = text(of: try document(baseSetup()), page: 0)
+
+        #expect(page1.contains("Heights are measured from the floor, distances to the subject."))
+    }
+}
+
+@Suite("PDF equipment tables")
+@MainActor
+struct PDFEquipmentTablesTests {
+    private func tables(_ nodes: [Equipment], subjectHeight: String = "") -> [PDFTable] {
+        let setup = Setup(setupName: "Shoe shoot", subjectHeight: subjectHeight)
+        setup.nodes = nodes
+        return PDFEquipmentTables.tables(for: setup)
+    }
+
+    @Test("Every table is as wide as the page content and has one cell per column")
+    func shape() {
+        let all = tables([Equipment(category: .camera), Equipment(category: .light), Equipment(category: .accessory)])
+
+        #expect(all.map(\.title) == ["SUBJECT", "CAMERA", "LIGHTING", "ACCESSORIES"])
+        for table in all {
+            #expect(table.columns.reduce(0) { $0 + $1.width } == PDFLayout.contentWidth, "\(table.title) width")
+            #expect(table.rows.allSatisfy { $0.cells.count == table.columns.count }, "\(table.title) cells")
+        }
+    }
+
+    @Test("The camera row has every form field with its unit")
+    func camera() throws {
+        let camera = Equipment(category: .camera, name: "Sony A7 IV", role: "Main", lens: "50", iso: "100",
+                               aperture: "f/8", shutterSpeed: "1/200", whiteBalance: "5600", height: "1.20",
+                               tilt: "-5", distance: "1.77", accessories: "Tripod")
+        let table = try #require(tables([camera]).first { $0.title == "CAMERA" })
+        let row = try #require(table.rows.first)
+
+        #expect(table.columns.map(\.title) == ["Name / role", "Lens", "ISO", "Aperture", "Shutter speed",
+                                               "White balance", "Height", "Tilt", "Distance to subject"])
+        #expect(row.cells == ["Sony A7 IV", "50 mm", "100", "f/8", "1/200", "5600 K", "1.20 m", "-5°", "1.77 m"])
+        #expect(row.role == "Main" && row.accessories == "Tripod")
+    }
+
+    @Test("The light row has every form field with its unit")
+    func light() throws {
+        let light = Equipment(category: .light, name: "Profoto D2", role: "Key", power: "1/4", colorTemp: "5600",
+                              height: "1,9", tilt: "-30", horizontalAim: "56", distance: "1.78",
+                              accessories: "Softbox")
+        let table = try #require(tables([light]).first { $0.title == "LIGHTING" })
+        let row = try #require(table.rows.first)
+
+        #expect(table.columns.map(\.title) == ["Name / role", "Power", "Color temperature", "Height", "Tilt",
+                                               "Horizontal aim", "Distance to subject"])
+        #expect(row.cells == ["Profoto D2", "1/4", "5600 K", "1,9 m", "-30°", "56°", "1.78 m"])
+        #expect(row.role == "Key" && row.accessories == "Softbox")
+    }
+
+    @Test("Empty values show a dash, with no unit")
+    func emptyValues() throws {
+        let row = try #require(tables([Equipment(category: .light)]).last?.rows.first)
+
+        #expect(row.cells.allSatisfy { $0 == "—" })
+        #expect(row.role.isEmpty && row.accessories == "—")
+    }
+
+    @Test("A unit the user typed is not repeated")
+    func typedUnit() throws {
+        let camera = Equipment(category: .camera, lens: "24-70mm", whiteBalance: "5600K", height: "1.2 m", tilt: "5°")
+        let row = try #require(tables([camera]).last?.rows.first)
+
+        #expect(row.cells[1] == "24-70mm" && row.cells[5] == "5600K" && row.cells[6] == "1.2 m" && row.cells[7] == "5°")
+    }
+
+    @Test("The subject row has its height; empty tables are left out")
+    func subjectOnly() throws {
+        let all = tables([], subjectHeight: "0.90")
+
+        #expect(all.map(\.title) == ["SUBJECT"])
+        #expect(all.first?.rows.first?.cells == ["Subject", "0.90 m"])
+    }
+
+    @Test("Accessories list their name and notes")
+    func accessories() {
+        let all = tables([Equipment(category: .accessory, name: "Reflector", notes: "Camera right")])
+
+        #expect(all.last?.title == "ACCESSORIES")
+        #expect(all.last?.rows.first?.cells == ["Reflector", "Camera right"])
+    }
+
+    @Test("Every type has a black PDF icon", arguments: EquipmentCategory.allCases)
+    func icons(category: EquipmentCategory) {
+        #expect(UIImage(named: category.pdfImageName) != nil)
     }
 }
