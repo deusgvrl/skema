@@ -89,7 +89,7 @@ struct LightingDiagramView: View {
                 }
 
                 // Distance Labels: display down to 0.35 m so equipment at studio distances (< 1.5 m) keep labels
-                let minDistanceThreshold = 0.35
+                let minDistanceThreshold = 0.05
 
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)

@@ -196,6 +196,16 @@ extension Equipment {
         }
 }
 
+extension Equipment {
+    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
+    var displayName: String {
+        let role = role.trimmingCharacters(in: .whitespaces)
+        guard !role.isEmpty else { return name }
+        return label.isEmpty ? role : "\(role) - \(name)"
+    }
+}
+
+
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case camera = "Camera"
     case light = "Light"
@@ -204,11 +214,29 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
-extension Equipment {
-    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
-    var displayName: String {
-        let role = role.trimmingCharacters(in: .whitespaces)
-        guard !role.isEmpty else { return name }
-        return label.isEmpty ? role : "\(label) \(role)"
+extension EquipmentCategory {
+    
+    /// Resolves the exact image asset name based on selection state
+    func imageName(isSelected: Bool) -> String {
+        switch self {
+        case .camera:
+            return isSelected ? "icon_camera_selected" : "icon_camera_viewonly"
+        case .light:
+            return isSelected ? "icon_light_selected" : "icon_light_view_only"
+        case .accessory:
+            return isSelected ? "icon_acc_selected" : "icon_acc_viewonly"
+        }
     }
+
+    /// Controls specific width/height dimensions for each category
+    var iconSize: CGSize {
+            switch self {
+            case .camera:
+                return CGSize(width: 80, height: 80)
+            case .light:
+                return CGSize(width: 80, height: 80)
+            case .accessory:
+                return CGSize(width: 80, height: 80) // Can adjust width/height per category if needed
+            }
+        }
 }
