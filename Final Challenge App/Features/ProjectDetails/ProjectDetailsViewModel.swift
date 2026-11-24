@@ -14,6 +14,8 @@ final class ProjectDetailsViewModel {
     enum SaveOutcome { case saved, nameMissing, failed }
 
     private(set) var showsNameRequired = false
+    /// Clients of saved setups, offered in the Client row.
+    private(set) var savedClients: [String] = []
     var isSaveFailedAlertPresented = false
 
     init(storageController: StorageController? = nil,
@@ -48,6 +50,10 @@ final class ProjectDetailsViewModel {
             isSaveFailedAlertPresented = true
             return .failed
         }
+    }
+
+    func loadClients() {
+        savedClients = SetupSections.clientNames(from: storageController.fetchAllSetups())
     }
 
     func nameChanged(_ name: String) {

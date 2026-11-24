@@ -57,6 +57,14 @@ enum SetupSections {
         return client.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// The clients of the saved setups, A to Z, each once, spelled like its By Client heading.
+    static func clientNames(from setups: [Setup]) -> [String] {
+        Dictionary(grouping: split(setups).saved) { clientKey(for: $0.client) }
+            .filter { !$0.key.isEmpty }
+            .sorted { $0.key < $1.key }
+            .map { heading(for: $0.value) }
+    }
+
     // MARK: - Helpers
 
     private static func split(_ setups: [Setup]) -> (drafts: [Setup], saved: [Setup]) {
