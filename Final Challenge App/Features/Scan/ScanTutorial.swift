@@ -37,17 +37,6 @@ enum ScanStep: Int, CaseIterable {
         }
     }
 
-    /// The green line once the step is done (the floor found, or the step's tap landed); nil for Finish.
-    var doneTitle: String? {
-        switch self {
-        case .floor: "Floor found"
-        case .subject: "Subject set"
-        case .camera: "Camera added"
-        case .light: "Light added"
-        case .finish: nil
-        }
-    }
-
     /// What a tap sets in this step: nothing on the floor step (the floor is found, not tapped). After the first light,
     /// taps keep adding lights.
     var tapKind: ScanTapKind? {
@@ -56,15 +45,6 @@ enum ScanStep: Int, CaseIterable {
         case .subject: .subject
         case .camera: .camera
         case .light, .finish: .light
-        }
-    }
-
-    /// The step a tap of `kind` completes.
-    init(completing kind: ScanTapKind) {
-        switch kind {
-        case .subject: self = .subject
-        case .camera: self = .camera
-        case .light: self = .light
         }
     }
 

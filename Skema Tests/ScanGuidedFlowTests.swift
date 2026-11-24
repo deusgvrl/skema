@@ -30,13 +30,6 @@ struct ScanStepTests {
         ])
     }
 
-    @Test("Each step says what is done once it is", arguments: [
-        (ScanStep.floor, "Floor found"), (.subject, "Subject set"), (.camera, "Camera added"), (.light, "Light added")
-    ])
-    func doneTitles(step: ScanStep, expected: String) {
-        #expect(step.doneTitle == expected)
-    }
-
     @Test("Each step's small line says why, or what to do first")
     func details() {
         #expect(ScanStep.allCases.map(\.detail) == [
@@ -98,9 +91,13 @@ struct ScanGuidedFlowTests {
             storageController: StorageController(inMemory: true))
     }
 
-    /// A tap on a frame that shows the floor (so the floor is found first, as the frame loop would have).
+    /// A tap on a frame that shows the floor (so the floor is found first, as the frame loop would have), then
+    /// (phase 3) a walk around what it set, so the next tap isn't held by the gate.
     private func tap(_ viewModel: ScanViewModel, at point: CGPoint = middle, metres: Float? = 2) throws {
+        let subjectBefore = viewModel.subject
+        let itemsBefore = viewModel.items.count
         viewModel.tap(atScreen: point, screenSize: screen, in: try measuringFrame(at: 0, metres: metres, planes: floor))
+        try walkAroundNewest(viewModel, subjectBefore: subjectBefore, itemsBefore: itemsBefore, planes: floor)
     }
 
     /// One frame of the scan, `planes` as ARKit found them (the floor by default).
@@ -124,7 +121,7 @@ struct ScanGuidedFlowTests {
         try look(viewModel)
 
         #expect(viewModel.hasFloor)
-        #expect(viewModel.completedStep == .floor)
+        #expect(viewModel.justDone == .floor)
         #expect(viewModel.currentStep == .subject && viewModel.kind == .subject)
         #expect(!viewModel.canUndo)
     }
@@ -326,7 +323,7 @@ struct ScanGuidedFlowTests {
 
         viewModel.undoTapped()
 
-        #expect(viewModel.completedStep == nil && viewModel.feedback == nil)
+        #expect(viewModel.justDone == nil && viewModel.feedback == nil)
     }
 
     @Test("Every step keeps its small line all through the scan")
@@ -334,7 +331,7 @@ struct ScanGuidedFlowTests {
         let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
 
-        viewModel.clearCompletedStep()
+        viewModel.clearDone()
 
         #expect(viewModel.instruction.main == "Tap the camera")
         #expect(viewModel.instruction.detail == "Walk up to it first")
@@ -345,9 +342,9 @@ struct ScanGuidedFlowTests {
         let viewModel = makeViewModel()
         try look(viewModel)
 
-        viewModel.clearCompletedStep()
+        viewModel.clearDone()
 
-        #expect(viewModel.completedStep == nil && viewModel.currentStep == .subject)
+        #expect(viewModel.justDone == nil && viewModel.currentStep == .subject)
     }
 }
 

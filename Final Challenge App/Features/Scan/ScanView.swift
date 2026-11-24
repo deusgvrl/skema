@@ -102,15 +102,15 @@ struct ScanView: View {
         }
         .toolbarColorScheme(usesCameraAppearance ? .dark : nil, for: .navigationBar)
         .task { await viewModel.start() }
-        .task(id: viewModel.completedStep) {
-            guard viewModel.completedStep != nil else { return }
+        .task(id: viewModel.justDone) {
+            guard viewModel.justDone != nil else { return }
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled else { return }
-            withAnimation { viewModel.clearCompletedStep() }
+            withAnimation { viewModel.clearDone() }
         }
         // Feedback in more than one channel (HIG Feedback): a success tap when a step is done, a warning when a tap
         // set nothing.
-        .sensoryFeedback(.success, trigger: viewModel.completedStep) { _, new in new != nil }
+        .sensoryFeedback(.success, trigger: viewModel.justDone) { _, new in new != nil }
         .sensoryFeedback(.warning, trigger: viewModel.feedback) { _, new in new != nil }
         .task(id: viewModel.feedback) {
             guard viewModel.feedback != nil else { return }
@@ -156,7 +156,7 @@ struct ScanView: View {
         VStack(spacing: 16) {
             if viewModel.screen == .scanning {
                 ScanStatusChips(step: viewModel.currentStep,
-                                lights: viewModel.items.filter { $0.kind == .light }.count)
+                                lights: viewModel.doneCount(of: .light))
             }
             if showsFinishScan {
                 ScanFinishButton(isEnabled: viewModel.canFinish) {
@@ -237,9 +237,9 @@ struct ScanView: View {
     }
 }
 
-/// What is drawn over the camera for each tap (Sketch T02–T09): a green box with a tag above it for the subject and
-/// each camera and light (the floor has no tag since A10-112). A tag is green once its values are saved; why it is not
-/// yet is said by the instruction ("Too far to measure", "Need a closer look").
+/// What is drawn over the camera for each tap (Sketch T02–T09): a box with a tag above it for the subject and each
+/// camera and light (the floor has no tag since A10-112). A tag shows a ring while its item is being scanned and turns
+/// green once it is done (phase 3); what to do meanwhile is said by the instruction ("Walk around Light 1").
 private struct ScanTagsView: View {
     let viewModel: ScanViewModel
 
@@ -248,13 +248,14 @@ private struct ScanTagsView: View {
             let size = geometry.size
             ZStack {
                 if let subject = viewModel.subject {
-                    marker(title: "Subject", isSaved: viewModel.subjectIsSaved,
+                    marker(ScanTag(title: "Subject", isDone: viewModel.subjectIsDone,
+                                   progress: viewModel.subjectProgress),
                            box: viewModel.subjectBox(in: size),
                            anchor: viewModel.tagPosition(of: subject, in: size), size: size)
                 }
                 ForEach(viewModel.items) { item in
-                    marker(title: item.name,
-                           isSaved: viewModel.isSaved(item),
+                    marker(ScanTag(title: item.name, isDone: viewModel.isDone(item),
+                                   progress: viewModel.progress(of: item)),
                            box: viewModel.box(for: item, in: size),
                            anchor: viewModel.tagPosition(of: item.anchor, in: size), size: size)
                 }
@@ -267,9 +268,9 @@ private struct ScanTagsView: View {
     /// The tag just above the item's box (or at the tapped point while there is no box yet). The box itself is drawn
     /// in 3D in the camera view (A10-106, `ScanOutlines`).
     @ViewBuilder
-    private func marker(title: String, isSaved: Bool, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
+    private func marker(_ tag: ScanTag, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
         if let point = box.map({ CGPoint(x: $0.midX, y: $0.minY - 20) }) ?? anchor {
-            ScanTag(title: title, isSaved: isSaved).position(clamped(point, in: size))
+            tag.position(clamped(point, in: size))
         }
     }
 
@@ -279,22 +280,36 @@ private struct ScanTagsView: View {
     }
 }
 
-/// "Light 1" with a checkmark, in black on green, once saved; until then just the name on dark glass. Why it is not
-/// saved yet is said by the scan's instruction, not on the tag. The checkmark is a symbol, so VoiceOver reads only the
-/// name, and the state never rests on colour alone.
+/// "Light 1" with a checkmark, in black on green, once done; until then a ring that fills as the item is scanned (half
+/// for enough points, half for the walk around it) and the name, on dark glass. What to do is said by the scan's
+/// instruction, not on the tag. The checkmark is a symbol and the ring a shape, so the state never rests on colour.
 struct ScanTag: View {
     let title: String
-    let isSaved: Bool
+    let isDone: Bool
+    /// 0…1, for the ring.
+    let progress: Double
 
     var body: some View {
         Group {
-            if !isSaved {
-                Text(title)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .frame(height: 26)
-                    .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
+            if !isDone {
+                HStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .stroke(.white.opacity(0.3), lineWidth: 2.5)
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(.white, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                    .frame(width: 13, height: 13)
+                    .animation(.default, value: progress)
+                    Text(title)
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .frame(height: 26)
+                .glassEffect(.regular.tint(ScanPalette.glassTint), in: .capsule)
             } else {
                 Label(title, systemImage: "checkmark")
                     .labelStyle(.titleAndIcon)

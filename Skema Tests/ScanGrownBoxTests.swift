@@ -38,8 +38,14 @@ struct ScanGrownBoxTests {
             storageController: StorageController(inMemory: true))
     }
 
-    private func tap(_ viewModel: ScanViewModel, at point: CGPoint, at time: Double = 0) throws {
+    /// A tap, then (phase 3) a walk around what it set, unless `walk` is false.
+    private func tap(_ viewModel: ScanViewModel, at point: CGPoint, at time: Double = 0, walk: Bool = true) throws {
+        let subjectBefore = viewModel.subject
+        let itemsBefore = viewModel.items.count
         viewModel.tap(atScreen: point, screenSize: screen, in: try measuringFrame(at: time, metres: 2, planes: planes))
+        if walk {
+            try walkAroundNewest(viewModel, subjectBefore: subjectBefore, itemsBefore: itemsBefore, planes: planes)
+        }
     }
 
     /// Subject and camera tapped (the floor is found from the frames): the next tap adds a light.
@@ -58,7 +64,7 @@ struct ScanGrownBoxTests {
     func firstBoxFromTheTapFrame() throws {
         let viewModel = try scanWithCamera()
 
-        try tap(viewModel, at: lightSpot, at: 5)
+        try tap(viewModel, at: lightSpot, at: 5, walk: false)
 
         let light = try #require(viewModel.items.first { $0.kind == .light })
         // The 10 cm column would be 20 cm wide; the paint takes the whole 3.84 m wide wall.

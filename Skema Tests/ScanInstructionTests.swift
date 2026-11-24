@@ -2,8 +2,8 @@
 //  ScanInstructionTests.swift
 //  Skema Tests
 //
-//  The scan screen's one centred instruction, like Apple's Measure (copy approved 23 Nov 2026): the current step, a
-//  short "done" line, a problem, or what a tap did; one at a time, in that order of priority (feedback first).
+//  The scan screen's one instruction (layout A, copy decided 24 Nov 2026): what a tap did, a problem, a done line,
+//  the item being scanned, or the current step; one at a time, in that order of priority.
 //
 
 import Testing
@@ -12,9 +12,9 @@ import Testing
 @MainActor
 @Suite("Scan instruction")
 struct ScanInstructionTests {
-    private func instruction(step: ScanStep = .floor, completed: ScanStep? = nil, problem: ScanGuidance? = nil,
-                             feedback: ScanFeedback? = nil) -> ScanInstruction {
-        ScanInstruction.current(step: step, completed: completed, problem: problem, feedback: feedback)
+    private func instruction(step: ScanStep = .floor, done: ScanDone? = nil, problem: ScanGuidance? = nil,
+                             feedback: ScanFeedback? = nil, scanning: ScanScanning? = nil) -> ScanInstruction {
+        ScanInstruction.current(step: step, done: done, problem: problem, feedback: feedback, scanning: scanning)
     }
 
     // MARK: Steps
@@ -30,13 +30,34 @@ struct ScanInstructionTests {
         #expect(instruction(step: step) == ScanInstruction(main: main, detail: detail, style: .step))
     }
 
+    // MARK: The item being scanned
+
+    @Test("After a tap, the item being scanned asks to walk around it until it is done")
+    func scanning() {
+        let shown = instruction(step: .light, scanning: ScanScanning(name: "Light 1", isTooFar: false))
+
+        #expect(shown == ScanInstruction(main: "Walk around Light 1",
+                                         detail: "Keep it in view until its tag turns green", style: .step))
+        #expect(instruction(scanning: ScanScanning(name: "the camera", isTooFar: false)).main
+            == "Walk around the camera")
+    }
+
+    @Test("While the item is only seen beyond 5 m, it asks to walk closer")
+    func scanningTooFar() {
+        let shown = instruction(scanning: ScanScanning(name: "Light 1", isTooFar: true))
+
+        #expect(shown.main == "Walk closer to Light 1" && shown.detail == "It's more than 5 m away")
+        #expect(!shown.isBlocking)
+    }
+
     // MARK: Done
 
-    @Test("A step that was just done says so", arguments: [
-        (ScanStep.floor, "Floor found"), (.subject, "Subject set"), (.camera, "Camera added"), (.light, "Light added")
+    @Test("An item that was just done says so", arguments: [
+        (ScanDone.floor, "Floor found"), (.subject, "Subject done"), (.item("Camera"), "Camera done"),
+        (.item("Light 2"), "Light 2 done")
     ])
-    func done(step: ScanStep, main: String) {
-        #expect(instruction(step: .finish, completed: step) == ScanInstruction(main: main, detail: nil, style: .done))
+    func done(done: ScanDone, main: String) {
+        #expect(instruction(step: .finish, done: done) == ScanInstruction(main: main, detail: nil, style: .done))
     }
 
     // MARK: Problems
@@ -59,8 +80,8 @@ struct ScanInstructionTests {
         (.cannotMeasure, ["Can't measure that spot", "Tap a spot nearer to you"]),
         (.alreadyAdded(light: 1), ["Light 1 already added"]),
         (.alreadyAdded(light: 3), ["Light 3 already added"]),
-        (.tooFar, ["Too far to measure", "Walk closer, within 5 m"]),
-        (.needsCloserLook, ["Need a closer look", "Walk closer and hold still"]),
+        (.finishFirst("Light 1"), ["Finish Light 1 first", "Walk around it until its tag turns green"]),
+        (.finishFirst("the subject"), ["Finish the subject first", "Walk around it until its tag turns green"]),
         (.addFirst(.subject), ["Add the subject first"]),
         (.addFirst(.camera), ["Add the camera first"]),
         (.addFirst(.light), ["Add a light first"])
@@ -73,12 +94,13 @@ struct ScanInstructionTests {
 
     // MARK: Measure's look
 
-    @Test("Problems and what a tap did block: the camera dims; steps and done lines do not")
+    @Test("Problems and what a tap did block: the camera dims; steps, done and scanning lines do not")
     func blocking() {
         #expect(instruction(problem: .moreLight).isBlocking)
         #expect(instruction(feedback: .cannotMeasure).isBlocking)
         #expect(!instruction(step: .camera).isBlocking)
-        #expect(!instruction(step: .camera, completed: .subject).isBlocking)
+        #expect(!instruction(step: .camera, done: .subject).isBlocking)
+        #expect(!instruction(scanning: ScanScanning(name: "the camera", isTooFar: false)).isBlocking)
     }
 
     @Test("Each problem has its icon", arguments: [
@@ -91,26 +113,29 @@ struct ScanInstructionTests {
 
     @Test("Each tap message has its icon; steps and done lines have none", arguments: [
         (ScanFeedback.pointAtFloorFirst, "arrow.down.to.line"), (.cannotMeasure, "exclamationmark.triangle.fill"),
-        (.alreadyAdded(light: 2), "checkmark.circle.fill"), (.tooFar, "figure.walk"),
-        (.needsCloserLook, "circle.dotted"), (.addFirst(.camera), "plus.circle.fill")
+        (.alreadyAdded(light: 2), "checkmark.circle.fill"), (.finishFirst("Light 1"), "figure.walk"),
+        (.addFirst(.camera), "plus.circle.fill")
     ])
     func feedbackSymbols(feedback: ScanFeedback, symbol: String) {
         #expect(instruction(feedback: feedback).symbol == symbol)
         #expect(instruction(step: .light).symbol == nil)
-        #expect(instruction(step: .finish, completed: .light).symbol == nil)
+        #expect(instruction(step: .finish, done: .item("Light 1")).symbol == nil)
     }
 
     // MARK: Priority
 
-    @Test("Only one line shows: what a tap did, then a problem, then a done line, then the step (24 Nov ladder)")
+    @Test("Only one line shows: tap message, problem, done line, item being scanned, step (24 Nov ladder)")
     func priority() {
-        let all = instruction(step: .camera, completed: .subject, problem: .moreLight, feedback: .cannotMeasure)
-        let noFeedback = instruction(step: .camera, completed: .subject, problem: .moreLight)
-        let doneOnly = instruction(step: .camera, completed: .subject)
+        let scanning = ScanScanning(name: "the camera", isTooFar: false)
+        let all = instruction(step: .camera, done: .subject, problem: .moreLight, feedback: .cannotMeasure,
+                              scanning: scanning)
+        let noFeedback = instruction(step: .camera, done: .subject, problem: .moreLight, scanning: scanning)
+        let noProblem = instruction(step: .camera, done: .subject, scanning: scanning)
 
         #expect(all.main == "Can't measure that spot")
         #expect(noFeedback.main == "More light needed")
-        #expect(doneOnly.main == "Subject set")
+        #expect(noProblem.main == "Subject done")
+        #expect(instruction(step: .camera, scanning: scanning).main == "Walk around the camera")
         #expect(instruction(step: .camera).main == "Tap the camera")
     }
 }

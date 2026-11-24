@@ -36,11 +36,18 @@ struct ScanTapTests {
             storageController: storage ?? StorageController(inMemory: true))
     }
 
+    /// A tap of `kind`, then (phase 3) a walk around what it set, so the next tap isn't held by the gate; `walk: false`
+    /// for tests of the values from the tap's own view.
     private func tap(_ viewModel: ScanViewModel, _ kind: ScanTapKind, at point: CGPoint = middle,
-                     metres: Float = 2, withFloor: Bool = true) throws {
+                     metres: Float = 2, withFloor: Bool = true, walk: Bool = true) throws {
+        let subjectBefore = viewModel.subject
+        let itemsBefore = viewModel.items.count
         viewModel.kind = kind
         viewModel.tap(atScreen: point, screenSize: screen,
                       in: try measuringFrame(at: 0, metres: metres, planes: withFloor ? floor : []))
+        guard walk else { return }
+        try walkAroundNewest(viewModel, subjectBefore: subjectBefore, itemsBefore: itemsBefore,
+                             planes: withFloor ? floor : [])
     }
 
     // MARK: Taps
@@ -80,6 +87,8 @@ struct ScanTapTests {
     @Test("Items are numbered per kind in tap order")
     func numberedPerKind() throws {
         let viewModel = makeViewModel()
+        // Phase 3: items are done (so the gate lets the next tap through) only against a measured subject.
+        try tap(viewModel, .subject, metres: 3)
 
         try tap(viewModel, .light)
         try tap(viewModel, .camera, at: leftOfMiddle)
@@ -115,6 +124,7 @@ struct ScanTapTests {
     @Test("A tap far from every item adds a new item instead of removing one")
     func farTapAdds() throws {
         let viewModel = makeViewModel()
+        try tap(viewModel, .subject, metres: 3)
         try tap(viewModel, .light)
 
         // A10-106: on the same flat wall the second tap would be "Already tapped"; a wall at 3 m is another surface.
@@ -157,7 +167,8 @@ struct ScanTapTests {
     func finishWritesTheValues() throws {
         let viewModel = makeViewModel()
         try tap(viewModel, .subject, metres: 3)
-        try tap(viewModel, .light, metres: 2)
+        // The values from the tap's own view: a walk would grow the light's box over the rest of this flat wall.
+        try tap(viewModel, .light, metres: 2, walk: false)
 
         viewModel.finishTapped()
 
@@ -215,7 +226,7 @@ struct ScanTapTests {
         let viewModel = makeViewModel()
         try tap(viewModel, .subject, metres: 3)
 
-        try tap(viewModel, .light, metres: 2)
+        try tap(viewModel, .light, metres: 2, walk: false)
 
         let item = try #require(viewModel.items.first)
         let light = try #require(viewModel.draftSetup.nodes.first)
@@ -241,13 +252,17 @@ struct ScanTapTests {
     @Test("An item only seen farther than 5 m is out of range, and so is a subject")
     func tooFar() throws {
         let viewModel = makeViewModel()
-        try tap(viewModel, .subject, metres: 6)
+        try tap(viewModel, .subject, metres: 3)
         try tap(viewModel, .light, metres: 6)
+        let farSubject = makeViewModel()
+        try tap(farSubject, .subject, metres: 6)
 
         let item = try #require(viewModel.items.first)
         #expect(item.result?.status == .outOfRange && !viewModel.isSaved(item))
-        #expect(viewModel.subjectResult?.status == .outOfRange && !viewModel.subjectIsSaved)
         #expect(try #require(viewModel.draftSetup.nodes.first).distance.isEmpty)
+        #expect(farSubject.subjectResult?.status == .outOfRange && !farSubject.subjectIsSaved)
+        farSubject.clearDone()
+        #expect(farSubject.instruction.main == "Walk closer to the subject")
     }
 
     @Test("An item with too few LiDAR points is not saved")
@@ -262,82 +277,15 @@ struct ScanTapTests {
         #expect(item.result?.status == .tooFewPoints && !viewModel.isSaved(item))
     }
 
-    @Test("A measured item next to an unmeasured subject is not saved")
+    @Test("While the subject isn't measured (only seen beyond 5 m), a tap on an item is held by the gate")
     func subjectNotMeasured() throws {
         let viewModel = makeViewModel()
         try tap(viewModel, .subject, metres: 6)
 
         try tap(viewModel, .light, metres: 2)
 
-        let item = try #require(viewModel.items.first)
-        #expect(item.result?.status == .measured && !viewModel.isSaved(item))
-    }
-
-    // MARK: "Too far" and "Need a closer look" in the instruction
-
-    private func look(_ viewModel: ScanViewModel, at time: Double, metres: Float,
-                      planes: [ScanPlane]? = nil) throws {
-        viewModel.collect(from: try measuringFrame(at: time, metres: metres, planes: planes ?? floor))
-    }
-
-    @Test("1.5 s after a light tap that is still too far, the instruction says so; not before")
-    func tooFarMessage() throws {
-        let viewModel = makeViewModel()
-        try tap(viewModel, .subject, metres: 3)
-        try tap(viewModel, .light, metres: 6)
-
-        try look(viewModel, at: 1.4, metres: 6)
-        #expect(viewModel.feedback == nil)
-        try look(viewModel, at: 1.6, metres: 6)
-
-        #expect(viewModel.feedback == .tooFar)
-        #expect(viewModel.instruction.main == "Too far to measure")
-    }
-
-    @Test("1.5 s after a light tap with too few points, the instruction asks for a closer look")
-    func closerLookMessage() throws {
-        let viewModel = makeViewModel()
-        let highFloor = [makePlane(worldY: 1.3, isFloor: true)]
-        viewModel.kind = .light
-        viewModel.tap(atScreen: middle, screenSize: screen,
-                      in: try measuringFrame(at: 0, metres: 2, planes: highFloor))
-
-        try look(viewModel, at: 1.6, metres: 2, planes: highFloor)
-
-        #expect(viewModel.feedback == .needsCloserLook)
-    }
-
-    @Test("A light that is measured shows no message 1.5 s later")
-    func measuredNoMessage() throws {
-        let viewModel = makeViewModel()
-        try tap(viewModel, .subject, metres: 3)
-        try tap(viewModel, .light, metres: 2)
-
-        try look(viewModel, at: 1.6, metres: 2)
-
-        #expect(viewModel.feedback == nil)
-    }
-
-    @Test("A subject that is too far gets the message too")
-    func subjectTooFarMessage() throws {
-        let viewModel = makeViewModel()
-        try tap(viewModel, .subject, metres: 6)
-
-        try look(viewModel, at: 1.6, metres: 6)
-
-        #expect(viewModel.feedback == .tooFar)
-    }
-
-    @Test("Undo before the 1.5 s drops the check")
-    func undoDropsTheCheck() throws {
-        let viewModel = makeViewModel()
-        try tap(viewModel, .subject, metres: 3)
-        try tap(viewModel, .light, metres: 6)
-
-        viewModel.undoTapped()
-        try look(viewModel, at: 1.6, metres: 6)
-
-        #expect(viewModel.feedback == nil)
+        #expect(viewModel.items.isEmpty)
+        #expect(viewModel.feedback == .finishFirst("the subject"))
     }
 
     // MARK: Saving the setup (dev's flow)
