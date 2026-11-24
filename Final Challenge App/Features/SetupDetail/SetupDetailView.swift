@@ -58,10 +58,16 @@ struct SetupDetailView: View {
             }
 
             if isEditing,
-               case .equipment(let nodeId) = activeSheetContent,
+               let content = activeSheetContent,
                quickActionsOpacity > 0.01 {
+                let nodeId: UUID? = {
+                    if case .equipment(let id) = content { return id }
+                    return nil
+                }()
+
                 NodeQuickActionsToolbar(
                     nodeId: nodeId,
+                    showsDelete: nodeId != nil,
                     onDelete: { id in
                         quickDeleteNode(id: id)
                     },
@@ -203,6 +209,12 @@ private extension SetupDetailView {
     }
 
     func handleSubjectTap() {
+        if !isEditing {
+            withAnimation {
+                viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
         }

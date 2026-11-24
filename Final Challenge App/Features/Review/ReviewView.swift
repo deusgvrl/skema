@@ -68,17 +68,25 @@ struct ReviewView: View {
 
             // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
             if viewModel.isEditingDiagram,
-               case .equipment(let nodeId) = activeSheetContent,
+               let content = activeSheetContent,
                quickActionsOpacity > 0.01 {
+
+                let nodeId: UUID? = {
+                    if case .equipment(let id) = content { return id }
+                    return nil
+                }()
+
                 NodeQuickActionsToolbar(
                     nodeId: nodeId,
-                    onDelete: quickDeleteNode(id:),
+                    showsDelete: nodeId != nil,
+                    onDelete: { id in
+                        quickDeleteNode(id: id)
+                    },
                     onAdd: {
                         resetSheetState()
                         isAddingNode = true
                     }
                 )
-
                 .padding(.bottom, currentSheetHeight + 8)
                 .opacity(quickActionsOpacity)
                 .scaleEffect(quickActionsScale)
@@ -231,7 +239,13 @@ struct ReviewView: View {
         activeSheetContent = .equipment(node.id)
     }
 
-    private func handleSubjectTap() {
+    func handleSubjectTap() {
+        if !viewModel.isEditingDiagram {
+            withAnimation {
+                viewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
         }

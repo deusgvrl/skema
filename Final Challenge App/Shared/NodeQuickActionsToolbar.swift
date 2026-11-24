@@ -8,23 +8,26 @@
 import SwiftUI
 
 struct NodeQuickActionsToolbar: View {
-    let nodeId: UUID
-    var onDelete: (UUID) -> Void
+    let nodeId: UUID?
+    var showsDelete: Bool = true
+    var onDelete: ((UUID) -> Void)?
     var onAdd: () -> Void
 
     var body: some View {
         HStack {
-            // Centered Delete Button
-            Button(role: .destructive) {
-                onDelete(nodeId)
-            } label: {
-                Image(systemName: "trash")
-                    .font(.title2)
-                    .foregroundStyle(.red)
-                    .frame(width: 45, height: 45)
-                    .background(.regularMaterial, in: Circle())
+            // Delete Button (Visible only when editing equipment nodes)
+            if showsDelete, let id = nodeId {
+                Button(role: .destructive) {
+                    onDelete?(id)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.title2)
+                        .foregroundStyle(.red)
+                        .frame(width: 45, height: 45)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .glassEffect(.clear.interactive())
             }
-            .glassEffect(.clear.interactive())
 
             Spacer()
 
