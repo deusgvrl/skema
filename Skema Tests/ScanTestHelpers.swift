@@ -120,3 +120,25 @@ func measuringFrame(at time: Double, metres: Float?, planes: [ScanPlane] = [], c
                      depth: metres.map { makeDepth(width: 128, height: 96, depth: $0) },
                      tracking: .normal, ambientIntensity: nil, planes: planes)
 }
+
+/// Scan screen phase 3: after a tap, the photographer walks around what it set, half its distance to the left and to
+/// the right of it (about 53° around it, more than the 45° an item needs to be done), then back to where the tap was
+/// made, so the newest camera (tags, boxes on screen) is the tap's again. Does nothing when the tap set nothing new
+/// (`subjectBefore` and `itemsBefore` are the subject and the item count before the tap).
+@MainActor
+func walkAroundNewest(_ viewModel: ScanViewModel, subjectBefore: SIMD3<Float>?, itemsBefore: Int,
+                      planes: [ScanPlane]) throws {
+    let anchor: SIMD3<Float>?
+    if viewModel.items.count > itemsBefore {
+        anchor = viewModel.items.last?.anchor
+    } else if viewModel.subject != subjectBefore {
+        anchor = viewModel.subject
+    } else {
+        anchor = nil
+    }
+    guard let anchor else { return }
+    let metres = -anchor.z
+    for cameraX in [anchor.x - metres / 2, anchor.x + metres / 2, 0] {
+        viewModel.collect(from: try measuringFrame(at: 0, metres: metres, planes: planes, cameraX: cameraX))
+    }
+}

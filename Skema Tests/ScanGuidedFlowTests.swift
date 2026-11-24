@@ -3,7 +3,7 @@
 //  Skema Tests
 //
 //  The guided tap scan (Sketch UT Review T01–T10): Floor → Subject → Camera → Light → Finish, picked
-//  automatically; a step-by-step tutorial on first use, a ? to replay it after. The floor is found by pointing the
+//  automatically; one centred instruction with its small line guides each step. The floor is found by pointing the
 //  phone at it, without a tap (A10-112).
 //  Camera and screen as in ScanTapTests: (720, 960) is the middle of the picture; depth is a wall `metres` ahead.
 //
@@ -20,38 +20,40 @@ private let middle = CGPoint(x: 720, y: 960)
 private let leftOfMiddle = CGPoint(x: 720, y: 576)
 private let belowMiddle = CGPoint(x: 720, y: 1344)
 
+@MainActor
 @Suite("Scan steps")
 struct ScanStepTests {
-    @Test("Five steps with the Sketch titles, in order")
+    @Test("Five steps with their lines, in order (copy decided 24 Nov 2026)")
     func titles() {
         #expect(ScanStep.allCases.map(\.title) == [
-            "Point at the floor", "Tap your product", "Tap the camera", "Tap each light", "Tap Finish Scan"
+            "Point at the floor", "Tap the subject", "Tap the camera", "Tap a light", "Tap the next light"
         ])
-        #expect(ScanStep.floor.positionLabel == "STEP 1 OF 5")
-        #expect(ScanStep.finish.positionLabel == "STEP 5 OF 5")
     }
 
-    @Test("Each step says what is done once it is", arguments: [
-        (ScanStep.floor, "Floor found"), (.subject, "Subject set"), (.camera, "Camera added"), (.light, "Light added")
-    ])
-    func doneTitles(step: ScanStep, expected: String) {
-        #expect(step.doneTitle == expected)
+    @Test("Each step's small line says why, or what to do first")
+    func details() {
+        #expect(ScanStep.allCases.map(\.detail) == [
+            "Heights are measured from it", "Walk up to it first", "Walk up to it first", "Walk up to it first",
+            "Or tap Finish Scan if that's all"
+        ])
     }
 
-    @Test("Messages follow Sketch; the floor is found by pointing at it; the camera and light steps say to walk up")
-    func messages() {
-        #expect(ScanStep.floor.message
-                == "Point the phone down at the floor until it's found. Heights are measured from it.")
-        #expect(ScanStep.subject.message == "Point at the product and tap it. Every distance is measured from it.")
-        #expect(ScanStep.camera.message.hasPrefix("Walk up to the camera and tap it."))
-        #expect(ScanStep.light.message == "Walk up to a light and tap it. Tap every light in the setup.")
-        #expect(ScanStep.finish.message == "Tap any other lights first, then finish.")
+    @Test("Chips: the steps before the current one are done, the current one is now, the rest are still to do",
+          arguments: [
+            (ScanStep.floor, [ScanChip.State.now, .todo, .todo, .todo]),
+            (.camera, [.done, .done, .now, .todo]),
+            (.light, [.done, .done, .done, .now]),
+            (.finish, [.done, .done, .done, .done])
+          ])
+    func chipStates(step: ScanStep, states: [ScanChip.State]) {
+        #expect(ScanChip.allCases.map { $0.state(at: step) } == states)
     }
 
-    @Test("Without the tutorial, a short hint names the next step")
-    func hints() {
-        #expect(ScanStep.floor.hint == "Point at the floor to start")
-        #expect(ScanStep.light.hint == "Tap each light")
+    @Test("Chip titles: Floor, Subject, Camera, and the lights counted once there are any")
+    func chipTitles() {
+        #expect(ScanChip.allCases.map { $0.title(lights: 0) } == ["Floor", "Subject", "Camera", "Lights"])
+        #expect(ScanChip.lights.title(lights: 1) == "1 Light")
+        #expect(ScanChip.lights.title(lights: 2) == "2 Lights")
     }
 
     @Test("The step follows what is still missing, always in the same order", arguments: [
@@ -75,30 +77,27 @@ struct ScanStepTests {
 }
 
 @MainActor
-@Suite("Scan: guided taps and tutorial")
+@Suite("Scan: guided taps")
 struct ScanGuidedFlowTests {
     let arSession = FakeARSession()
     private let floor = [makePlane(worldY: -1, isFloor: true)]
 
-    func makeSettings(done: Bool = false) -> ScanGuideSettings {
-        let settings = ScanGuideSettings(defaults: UserDefaults(suiteName: UUID().uuidString)!)
-        settings.isTutorialDone = done
-        return settings
-    }
-
-    func makeViewModel(tutorial: ScanGuideSettings) -> ScanViewModel {
+    func makeViewModel() -> ScanViewModel {
         ScanViewModel(
             makeScan: { [arSession] in
                 ScanSession(session: arSession, frameInterval: 1.0 / 15.0, supportsLiDAR: { true })
             },
             camera: FakeCameraPermission(status: .authorized),
-            storageController: StorageController(inMemory: true),
-            tutorial: tutorial)
+            storageController: StorageController(inMemory: true))
     }
 
-    /// A tap on a frame that shows the floor (so the floor is found first, as the frame loop would have).
+    /// A tap on a frame that shows the floor (so the floor is found first, as the frame loop would have), then
+    /// (phase 3) a walk around what it set, so the next tap isn't held by the gate.
     private func tap(_ viewModel: ScanViewModel, at point: CGPoint = middle, metres: Float? = 2) throws {
+        let subjectBefore = viewModel.subject
+        let itemsBefore = viewModel.items.count
         viewModel.tap(atScreen: point, screenSize: screen, in: try measuringFrame(at: 0, metres: metres, planes: floor))
+        try walkAroundNewest(viewModel, subjectBefore: subjectBefore, itemsBefore: itemsBefore, planes: floor)
     }
 
     /// One frame of the scan, `planes` as ARKit found them (the floor by default).
@@ -106,31 +105,30 @@ struct ScanGuidedFlowTests {
         viewModel.collect(from: try measuringFrame(at: time, metres: 2, planes: planes ?? floor))
     }
 
-    @Test("Case 1: a new scan starts on the floor step, with the tutorial on first use only; no tap sets anything yet")
+    @Test("Case 1: a new scan starts on the floor step, with its line and small line; no tap sets anything yet")
     func startsOnFloor() throws {
-        let first = makeViewModel(tutorial: makeSettings())
-        let later = makeViewModel(tutorial: makeSettings(done: true))
+        let viewModel = makeViewModel()
 
-        #expect(first.currentStep == .floor && !first.hasFloor)
-        #expect(first.isTutorialVisible)
-        #expect(!later.isTutorialVisible)
+        #expect(viewModel.currentStep == .floor && !viewModel.hasFloor)
+        #expect(viewModel.instruction.main == "Point at the floor")
+        #expect(viewModel.instruction.detail == "Heights are measured from it")
     }
 
     @Test("Case 2: a frame with ARKit's floor finds it: step 1 is done, and the next tap sets the subject")
     func floorFound() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
 
         try look(viewModel)
 
         #expect(viewModel.hasFloor)
-        #expect(viewModel.completedStep == .floor)
+        #expect(viewModel.justDone == .floor)
         #expect(viewModel.currentStep == .subject && viewModel.kind == .subject)
         #expect(!viewModel.canUndo)
     }
 
     @Test("Case 3: a table is not the floor")
     func tableIsNotTheFloor() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
 
         try look(viewModel, planes: [makePlane(worldY: -0.3, isFloor: false)])
 
@@ -139,32 +137,61 @@ struct ScanGuidedFlowTests {
 
     @Test("Case 4: no floor for 5 s shows the tip; finding the floor clears it")
     func floorNotFoundTip() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
 
         for tenth in 0...49 { try look(viewModel, at: Double(tenth) / 10, planes: []) }
-        #expect(viewModel.message == nil)
+        #expect(!viewModel.isFloorMissing)
         try look(viewModel, at: 5, planes: [])
-        #expect(viewModel.message == "Floor not found yet. Tilt down and move closer to the floor.")
+        #expect(viewModel.isFloorMissing)
+        #expect(viewModel.instruction.main == "Floor not found yet")
 
         try look(viewModel, at: 5.2)
 
-        #expect(viewModel.message == nil && viewModel.hasFloor)
+        #expect(!viewModel.isFloorMissing && viewModel.hasFloor)
+    }
+
+    /// A frame in a dark room with no floor in it, its tracking as given; it goes to the tips and to the floor search,
+    /// as the frame loop does.
+    private func lookInTheDark(_ viewModel: ScanViewModel, at time: Double, tracking: ScanTracking) throws {
+        let lit = try measuringFrame(at: time, metres: 2)
+        let frame = ScanFrame(timestamp: time, camera: lit.camera, depth: lit.depth, tracking: tracking,
+                              ambientIntensity: 100, planes: [])
+        viewModel.updateGuidance(for: frame)
+        viewModel.collect(from: frame)
+    }
+
+    @Test("Case 4b: in a dark room, More light needed stays up while tracking comes and goes, over the floor tip")
+    func darkWinsOverNoFloor() throws {
+        let viewModel = makeViewModel()
+        var shown: Set<String> = []
+
+        for tenth in 0...80 {
+            let time = Double(tenth) / 10
+            // As in the dark: tracking drops to limited (too little detail) for 0.6 s of every 1.2 s.
+            let tracking: ScanTracking = tenth % 12 < 6 ? .normal : .limited(.insufficientFeatures)
+            try lookInTheDark(viewModel, at: time, tracking: tracking)
+            if time >= 0.5 { shown.insert(viewModel.instruction.main) }
+        }
+
+        #expect(viewModel.isFloorMissing)
+        #expect(shown == ["More light needed"])
     }
 
     @Test("Case 5: a tap before the floor is found sets nothing and says to point at the floor")
     func tapBeforeTheFloor() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
 
         viewModel.tap(atScreen: middle, screenSize: screen, in: try measuringFrame(at: 0, metres: 3, planes: []))
 
         #expect(viewModel.subject == nil && viewModel.items.isEmpty && !viewModel.canUndo)
-        #expect(viewModel.message == "Point the phone down at the floor first.")
+        #expect(viewModel.feedback == .pointAtFloorFirst)
+        #expect(viewModel.instruction.main == "Point at the floor first")
         #expect(viewModel.currentStep == .floor)
     }
 
     @Test("Case 6: a lower floor found later is the one heights use")
     func lowerFloorLater() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try look(viewModel)
 
         try look(viewModel, at: 0.2, planes: floor + [makePlane(worldY: -1.2, isFloor: true)])
@@ -174,19 +201,18 @@ struct ScanGuidedFlowTests {
 
     @Test("A subject tap with no LiDAR depth sets nothing and says so")
     func tapNoDepth() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
 
         try tap(viewModel, metres: nil)
 
         #expect(viewModel.subject == nil)
-        #expect(viewModel.message == "No LiDAR depth there")
+        #expect(viewModel.feedback == .cannotMeasure)
         #expect(viewModel.currentStep == .subject)
     }
 
     @Test("Subject, camera, light: each tap is the right kind, then the scan can finish")
     func fullSequence() throws {
-        let settings = makeSettings()
-        let viewModel = makeViewModel(tutorial: settings)
+        let viewModel = makeViewModel()
 
         try tap(viewModel, metres: 3)
         #expect(viewModel.subject != nil && viewModel.kind == .camera)
@@ -198,26 +224,26 @@ struct ScanGuidedFlowTests {
         #expect(viewModel.items.map(\.kind) == [.camera, .light])
         #expect(viewModel.currentStep == .finish && viewModel.canFinish)
         #expect(viewModel.kind == .light)
-        #expect(settings.isTutorialDone)
         #expect(viewModel.items.allSatisfy { viewModel.box(for: $0, in: screen) != nil })
     }
 
-    @Test("Tags say Camera and Light, numbered only when there are several; the subject gets a box too")
+    @Test("Items are called Camera, Light 1, Light 2: the same name on the tag, in the instruction and the setup")
     func shortTitles() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
         try tap(viewModel, at: leftOfMiddle)
         try tap(viewModel, at: belowMiddle)
         // A10-106: the second light is on a wall at 3 m; on the first light's wall it would be "Already tapped".
         try tap(viewModel, at: CGPoint(x: 300, y: 1700), metres: 3)
 
-        #expect(viewModel.items.map(viewModel.shortTitle(for:)) == ["Camera", "Light 1", "Light 2"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1", "Light 2"])
+        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera", "Light 1", "Light 2"])
         #expect(viewModel.subjectBox(in: screen) != nil)
     }
 
     @Test("Nothing to undo before the first tap; undo then changes nothing")
     func undoNothing() {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
 
         viewModel.undoTapped()
 
@@ -227,7 +253,7 @@ struct ScanGuidedFlowTests {
 
     @Test("Undo after the subject tap clears the subject and asks for it again; the floor stays found")
     func undoSubject() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
 
         viewModel.undoTapped()
@@ -240,7 +266,7 @@ struct ScanGuidedFlowTests {
 
     @Test("Undo removes the last light and its equipment; the next light takes its number again")
     func undoLight() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
         try tap(viewModel, at: leftOfMiddle)
         try tap(viewModel, at: belowMiddle)
@@ -250,17 +276,17 @@ struct ScanGuidedFlowTests {
 
         viewModel.undoTapped()
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
-        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
+        #expect(viewModel.draftSetup.nodes.map(\.name) == ["Camera", "Light 1"])
 
         try tap(viewModel, at: CGPoint(x: 300, y: 1700), metres: 4)
 
-        #expect(viewModel.items.last?.name == "Studio Lighting 2")
+        #expect(viewModel.items.last?.name == "Light 2")
     }
 
     @Test("Case 7: undo steps back one tap at a time; the subject is the last, and the floor stays found")
     func undoAll() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
         try tap(viewModel, at: leftOfMiddle)
         try tap(viewModel, at: belowMiddle)
@@ -278,7 +304,7 @@ struct ScanGuidedFlowTests {
 
     @Test("An item removed by tapping its tag is skipped by undo")
     func undoSkipsRemovedItem() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try tap(viewModel, metres: 3)
         try tap(viewModel, at: leftOfMiddle)
         let cameraTag = try #require(viewModel.tagPosition(of: viewModel.items[0].anchor, in: screen))
@@ -292,34 +318,33 @@ struct ScanGuidedFlowTests {
 
     @Test("Undo clears the done flash and the last hint")
     func undoClearsFlash() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try tap(viewModel)
 
         viewModel.undoTapped()
 
-        #expect(viewModel.completedStep == nil && viewModel.message == nil)
+        #expect(viewModel.justDone == nil && viewModel.feedback == nil)
     }
 
-    @Test("Skip hides the tutorial for good; ? replays it")
-    func skipAndReplay() {
-        let settings = makeSettings()
-        let viewModel = makeViewModel(tutorial: settings)
+    @Test("Every step keeps its small line all through the scan")
+    func smallLinesAlwaysShow() throws {
+        let viewModel = makeViewModel()
+        try tap(viewModel, metres: 3)
 
-        viewModel.skipTutorial()
-        #expect(!viewModel.isTutorialVisible && settings.isTutorialDone)
+        viewModel.clearDone()
 
-        viewModel.replayTutorial()
-        #expect(viewModel.isTutorialVisible)
+        #expect(viewModel.instruction.main == "Tap the camera")
+        #expect(viewModel.instruction.detail == "Walk up to it first")
     }
 
     @Test("Clearing the done flash keeps the step moved on")
     func clearDone() throws {
-        let viewModel = makeViewModel(tutorial: makeSettings())
+        let viewModel = makeViewModel()
         try look(viewModel)
 
-        viewModel.clearCompletedStep()
+        viewModel.clearDone()
 
-        #expect(viewModel.completedStep == nil && viewModel.currentStep == .subject)
+        #expect(viewModel.justDone == nil && viewModel.currentStep == .subject)
     }
 }
 

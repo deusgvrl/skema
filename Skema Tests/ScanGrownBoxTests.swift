@@ -35,12 +35,17 @@ struct ScanGrownBoxTests {
                 ScanSession(session: arSession, frameInterval: 1.0 / 15.0, supportsLiDAR: { true })
             },
             camera: FakeCameraPermission(status: .authorized),
-            storageController: StorageController(inMemory: true),
-            tutorial: nil)
+            storageController: StorageController(inMemory: true))
     }
 
-    private func tap(_ viewModel: ScanViewModel, at point: CGPoint, at time: Double = 0) throws {
+    /// A tap, then (phase 3) a walk around what it set, unless `walk` is false.
+    private func tap(_ viewModel: ScanViewModel, at point: CGPoint, at time: Double = 0, walk: Bool = true) throws {
+        let subjectBefore = viewModel.subject
+        let itemsBefore = viewModel.items.count
         viewModel.tap(atScreen: point, screenSize: screen, in: try measuringFrame(at: time, metres: 2, planes: planes))
+        if walk {
+            try walkAroundNewest(viewModel, subjectBefore: subjectBefore, itemsBefore: itemsBefore, planes: planes)
+        }
     }
 
     /// Subject and camera tapped (the floor is found from the frames): the next tap adds a light.
@@ -59,7 +64,7 @@ struct ScanGrownBoxTests {
     func firstBoxFromTheTapFrame() throws {
         let viewModel = try scanWithCamera()
 
-        try tap(viewModel, at: lightSpot, at: 5)
+        try tap(viewModel, at: lightSpot, at: 5, walk: false)
 
         let light = try #require(viewModel.items.first { $0.kind == .light })
         // The 10 cm column would be 20 cm wide; the paint takes the whole 3.84 m wide wall.
@@ -74,7 +79,7 @@ struct ScanGrownBoxTests {
         #expect(try #require(width(of: viewModel.itemBounds[camera.id])) <= 0.2 + 1e-4)
     }
 
-    @Test("Case 12: a light tap inside Light 1's big box makes no new item and says Already tapped: Light 1")
+    @Test("Case 12: a light tap inside Light 1's big box makes no new item and says Light 1 already added")
     func secondTapOnTheSameLight() throws {
         let viewModel = try scanWithCamera()
         try tap(viewModel, at: lightSpot)
@@ -82,9 +87,10 @@ struct ScanGrownBoxTests {
         // 356 points from Light 1's tag, so it is not a tap on the tag; world x = 1.48 m, inside the wall's box.
         try tap(viewModel, at: CGPoint(x: 720, y: 1700))
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
         #expect(viewModel.draftSetup.nodes.count == 2)
-        #expect(viewModel.message == "Already tapped: Light 1")
+        #expect(viewModel.feedback == .alreadyAdded(light: 1))
+        #expect(viewModel.instruction.main == "Light 1 already added")
     }
 
     @Test("Case 13: a light tap inside a camera's box makes a new light")
@@ -94,7 +100,7 @@ struct ScanGrownBoxTests {
         // 120 points from the camera's tag; world (-0.768, -0.24, -2), inside the camera's column.
         try tap(viewModel, at: CGPoint(x: 600, y: 576))
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
     }
 
     @Test("Case 15: after Undo removes Light 1, a tap on the same place makes a new light")
@@ -105,7 +111,7 @@ struct ScanGrownBoxTests {
         viewModel.undoTapped()
         try tap(viewModel, at: lightSpot)
 
-        #expect(viewModel.items.map(\.name) == ["Camera 1", "Studio Lighting 1"])
-        #expect(viewModel.message == nil)
+        #expect(viewModel.items.map(\.name) == ["Camera", "Light 1"])
+        #expect(viewModel.feedback == nil)
     }
 }
