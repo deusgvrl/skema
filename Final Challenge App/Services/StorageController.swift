@@ -10,10 +10,12 @@ final class StorageController {
     let container: ModelContainer
     let context: ModelContext
 
-    init(inMemory: Bool = false) {
+    /// `url` stores the data in that file instead of the default one (tests that need a store on disk).
+    init(inMemory: Bool = false, url: URL? = nil) {
         do {
             let schema = Schema([Setup.self, Equipment.self, ReferenceImage.self])
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
+            let config = url.map { ModelConfiguration(schema: schema, url: $0) }
+                ?? ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
             self.container = try ModelContainer(for: schema, configurations: [config])
             self.context = container.mainContext
         } catch {
@@ -40,7 +42,15 @@ final class StorageController {
         save()
     }
 
+    /// Deletes a setup for good, with its equipment and photos. They are taken off the setup first, so a view
+    /// still holding it reads none of them (reading a deleted item's fields stops the app).
     func deleteSetup(_ setup: Setup) {
+        let nodes = setup.nodes
+        let images = setup.referenceImages
+        setup.nodes = []
+        setup.referenceImages = []
+        nodes.forEach(context.delete)
+        images.forEach(context.delete)
         context.delete(setup)
         save()
     }

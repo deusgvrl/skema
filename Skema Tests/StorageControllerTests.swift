@@ -176,4 +176,56 @@ struct StorageControllerTests {
         let remainingImagesInDB = try storageController.context.fetch(imageDescriptor)
         #expect(remainingImagesInDB.isEmpty, "The image should be completely removed from the database.")
     }
+
+    // MARK: Deleting a draft (crash fix, 24 Nov 2026)
+    // Only a store on disk shows the crash: a view still holding the deleted setup read a deleted item's fields.
+
+    /// A store on disk, in its own temporary file.
+    private func storageOnDisk() -> StorageController {
+        StorageController(url: URL.temporaryDirectory.appending(path: "\(UUID().uuidString).store"))
+    }
+
+    /// A draft (never saved by the user) with a light, a camera and a photo, as a scan leaves it.
+    private func storedDraft(in storage: StorageController) -> Setup {
+        let setup = Setup()
+        storage.addSetup(setup)
+        storage.addEquipment(Equipment(category: .light, name: "Light 1"), to: setup)
+        storage.addEquipment(Equipment(category: .camera, name: "Camera"), to: setup)
+        storage.addReferenceImage(ReferenceImage(imageData: Data("photo".utf8)), to: setup)
+        return setup
+    }
+
+    /// What the home grid cell reads from the setup it still holds.
+    private func expectNothingLeft(on setup: Setup, in storage: StorageController) throws {
+        #expect(setup.nodes.filter { $0.category == .light }.isEmpty)
+        #expect(setup.coverImage == nil)
+        let fresh = ModelContext(storage.container)
+        #expect(try fresh.fetchCount(FetchDescriptor<Setup>()) == 0)
+        #expect(try fresh.fetchCount(FetchDescriptor<Equipment>()) == 0, "Its equipment is deleted with it.")
+        #expect(try fresh.fetchCount(FetchDescriptor<ReferenceImage>()) == 0, "Its photos are deleted with it.")
+    }
+
+    @Test("Deleting a draft leaves nothing a view can trip on")
+    func deleteDraftLeavesNothingToRead() throws {
+        let storage = storageOnDisk()
+        let setup = storedDraft(in: storage)
+        _ = storage.fetchAllSetups().first?.nodes.count // The home screen fetches it and shows its lights first.
+
+        storage.deleteSetup(setup)
+
+        try expectNothingLeft(on: setup, in: storage)
+    }
+
+    @Test("Deleting a draft from Setups doesn't crash")
+    func deleteDraftFromSetups() throws {
+        let storage = storageOnDisk()
+        let setup = storedDraft(in: storage)
+        let viewModel = SetupsViewModel(storageController: storage)
+
+        viewModel.deleteTapped(setup)
+        viewModel.confirmDelete()
+
+        #expect(viewModel.setups.isEmpty)
+        try expectNothingLeft(on: setup, in: storage)
+    }
 }
