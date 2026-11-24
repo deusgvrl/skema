@@ -114,7 +114,14 @@ extension Equipment {
     func syncPositionFromDistance() {
         let normalized = distance.replacingOccurrences(of: ",", with: ".")
         let cleaned = normalized.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
-        guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
+        guard let targetMeters = Double(cleaned), targetMeters >= 0 else { return }
+
+        if targetMeters == 0 {
+            positionX = 0
+            positionY = 0
+            self.distance = "0.00"
+            return
+        }
 
         let targetPoints = targetMeters * Self.pointsPerMeter
         let currentPoints = sqrt(positionX * positionX + positionY * positionY)
@@ -127,6 +134,7 @@ extension Equipment {
             positionX = 0
             positionY = -targetPoints
         }
+        self.distance = String(format: "%.2f", targetMeters)
     }
 
     func clone() -> Equipment {
@@ -205,7 +213,6 @@ extension Equipment {
     }
 }
 
-
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case camera = "Camera"
     case light = "Light"
@@ -215,7 +222,7 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
 }
 
 extension EquipmentCategory {
-    
+
     /// Resolves the exact image asset name based on selection state
     func imageName(isSelected: Bool) -> String {
         switch self {

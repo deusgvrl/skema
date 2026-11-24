@@ -37,7 +37,7 @@ struct NodeView: View {
                 if node.category == .light {
                     LightBeamConeView(colorTemp: node.colorTemp)
                 }
-                
+
                 EquipmentNodeIconView(category: node.category, isSelected: isSelected)
 
                 // Directional Pointer Ray & Front Rotate Handle
@@ -103,6 +103,7 @@ struct NodeView: View {
 
                     Text(node.role)
                         .font(.caption)
+                        .fontWeight(isSelected ? .bold : .regular)
                         .foregroundStyle(DesignTokens.textPrimary)
                         .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
                 }
