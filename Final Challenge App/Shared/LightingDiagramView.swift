@@ -3,7 +3,6 @@ import SwiftUI
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
-    var isExportedToPdf: Bool = false
     var undoManager: UndoManager?
 
     // Converted to Binding so parent controls selection lifecycle
@@ -28,7 +27,6 @@ struct LightingDiagramView: View {
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
-        isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
         selectedNodeId: Binding<UUID?> = .constant(nil),
         initialZoomScale: CGFloat = 1.0,
@@ -38,7 +36,6 @@ struct LightingDiagramView: View {
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
-        self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
         self._selectedNodeId = selectedNodeId
         self._zoomScale = State(initialValue: initialZoomScale)
@@ -95,7 +92,7 @@ struct LightingDiagramView: View {
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
 
                     // Skip distance label if node is placed directly on subject center
-                    if node.position != .zero && (isExportedToPdf || distanceValue >= minDistanceThreshold) {
+                    if node.position != .zero && distanceValue >= minDistanceThreshold {
                         let deltaX = node.position.x
                         let deltaY = node.position.y
                         let posX = subjectCenter.x + deltaX * 0.5

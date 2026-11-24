@@ -235,6 +235,15 @@ extension EquipmentCategory {
         }
     }
 
+    /// The black icon drawn in the PDF's diagram.
+    var pdfImageName: String {
+        switch self {
+        case .camera: "icon_camera_pdf"
+        case .light: "icon_light_pdf"
+        case .accessory: "icon_acc_pdf"
+        }
+    }
+
     /// Controls specific width/height dimensions for each category
     var iconSize: CGSize {
             switch self {

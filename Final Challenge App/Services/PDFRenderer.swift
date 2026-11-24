@@ -21,22 +21,22 @@ enum PDFLayout {
     static let cellPadding: CGFloat = 4
     static let lineWidth: CGFloat = 0.5
 
-    /// The notes box on page 1 takes a quarter of the page; the diagram box gets the rest (Amadeus, 18 Nov).
-    static var notesBoxHeight: CGFloat { pageSize.height / 4 }
+    /// The notes box on page 1 takes a tenth of the page; the diagram box gets the rest (was a quarter, 18 Nov).
+    static var notesBoxHeight: CGFloat { pageSize.height / 10 }
     /// About the shape of the page-1 diagram box. The View draws the diagram at this shape (or bigger, see
     /// `DiagramCanvas`), and the PDF fits the picture into the real box.
-    static var diagramCanvasSize: CGSize { CGSize(width: contentWidth, height: 400) }
+    static var diagramCanvasSize: CGSize { CGSize(width: contentWidth, height: 540) }
     static let footerHeight: CGFloat = 28
 
-    /// Table column widths: ID, equipment, accessories, distance, height-tilt-aim, settings.
-    /// They add up to the page width minus both margins (523 pt). Distance fits its header on one line.
-    static let columnWidths: [CGFloat] = [32, 120, 96, 66, 99, 110]
-
-    static let photoColumns = 2
+    static let photoColumns = 3
     static let photoRows = 2
     static let photosPerPage = photoColumns * photoRows
     static let photoBoxHeight: CGFloat = 150
     static let photoLabelHeight: CGFloat = 14
+    /// The photos of a row share the content width, with one gap between each two.
+    static var photoColumnWidth: CGFloat {
+        (contentWidth - CGFloat(photoColumns - 1) * spacing) / CGFloat(photoColumns)
+    }
 
     static var contentWidth: CGFloat { pageSize.width - 2 * margin }
     /// Where content must stop so the footer keeps its space.
@@ -46,7 +46,6 @@ enum PDFLayout {
 /// Builds the templated A4 PDF of a setup (A10-13). Notes, equipment and photos can add pages (A10-98).
 final class PDFRenderer {
     private static let signposter = OSSignposter(subsystem: "Skema", category: "PDFExport")
-    private static let emptyValue = "—"
     private static let separator = " · "
 
     private let calendar: Calendar
@@ -100,7 +99,7 @@ final class PDFRenderer {
         pages.advance(PDFLayout.sectionSpacing)
 
         pages.drawHeading("LIGHTING DIAGRAM")
-        // The diagram fills page 1 down to where the notes heading and the quarter-page notes box start.
+        // The diagram fills page 1 down to where the notes heading and the notes box start.
         let headingFont = UIFont.boldSystemFont(ofSize: PDFLayout.headingFontSize)
         let notesHeading = PageWriter.height(of: "NOTES", font: headingFont, width: PDFLayout.contentWidth)
             + PDFLayout.spacing / 2
@@ -145,93 +144,20 @@ final class PDFRenderer {
         return formatter.string(from: date)
     }
 
-    // MARK: - Equipment table
+    // MARK: - Equipment tables
 
     private func drawEquipment(setup: Setup, pages: PageWriter) {
-        let items = DisplayOrder.equipment(setup.nodes)
         // Equipment always starts on a new page, after any notes pages.
         pages.startPage()
         pages.drawText("Equipment Details", font: .boldSystemFont(ofSize: PDFLayout.sectionFontSize))
-        let summary = equipmentSummary(items)
+        let summary = PDFEquipmentTables.summary(for: setup, separator: Self.separator)
         if !summary.isEmpty {
             pages.drawText(summary, font: .systemFont(ofSize: PDFLayout.bodyFontSize), color: .darkGray)
         }
         pages.advance(PDFLayout.spacing)
-
-        drawTableHeader(pages: pages)
-        for item in items {
-            let cells = rowCells(for: item)
-            let height = pages.rowHeight(cells, widths: PDFLayout.columnWidths)
-            if pages.cursorY + height > PDFLayout.contentBottom {
-                pages.startPage()
-                drawTableHeader(pages: pages)
-            }
-            pages.drawRow(cells, widths: PDFLayout.columnWidths, height: height, bold: false)
+        for table in PDFEquipmentTables.tables(for: setup) {
+            pages.drawTable(table)
         }
-    }
-
-    private func drawTableHeader(pages: PageWriter) {
-        let titles = ["ID", "EQUIPMENT", "ACCESSORIES", "DISTANCE", "HEIGHT · TILT · AIM", "SETTINGS"]
-        let height = pages.rowHeight(titles, widths: PDFLayout.columnWidths, bold: true)
-        pages.drawRow(titles, widths: PDFLayout.columnWidths, height: height, bold: true)
-    }
-
-    /// "2 lights · 1 accessory · 1 camera"; types with no items are left out.
-    private func equipmentSummary(_ items: [Equipment]) -> String {
-        let kinds: [(category: EquipmentCategory, words: [String])] = [
-            (.light, ["light", "lights"]),
-            (.accessory, ["accessory", "accessories"]),
-            (.camera, ["camera", "cameras"])
-        ]
-        return kinds.compactMap { kind in
-            let count = items.filter { $0.category == kind.category }.count
-            guard count > 0 else { return nil }
-            return "\(count) \(kind.words[count == 1 ? 0 : 1])"
-        }.joined(separator: Self.separator)
-    }
-
-    private func rowCells(for item: Equipment) -> [String] {
-        [
-            orDash(item.label),
-            orDash(lines([item.name, item.role] + (item.category == .camera ? [item.lens] : []))),
-            orDash(item.accessories),
-            orDash(item.distance),
-            orDash(joined([item.height, item.tilt, item.horizontalAim])),
-            orDash(settings(for: item))
-        ]
-    }
-
-    /// Lights: power and colour temperature. Cameras: ISO, aperture and shutter. Accessories have none.
-    private func settings(for item: Equipment) -> String {
-        switch item.category {
-        case .light:
-            return joined([item.power, item.colorTemp])
-        case .camera:
-            let exposure = joined([item.iso, item.aperture])
-            return [exposure, item.shutterSpeed]
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-                .joined(separator: ", ")
-        case .accessory:
-            return ""
-        }
-    }
-
-    private func joined(_ parts: [String]) -> String {
-        nonEmpty(parts).joined(separator: Self.separator)
-    }
-
-    private func lines(_ parts: [String]) -> String {
-        nonEmpty(parts).joined(separator: "\n")
-    }
-
-    private func nonEmpty(_ parts: [String]) -> [String] {
-        parts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-    }
-
-    private func orDash(_ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? Self.emptyValue : trimmed
     }
 
     // MARK: - References
@@ -240,11 +166,12 @@ final class PDFRenderer {
         let photos = DisplayOrder.photos(setup.referenceImages)
         guard !photos.isEmpty else { return }
 
-        // The whole 2 x 2 block goes under the table only if it fits there; otherwise it gets a new page.
+        // The first block (up to `photosPerPage`) goes under the tables only if it fits there; otherwise on a new page.
         let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.photoLabelHeight + PDFLayout.spacing
-        let blockHeight = CGFloat(PDFLayout.photoRows) * cellHeight
+        let firstCount = min(photos.count, PDFLayout.photosPerPage)
+        let firstRows = (firstCount + PDFLayout.photoColumns - 1) / PDFLayout.photoColumns
+        let blockHeight = CGFloat(firstRows) * cellHeight
         let headingHeight = PDFLayout.sectionFontSize + PDFLayout.sectionSpacing
-        pages.advance(PDFLayout.sectionSpacing)
         if pages.cursorY + headingHeight + blockHeight > PDFLayout.contentBottom {
             pages.startPage()
         }
@@ -260,7 +187,7 @@ final class PDFRenderer {
     }
 
     private func drawPhotoGrid(_ group: [ReferenceImage], firstNumber: Int, pages: PageWriter) {
-        let columnWidth = (PDFLayout.contentWidth - PDFLayout.spacing) / CGFloat(PDFLayout.photoColumns)
+        let columnWidth = PDFLayout.photoColumnWidth
         let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.photoLabelHeight + PDFLayout.spacing
         let top = pages.cursorY
         for (offset, photo) in group.enumerated() {

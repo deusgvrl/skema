@@ -105,50 +105,14 @@ final class PageWriter {
         )
     }
 
-    // MARK: Table rows
-
-    func rowHeight(_ cells: [String], widths: [CGFloat], bold: Bool = false) -> CGFloat {
-        let font = Self.tableFont(bold: bold)
-        let tallest = zip(cells, widths)
-            .map { Self.height(of: $0, font: font, width: $1 - 2 * PDFLayout.cellPadding) }
-            .max() ?? 0
-        return tallest + 2 * PDFLayout.cellPadding
-    }
-
-    func drawRow(_ cells: [String], widths: [CGFloat], height: CGFloat, bold: Bool) {
-        let font = Self.tableFont(bold: bold)
-        var columnX = PDFLayout.margin
-        for (cell, width) in zip(cells, widths) {
-            let rect = CGRect(
-                x: columnX + PDFLayout.cellPadding,
-                y: cursorY + PDFLayout.cellPadding,
-                width: width - 2 * PDFLayout.cellPadding,
-                height: height - 2 * PDFLayout.cellPadding
-            )
-            Self.draw(cell, font: font, color: bold ? .darkGray : .black, in: rect)
-            columnX += width
-        }
-        cursorY += height
-        let line = UIBezierPath()
-        line.move(to: CGPoint(x: PDFLayout.margin, y: cursorY))
-        line.addLine(to: CGPoint(x: PDFLayout.margin + PDFLayout.contentWidth, y: cursorY))
-        line.lineWidth = PDFLayout.lineWidth
-        UIColor.lightGray.setStroke()
-        line.stroke()
-    }
-
-    private static func tableFont(bold: Bool) -> UIFont {
-        bold ? .boldSystemFont(ofSize: PDFLayout.minimumFontSize) : .systemFont(ofSize: PDFLayout.minimumFontSize)
-    }
-
     // MARK: Footer
 
     private func drawFooter() {
         let font = UIFont.systemFont(ofSize: PDFLayout.minimumFontSize)
         let top = PDFLayout.pageSize.height - PDFLayout.margin - PDFLayout.footerHeight
         let lineHeight = PDFLayout.footerHeight / 2
-        let note = "Skema Photo · Height, tilt and aim are relative to the subject. "
-            + "Values marked from the scan are estimates."
+        let note = "Skema Photo · Heights are measured from the floor, distances to the subject. "
+            + "Values from the scan are estimates."
         let noteRect = CGRect(x: PDFLayout.margin, y: top, width: PDFLayout.contentWidth, height: lineHeight)
         Self.draw(note, font: font, color: .darkGray, in: noteRect)
 
