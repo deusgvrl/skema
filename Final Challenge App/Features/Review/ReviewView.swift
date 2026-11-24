@@ -70,12 +70,20 @@ struct ReviewView: View {
             if viewModel.isEditingDiagram,
                case .equipment(let nodeId) = activeSheetContent,
                quickActionsOpacity > 0.01 {
-                NodeQuickActionsToolbar(nodeId: nodeId, onDelete: quickDeleteNode(id:))
-                        .padding(.bottom, currentSheetHeight + 8) // Moves 1:1 with finger
-                    .opacity(quickActionsOpacity)            // Fades out continuously
-                    .scaleEffect(quickActionsScale)
-                    .allowsHitTesting(quickActionsOpacity > 0.5)
-                    .zIndex(1)
+                NodeQuickActionsToolbar(
+                    nodeId: nodeId,
+                    onDelete: quickDeleteNode(id:),
+                    onAdd: {
+                        resetSheetState()
+                        isAddingNode = true
+                    }
+                )
+
+                .padding(.bottom, currentSheetHeight + 8)
+                .opacity(quickActionsOpacity)
+                .scaleEffect(quickActionsScale)
+                .allowsHitTesting(quickActionsOpacity > 0.5)
+                .zIndex(1)
             }
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
@@ -205,9 +213,19 @@ struct ReviewView: View {
 
     // MARK: - Tap Handlers
 
-    private func handleNodeTap(_ node: Equipment) {
+    func resetSheetState() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            selectedNodeId = nil
+            activeSheetContent = nil
             selectedDetent = .height(76)
+        }
+    }
+
+    func handleNodeTap(_ node: Equipment) {
+        if !viewModel.isEditingDiagram {
+            withAnimation {
+                viewModel.beginEditing(undoManager: undoManager)
+            }
         }
         selectedNodeId = node.id
         activeSheetContent = .equipment(node.id)

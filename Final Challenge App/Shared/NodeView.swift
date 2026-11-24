@@ -17,12 +17,12 @@ struct NodeView: View {
     @State private var globalCenter: CGPoint = .zero
     @State private var dragStartPosition: CGPoint = .zero
 
-    // Dynamic Handle Distance State
     private let defaultHandleDistance: CGFloat = 72.0
 
-    // Rotation Haptic State
+    // Rotation Haptic & Snapping States
     @State private var lastHapticAngle: Double = 0.0
     @State private var feedbackGenerator: UISelectionFeedbackGenerator?
+    @State private var lastRotationSnap: Int?
 
     @State private var currentHandleDistance: CGFloat = 72.0
     @State private var grabOffset: CGFloat = 0
@@ -32,13 +32,13 @@ struct NodeView: View {
 
     var body: some View {
         ZStack {
-            // 1. Rotating Equipment Shape, Directional Arrow & Rotate Handle
+            // 1. Unified Equipment Image Asset & Rotation Handle Controls
             ZStack {
-                switch node.category {
-                case .camera: TopViewCameraShapeView(isSelected: isSelected)
-                case .light: TopViewLightShapeView(isSelected: isSelected)
-                case .accessory: TopViewAccessoryShapeView(isSelected: isSelected)
+                if node.category == .light {
+                    LightBeamConeView(colorTemp: node.colorTemp)
                 }
+
+                EquipmentNodeIconView(category: node.category, isSelected: isSelected)
 
                 // Directional Pointer Ray & Front Rotate Handle
                 if isSelected && !isReadOnly {
@@ -80,20 +80,6 @@ struct NodeView: View {
                 currentHandleDistance = defaultHandleDistance
             }
         }
-        .background {
-            if node.category == .light {
-                Circle()
-                    .fill(RadialGradient(
-                        colors: [DesignTokens.diagramGlow, .clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 55
-                    ))
-                    .frame(width: 110, height: 110)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
         .background(
             GeometryReader { geo in
                 Color.clear
@@ -102,38 +88,37 @@ struct NodeView: View {
             }
         )
         .overlay(alignment: .bottom) {
-            Text(node.displayName)
-                .font(.caption)
-                .fontWeight(isSelected ? .bold : .regular)
-                .foregroundStyle(DesignTokens.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                .fixedSize()
-                .offset(y: 20)
+            HStack(spacing: 4) {
+                // 1. Primary Name (e.g. "Sony" or "W100")
+                Text(node.name.isEmpty ? "Equipment" : node.name)
+                    .font(.caption)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .foregroundStyle(DesignTokens.textPrimary)
+
+                // 2. Role Subtitle on the same level (e.g. "- Camera 2")
+                if zoomScale >= 1.75 && !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text("•")
+                        .font(.caption)
+                        .foregroundStyle(DesignTokens.textPrimary)
+
+                    Text(node.role)
+                        .font(.caption)
+                        .fontWeight(isSelected ? .bold : .regular)
+                        .foregroundStyle(DesignTokens.textPrimary)
+                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .fixedSize()
+            .offset(y: 30)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: zoomScale >= 1.75)
         }
         .scaleEffect(1 / zoomScale)
         .position(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
         .highPriorityGesture(TapGesture().onEnded { if !isRotating { onTap() } })
         .gesture(isReadOnly ? nil : dragGesture)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(node.displayName)
-        .accessibilityValue(
-            "\(node.category.rawValue), distance: \(node.distance) meters, rotation: \(Int(node.rotationAngle))°"
-        )
-        .accessibilityHint(
-            isSelected ? "Selected. Double-tap to deselect or use Actions to adjust." : "Double-tap to select."
-        )
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
-        .accessibilityAction(named: "Rotate 45° clockwise") {
-            node.rotationAngle = (node.rotationAngle + 45).truncatingRemainder(dividingBy: 360)
-            node.syncHorizontalAimFromRotation()
-        }
-        .accessibilityAction(named: "Rotate 45° counterclockwise") {
-            node.rotationAngle = (node.rotationAngle - 45 + 360).truncatingRemainder(dividingBy: 360)
-            node.syncHorizontalAimFromRotation()
-        }
-        .accessibilityAction(named: "Point to subject") { node.pointToSubject() }
     }
 
     // MARK: - Gestures & Helpers
@@ -159,19 +144,26 @@ struct NodeView: View {
                 var visualAngle = (atan2(deltaY, deltaX) * 180 / .pi) + 90
                 if visualAngle < 0 { visualAngle += 360 }
 
-                let step = 3.0
-                if Int(visualAngle / step) != Int(lastHapticAngle / step) {
-                    feedbackGenerator?.selectionChanged()
-                    feedbackGenerator?.prepare()
-                    lastHapticAngle = visualAngle
+                // Apply 45° angle snapping
+                let finalAngle = applyRotationSnap(to: visualAngle)
+
+                // Selection haptics for smooth continuous drag outside snap zones
+                if lastRotationSnap == nil {
+                    let step = 3.0
+                    if Int(finalAngle / step) != Int(lastHapticAngle / step) {
+                        feedbackGenerator?.selectionChanged()
+                        feedbackGenerator?.prepare()
+                        lastHapticAngle = finalAngle
+                    }
                 }
 
-                node.rotationAngle = visualAngle
+                node.rotationAngle = finalAngle
                 node.syncHorizontalAimFromRotation()
             }
             .onEnded { _ in
                 guard isRotating else { return }
                 isRotating = false
+                lastRotationSnap = nil
                 grabOffset = 0
                 onGestureEnd()
                 feedbackGenerator = nil
@@ -214,6 +206,27 @@ struct NodeView: View {
         globalCenter = CGPoint(x: frame.midX, y: frame.midY)
     }
 
+    private func applyRotationSnap(to rawAngle: Double) -> Double {
+        let snapAngles = [0, 45, 90, 135, 180, 225, 270, 315]
+        let tolerance: Double = 3.5
+
+        for target in snapAngles {
+            let diff = abs(rawAngle - Double(target))
+            let normalizedDiff = min(diff, 360.0 - diff)
+
+            if normalizedDiff <= tolerance {
+                if lastRotationSnap != target {
+                    lastRotationSnap = target
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+                return Double(target)
+            }
+        }
+
+        lastRotationSnap = nil
+        return rawAngle
+    }
+
     private func applyCardinalSnap(to rawPosition: CGPoint) -> CGPoint {
         let radius = hypot(rawPosition.x, rawPosition.y)
         guard radius > 15 else {
@@ -250,9 +263,7 @@ struct NodeView: View {
             return min(diff, 360 - diff) <= tolerance
         }
     }
-}
-
-// MARK: - Helper Dashed Line Shape
+}// MARK: - Helper Dashed Line Shape
 
 struct DashedLine: Shape {
     func path(in rect: CGRect) -> Path {
@@ -263,120 +274,80 @@ struct DashedLine: Shape {
     }
 }
 
-// MARK: - Custom Shapes & Top-View Equipment Components
+struct EquipmentNodeIconView: View {
+    let category: EquipmentCategory
+    let isSelected: Bool
 
-struct Trapezoid: Shape {
+    var body: some View {
+        Image(category.imageName(isSelected: isSelected))
+            .resizable()
+            .scaledToFit()
+            .frame(width: category.iconSize.width, height: category.iconSize.height)
+    }
+}
+
+struct LightBeamConeView: View {
+    let colorTemp: String
+
+    private var lightColor: Color {
+        Color.kelvinColor(from: colorTemp)
+    }
+
+    var body: some View {
+        ZStack {
+            // 1. Soft Volumetric Outer Spread
+            LightBeamShape()
+                .fill(
+                    LinearGradient(
+                        stops: [
+                            .init(color: lightColor.opacity(0.85), location: 0.0),
+                            .init(color: lightColor.opacity(0.40), location: 0.4),
+                            .init(color: lightColor.opacity(0.10), location: 0.8),
+                            .init(color: .clear, location: 1.0)
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+                .frame(width: 84, height: 96)
+                .blur(radius: 4) // Soft atmospheric glow edge
+
+            // 2. Focused Core Hotspot Beam
+            LightBeamShape()
+                .fill(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.9), location: 0.0),
+                            .init(color: lightColor.opacity(0.6), location: 0.3),
+                            .init(color: .clear, location: 1.0)
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+                .frame(width: 48, height: 75)
+                .blur(radius: 1.5)
+        }
+        .offset(y: -55) // Positions beam in front of the lamp head
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+// Trapezoid Shape representing the projected beam cone
+struct LightBeamShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let topWidth = rect.width
-        let inset = (topWidth - rect.width * 0.45) / 2.0
-        path.move(to: .zero)
-        path.addLine(to: CGPoint(x: topWidth, y: 0))
-        path.addLine(to: CGPoint(x: topWidth - inset, y: rect.height))
-        path.addLine(to: CGPoint(x: inset, y: rect.height))
+        let originWidth: CGFloat = 16 // Narrow origin at lamp head
+        let beamWidth: CGFloat = rect.width // Wide beam spread at end
+        let originInset = (beamWidth - originWidth) / 2
+
+        path.move(to: CGPoint(x: originInset, y: rect.maxY))
+        path.addLine(to: CGPoint(x: beamWidth - originInset, y: rect.maxY))
+        path.addLine(to: CGPoint(x: beamWidth, y: rect.minY))
+        path.addLine(to: CGPoint(x: 0, y: rect.minY))
         path.closeSubpath()
+
         return path
-    }
-}
-
-struct TopViewCameraShapeView: View {
-    let isSelected: Bool
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(DesignTokens.diagramNodeFill)
-                .frame(width: 38, height: 26)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(
-                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                            lineWidth: isSelected ? 2.0 : 1.5
-                        )
-                )
-                .shadow(
-                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                    radius: isSelected ? 5 : 2,
-                    y: 2
-                )
-                .offset(y: 12)
-
-            RoundedRectangle(cornerRadius: 3)
-                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke)
-                .frame(width: 18, height: 14)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(isSelected ? DesignTokens.accentPrimary : Color.clear, lineWidth: 1)
-                )
-        }
-        .frame(width: 44, height: 44)
-    }
-}
-
-struct TopViewLightShapeView: View {
-    let isSelected: Bool
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Trapezoid()
-                .fill(DesignTokens.diagramNodeFill)
-                .frame(width: 38, height: 22)
-                .overlay(
-                    Trapezoid()
-                        .stroke(
-                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                            lineWidth: isSelected ? 2.0 : 1.5
-                        )
-                )
-                .shadow(
-                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                    radius: isSelected ? 5 : 2,
-                    y: 2
-                )
-                .offset(y: 2)
-
-            Rectangle()
-                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke)
-                .frame(width: 38, height: 3)
-                .offset(y: 2)
-
-            RoundedRectangle(cornerRadius: 3)
-                .fill(DesignTokens.diagramStroke)
-                .frame(width: 18, height: 14)
-                .offset(y: 22)
-        }
-        .frame(width: 44, height: 44)
-    }
-}
-
-struct TopViewAccessoryShapeView: View {
-    let isSelected: Bool
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(DesignTokens.diagramNodeFill)
-                .frame(width: 50, height: 11)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(
-                            isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke,
-                            lineWidth: isSelected ? 2.0 : 1.5
-                        )
-                )
-                .shadow(
-                    color: isSelected ? DesignTokens.accentPrimary.opacity(0.4) : .clear,
-                    radius: isSelected ? 5 : 2,
-                    y: 2
-                )
-                .offset(y: 11)
-
-            Rectangle()
-                .fill(isSelected ? DesignTokens.accentPrimary : DesignTokens.diagramStroke)
-                .frame(width: 14, height: 4)
-                .cornerRadius(1)
-                .offset(y: 8)
-        }
-        .frame(width: 44, height: 44)
     }
 }

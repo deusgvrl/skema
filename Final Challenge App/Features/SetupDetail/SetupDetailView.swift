@@ -60,9 +60,16 @@ struct SetupDetailView: View {
             if isEditing,
                case .equipment(let nodeId) = activeSheetContent,
                quickActionsOpacity > 0.01 {
-                NodeQuickActionsToolbar(nodeId: nodeId) { id in
-                    quickDeleteNode(id: id)
-                }
+                NodeQuickActionsToolbar(
+                    nodeId: nodeId,
+                    onDelete: { id in
+                        quickDeleteNode(id: id)
+                    },
+                    onAdd: {
+                        resetSheetState()
+                        isAddingNode = true
+                    }
+                )
                 .padding(.bottom, currentSheetHeight + 8)
                 .opacity(quickActionsOpacity)
                 .scaleEffect(quickActionsScale)
@@ -185,9 +192,12 @@ private extension SetupDetailView {
     }
 
     func handleNodeTap(_ node: Equipment) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedDetent = .height(76)
+        if !isEditing {
+            withAnimation {
+                viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+            }
         }
+
         selectedNodeId = node.id
         activeSheetContent = .equipment(node.id)
     }

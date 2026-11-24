@@ -64,7 +64,7 @@ struct LightingDiagramView: View {
 
                 // Connecting Lines
                 Path { path in
-                    for node in viewModel.nodes {
+                    for node in viewModel.nodes where node.position != .zero {
                         path.move(to: subjectCenter)
                         let endPoint = CGPoint(
                             x: subjectCenter.x + node.position.x,
@@ -89,12 +89,13 @@ struct LightingDiagramView: View {
                 }
 
                 // Distance Labels: display down to 0.35 m so equipment at studio distances (< 1.5 m) keep labels
-                let minDistanceThreshold = 0.35
+                let minDistanceThreshold = 0.05
 
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
 
-                    if isExportedToPdf || distanceValue >= minDistanceThreshold {
+                    // Skip distance label if node is placed directly on subject center
+                    if node.position != .zero && (isExportedToPdf || distanceValue >= minDistanceThreshold) {
                         let deltaX = node.position.x
                         let deltaY = node.position.y
                         let posX = subjectCenter.x + deltaX * 0.5

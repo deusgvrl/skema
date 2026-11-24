@@ -114,7 +114,14 @@ extension Equipment {
     func syncPositionFromDistance() {
         let normalized = distance.replacingOccurrences(of: ",", with: ".")
         let cleaned = normalized.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
-        guard let targetMeters = Double(cleaned), targetMeters > 0 else { return }
+        guard let targetMeters = Double(cleaned), targetMeters >= 0 else { return }
+
+        if targetMeters == 0 {
+            positionX = 0
+            positionY = 0
+            self.distance = "0.00"
+            return
+        }
 
         let targetPoints = targetMeters * Self.pointsPerMeter
         let currentPoints = sqrt(positionX * positionX + positionY * positionY)
@@ -127,6 +134,7 @@ extension Equipment {
             positionX = 0
             positionY = -targetPoints
         }
+        self.distance = String(format: "%.2f", targetMeters)
     }
 
     func clone() -> Equipment {
@@ -196,6 +204,15 @@ extension Equipment {
         }
 }
 
+extension Equipment {
+    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
+    var displayName: String {
+        let role = role.trimmingCharacters(in: .whitespaces)
+        guard !role.isEmpty else { return name }
+        return label.isEmpty ? role : "\(role) - \(name)"
+    }
+}
+
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case camera = "Camera"
     case light = "Light"
@@ -204,11 +221,29 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
-extension Equipment {
-    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
-    var displayName: String {
-        let role = role.trimmingCharacters(in: .whitespaces)
-        guard !role.isEmpty else { return name }
-        return label.isEmpty ? role : "\(label) \(role)"
+extension EquipmentCategory {
+
+    /// Resolves the exact image asset name based on selection state
+    func imageName(isSelected: Bool) -> String {
+        switch self {
+        case .camera:
+            return isSelected ? "icon_camera_selected" : "icon_camera_viewonly"
+        case .light:
+            return isSelected ? "icon_light_selected" : "icon_light_view_only"
+        case .accessory:
+            return isSelected ? "icon_acc_selected" : "icon_acc_viewonly"
+        }
     }
+
+    /// Controls specific width/height dimensions for each category
+    var iconSize: CGSize {
+            switch self {
+            case .camera:
+                return CGSize(width: 80, height: 80)
+            case .light:
+                return CGSize(width: 80, height: 80)
+            case .accessory:
+                return CGSize(width: 80, height: 80) // Can adjust width/height per category if needed
+            }
+        }
 }

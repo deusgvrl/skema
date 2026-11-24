@@ -10,21 +10,35 @@ import SwiftUI
 struct NodeQuickActionsToolbar: View {
     let nodeId: UUID
     var onDelete: (UUID) -> Void
+    var onAdd: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack {
+            // Centered Delete Button
             Button(role: .destructive) {
                 onDelete(nodeId)
             } label: {
                 Image(systemName: "trash")
-                    .font(.subheadline.weight(.medium))
+                    .font(.title2)
                     .foregroundStyle(.red)
+                    .frame(width: 45, height: 45)
+                    .background(.regularMaterial, in: Circle())
             }
+            .glassEffect(.clear.interactive())
+
+            Spacer()
+
+            // Right-aligned Plus Button (45x45)
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+                    .font(.title2)
+                    .foregroundStyle(.white)
+                    .frame(width: 45, height: 45)
+                    .background(Circle().fill(DesignTokens.accentPrimary))
+            }
+            .glassEffect(.clear.interactive())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+        .padding(.horizontal, 30)
+        .frame(maxWidth: .infinity)
     }
 }

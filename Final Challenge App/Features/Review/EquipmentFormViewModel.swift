@@ -58,9 +58,14 @@ final class EquipmentFormViewModel {
 
     // MARK: - Data Operations
 
+    /// Reloads clean data from the model.
+    /// Resets all inputs to default/blank state if editingNodeId is nil or node is missing.
     func loadData() {
         guard let id = editingNodeId,
-              let node = reviewViewModel.nodes.first(where: { $0.id == id }) else { return }
+              let node = reviewViewModel.nodes.first(where: { $0.id == id }) else {
+            resetToDefaults()
+            return
+        }
 
         category = node.category
         name = node.name
@@ -83,7 +88,29 @@ final class EquipmentFormViewModel {
         notes = node.notes
     }
 
+    /// Resets all draft inputs to blank/default states for creating new equipment
+    func resetToDefaults() {
+        category = .light
+        name = ""
+        role = ""
+        power = ""
+        colorTemp = ""
+        lens = ""
+        iso = ""
+        aperture = ""
+        shutterSpeed = ""
+        whiteBalance = ""
+        height = ""
+        tilt = ""
+        horizontalAim = ""
+        distance = ""
+        accessories = ""
+        notes = ""
+    }
+
     func saveNode(undoManager: UndoManager?, completion: () -> Void) {
+        guard isFormValid else { return }
+
         let oldNodesSnapshot = reviewViewModel.nodes.map { $0.clone() }
         let sanitizedDistance = cleanNumericString(distance)
         let sanitizedAim = cleanNumericString(horizontalAim)
@@ -107,7 +134,7 @@ final class EquipmentFormViewModel {
             node.accessories = accessories
             node.notes = notes
 
-            // Synchronize diagram coordinates & heading rotation angle
+            // Synchronize diagram coordinates & heading rotation angle ONLY on save
             node.syncRotationFromHorizontalAim()
             node.syncPositionFromDistance()
 

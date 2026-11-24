@@ -11,14 +11,22 @@ struct EquipmentFormView: View {
     let undoManager: UndoManager?
     var isReadOnly: Bool = false
 
-    // State management for dirty tracking and confirmation alerts
     @State private var isDeleteAlert: Bool = false
     @State private var isDiscardAlertPresented: Bool = false
     @State private var isDirty: Bool = false
     @State private var isSwitchingNode: Bool = false
 
-    private var editingTitle: String? {
-        viewModel.nodes.first { $0.id == editingNodeId }?.displayName
+    private var editingNode: Equipment? {
+        viewModel.nodes.first { $0.id == editingNodeId }
+    }
+
+    private var editingTitle: String {
+        let name = editingNode?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? "Equipment" : name
+    }
+
+    private var editingRole: String {
+        editingNode?.role.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     init(
@@ -52,9 +60,30 @@ struct EquipmentFormView: View {
             .foregroundStyle(DesignTokens.textPrimary)
             .scrollContentBackground(.hidden)
             .background(selectedDetent == .large ? DesignTokens.sheetBackground : Color.clear)
-            .navigationTitle(formViewModel.isEditing ? (editingTitle ?? "Equipment Details") : "Add Equipment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    if formViewModel.isEditing && selectedDetent == .height(76) {
+                        VStack(spacing: 2) {
+                            Text(editingTitle)
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(DesignTokens.textPrimary)
+                                .lineLimit(1)
+
+                            if !editingRole.isEmpty {
+                                Text(editingRole)
+                                    .font(.subheadline)
+                                    .foregroundStyle(DesignTokens.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    } else {
+                        Text(formViewModel.isEditing ? editingTitle : "Add Equipment")
+                            .font(.headline)
+                            .foregroundStyle(DesignTokens.textPrimary)
+                    }
+                }
+
                 ToolbarItem(placement: .cancellationAction) {
                     Button(isReadOnly ? "Close" : "Cancel", systemImage: "xmark") {
                         if !isReadOnly && isDirty {
@@ -70,7 +99,11 @@ struct EquipmentFormView: View {
                         isPresented: $isDiscardAlertPresented,
                         titleVisibility: .visible
                     ) {
-                        Button("Discard Changes", role: .destructive) { dismiss() }
+                        Button("Discard Changes", role: .destructive) {
+                            formViewModel.loadData()
+                            isDirty = false
+                            dismiss()
+                        }
                     }
                 }
 
@@ -111,6 +144,8 @@ struct EquipmentFormView: View {
         .onChange(of: formViewModel.accessories) { _, _ in if !isSwitchingNode { isDirty = true } }
         .onChange(of: formViewModel.notes) { _, _ in if !isSwitchingNode { isDirty = true } }
         .onAppear {
+            formViewModel.loadData()
+            isDirty = false
             if editingNodeId != nil {
                 selectedDetent = .height(76)
             }
@@ -140,7 +175,6 @@ struct EquipmentFormView: View {
     }
 }
 
-// MARK: - Form Sections
 private extension EquipmentFormView {
     @ViewBuilder
     var equipmentSection: some View {
