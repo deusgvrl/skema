@@ -230,15 +230,11 @@ private extension SetupDetailView {
         selectedNodeId = nil
         activeSheetContent = nil
         let base = PDFLayout.diagramCanvasSize
-        let positions = viewModel.reviewViewModel.nodes.map(\.position)
-        let canvas = DiagramCanvas.size(fitting: positions, base: base)
-        let diagram = LightingDiagramView(
-            viewModel: viewModel.reviewViewModel,
-            isReadOnly: true,
-            isExportedToPdf: true
-        )
-        .frame(width: canvas.width, height: canvas.height)
-        .environment(\.colorScheme, .light)
+        let nodes = viewModel.reviewViewModel.nodes
+        let canvas = DiagramCanvas.size(fitting: nodes.map(\.position), base: base)
+        let diagram = PDFDiagramView(nodes: nodes)
+            .frame(width: canvas.width, height: canvas.height)
+            .environment(\.colorScheme, .light)
 
         let renderer = ImageRenderer(content: diagram)
         renderer.scale = max(1, Self.diagramImageScale * base.width / canvas.width)
