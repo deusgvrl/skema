@@ -19,20 +19,18 @@ struct NodeView: View {
 
     private let defaultHandleDistance: CGFloat = 72.0
 
-    // Rotation Haptic & Snapping States
-    @State private var lastHapticAngle: Double = 0.0
-    @State private var feedbackGenerator: UISelectionFeedbackGenerator?
+    // Snap Haptic & State (45° Increments)
+    @State private var snapFeedback: UIImpactFeedbackGenerator?
     @State private var lastRotationSnap: Int?
 
     @State private var currentHandleDistance: CGFloat = 72.0
     @State private var grabOffset: CGFloat = 0
 
-    // Cardinal Alignment Drag Haptic State (12, 3, 6, 9 o'clock)
+    // Cardinal Alignment Drag Haptic State
     @State private var lastCardinalSnap: Int?
 
     var body: some View {
         ZStack {
-            // 1. Unified Equipment Image Asset & Rotation Handle Controls
             ZStack {
                 if node.category == .light {
                     LightBeamConeView(colorTemp: node.colorTemp)
@@ -174,9 +172,10 @@ struct NodeView: View {
                     isRotating = true
                     onGestureStart()
                     grabOffset = fingerDistance - currentHandleDistance
-                    feedbackGenerator = UISelectionFeedbackGenerator()
-                    feedbackGenerator?.prepare()
-                    lastHapticAngle = node.rotationAngle
+
+                    // Prepare impact generator once when rotation starts
+                    snapFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    snapFeedback?.prepare()
                 }
 
                 currentHandleDistance = max(defaultHandleDistance, fingerDistance - grabOffset)
@@ -184,18 +183,8 @@ struct NodeView: View {
                 var visualAngle = (atan2(deltaY, deltaX) * 180 / .pi) + 90
                 if visualAngle < 0 { visualAngle += 360 }
 
-                // Apply 45° angle snapping
+                // Apply 45° angle snapping (triggers snapFeedback only when snapping)
                 let finalAngle = applyRotationSnap(to: visualAngle)
-
-                // Selection haptics for smooth continuous drag outside snap zones
-                if lastRotationSnap == nil {
-                    let step = 3.0
-                    if Int(finalAngle / step) != Int(lastHapticAngle / step) {
-                        feedbackGenerator?.selectionChanged()
-                        feedbackGenerator?.prepare()
-                        lastHapticAngle = finalAngle
-                    }
-                }
 
                 node.rotationAngle = finalAngle
                 node.syncHorizontalAimFromRotation()
@@ -206,7 +195,9 @@ struct NodeView: View {
                 lastRotationSnap = nil
                 grabOffset = 0
                 onGestureEnd()
-                feedbackGenerator = nil
+
+                snapFeedback = nil
+
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                     currentHandleDistance = defaultHandleDistance
                 }
@@ -227,7 +218,10 @@ struct NodeView: View {
                 let canvasDeltaX = value.translation.width / zoomScale
                 let canvasDeltaY = value.translation.height / zoomScale
 
-                let rawPosition = CGPoint(x: dragStartPosition.x + canvasDeltaX, y: dragStartPosition.y + canvasDeltaY)
+                let rawPosition = CGPoint(
+                    x: dragStartPosition.x + canvasDeltaX,
+                    y: dragStartPosition.y + canvasDeltaY
+                )
                 node.position = applyCardinalSnap(to: rawPosition)
                 node.syncDistanceFromPosition()
             }
@@ -257,7 +251,8 @@ struct NodeView: View {
             if normalizedDiff <= tolerance {
                 if lastRotationSnap != target {
                     lastRotationSnap = target
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    snapFeedback?.impactOccurred()
+                    snapFeedback?.prepare()
                 }
                 return Double(target)
             }
@@ -337,7 +332,6 @@ struct LightBeamConeView: View {
 
     var body: some View {
         ZStack {
-            // 1. Soft Volumetric Outer Spread
             LightBeamShape()
                 .fill(
                     LinearGradient(
@@ -352,9 +346,8 @@ struct LightBeamConeView: View {
                     )
                 )
                 .frame(width: 84, height: 96)
-                .blur(radius: 4) // Soft atmospheric glow edge
+                .blur(radius: 4)
 
-            // 2. Focused Core Hotspot Beam
             LightBeamShape()
                 .fill(
                     LinearGradient(
@@ -370,18 +363,17 @@ struct LightBeamConeView: View {
                 .frame(width: 48, height: 75)
                 .blur(radius: 1.5)
         }
-        .offset(y: -55) // Positions beam in front of the lamp head
+        .offset(y: -55)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 }
 
-// Trapezoid Shape representing the projected beam cone
 struct LightBeamShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let originWidth: CGFloat = 16 // Narrow origin at lamp head
-        let beamWidth: CGFloat = rect.width // Wide beam spread at end
+        let originWidth: CGFloat = 16
+        let beamWidth: CGFloat = rect.width
         let originInset = (beamWidth - originWidth) / 2
 
         path.move(to: CGPoint(x: originInset, y: rect.maxY))

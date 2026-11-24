@@ -116,13 +116,13 @@ private struct DiagramTipPill<TipType: Tip>: View {
 
 struct ReviewViewModeTip: Tip {
     var title: Text {
-        Text("Tap the pencil to edit your equipment")
+        Text("Tap the equipment or pencil button to edit your equipment")
     }
 }
 
 struct ReviewEditModeTip: Tip {
     var title: Text {
-        Text("Tap equipment to move, rotate, or edit details")
+        Text("You can drag equipment to move, rotate, or edit details")
     }
 }
 

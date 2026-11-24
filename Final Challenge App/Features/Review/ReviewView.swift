@@ -4,7 +4,7 @@ import SwiftUI
 /// Opens in view mode (Next, pencil); the pencil enters edit mode (undo/redo, ✓, +). Moving items
 /// keeps the long-press-then-drag gesture and only works in edit mode.
 struct ReviewView: View {
-    let isFromLoadingScreen: Bool
+    let isFromScanScreen: Bool
     @Bindable var viewModel: ReviewViewModel
     var onDismissToSetups: (() -> Void)?
 
@@ -38,11 +38,11 @@ struct ReviewView: View {
     }
 
     init(
-        isFromLoadingScreen: Bool,
+        isFromScanScreen: Bool,
         viewModel: ReviewViewModel,
         onDismissToSetups: (() -> Void)? = nil
     ) {
-        self.isFromLoadingScreen = isFromLoadingScreen
+        self.isFromScanScreen = isFromScanScreen
         self.viewModel = viewModel
         self.onDismissToSetups = onDismissToSetups
     }
@@ -93,7 +93,7 @@ struct ReviewView: View {
             ReviewToolbarContent(
                 viewModel: viewModel,
                 undoManager: undoManager,
-                isFromLoadingScreen: isFromLoadingScreen,
+                isFromScanScreen: isFromScanScreen,
                 activeSheetContent: $activeSheetContent,
                 selectedNodeId: $selectedNodeId,
                 isAddingNode: $isAddingNode,
@@ -115,7 +115,7 @@ struct ReviewView: View {
             )
         }
         .onAppear {
-            if (!isFromLoadingScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
+            if (!isFromScanScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
             }
         }
@@ -250,7 +250,7 @@ struct ReviewView: View {
     // MARK: - Helpers
 
     private func closeReview() {
-        if isFromLoadingScreen {
+        if isFromScanScreen {
             showsSaveSetupAlert = true
         } else {
             dismiss()
@@ -264,7 +264,7 @@ struct ReviewView: View {
             selectedNodeId = nil
             activeSheetContent = nil
             viewModel.discardEdits(undoManager: undoManager)
-            if !isFromLoadingScreen { dismiss() }
+            if !isFromScanScreen { dismiss() }
         }
     }
 
@@ -279,6 +279,6 @@ struct ReviewView: View {
 
 #Preview {
     NavigationStack {
-        ReviewView(isFromLoadingScreen: true, viewModel: ReviewViewModel())
+        ReviewView(isFromScanScreen: true, viewModel: ReviewViewModel())
     }
 }
