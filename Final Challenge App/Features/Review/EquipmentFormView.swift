@@ -331,20 +331,6 @@ private extension EquipmentFormView {
                         .foregroundStyle(DesignTokens.textSecondary)
                 }
 
-                if formViewModel.category == .light {
-                    HStack {
-                        Text("Horizontal aim")
-                        Spacer()
-                        TextField("e.g. 0", text: $formViewModel.horizontalAim)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(DesignTokens.textPrimary)
-                            .keyboardType(.numberPad)
-                            .disabled(isReadOnly)
-                        Text("°")
-                            .foregroundStyle(DesignTokens.textSecondary)
-                    }
-                }
-
                 HStack {
                     Text("Distance to subject")
                         .lineLimit(1)
