@@ -35,7 +35,7 @@ struct PDFDiagramView: View {
 
         // Target canvas radius (leaving margin for 60pt icons and labels around PDF edges)
         let maxCanvasRadius: CGFloat = 190.0
-        
+
         // Scale required so furthest equipment fits inside standard PDF box
         let fitScale = maxCanvasRadius / max(maxDistance, 50.0)
 
@@ -221,7 +221,7 @@ struct PDFDiagramView: View {
         let posX = node.position.x * scale
         let posY = node.position.y * scale
 
-        if (posX != 0 || posY != 0), let labelPos = calculateDistanceLabelPosition(posX: posX, posY: posY, centre: centre) {
+        if posX != 0 || posY != 0, let labelPos = calculateDistanceLabelPosition(posX: posX, posY: posY, centre: centre) {
             let metres = hypot(node.position.x, node.position.y) / Equipment.pointsPerMeter
             let text = node.distance.isEmpty ? String(format: "%.2f", metres) : node.distance
 
@@ -290,9 +290,9 @@ struct PDFDiagramView: View {
             (5.0, "5 m"),
             (10.0, "10 m")
         ]
-        
+
         let targetWidth: CGFloat = 70.0
-        
+
         let best = candidates.min(by: {
             abs(CGFloat($0.distance) * pointsPerMeterAtScale - targetWidth) <
             abs(CGFloat($1.distance) * pointsPerMeterAtScale - targetWidth)
