@@ -70,10 +70,6 @@ struct SetupDetailView: View {
                     showsDelete: nodeId != nil,
                     onDelete: { id in
                         quickDeleteNode(id: id)
-                    },
-                    onAdd: {
-                        resetSheetState()
-                        isAddingNode = true
                     }
                 )
                 .padding(.bottom, currentSheetHeight + 8)
