@@ -315,15 +315,25 @@ struct PDFEquipmentTablesTests {
 
     @Test("The light row has every form field with its unit")
     func light() throws {
-        let light = Equipment(category: .light, name: "Profoto D2", role: "Key", power: "1/4", colorTemp: "5600",
-                              height: "1,9", tilt: "-30", horizontalAim: "56", distance: "1.78",
-                              accessories: "Softbox")
+        let light = Equipment(
+            category: .light,
+            name: "Profoto D2",
+            role: "Key",
+            power: "1/4",
+            colorTemp: "5600",
+            height: "1,9",
+            tilt: "-30",
+            horizontalAim: "56",
+            distance: "1.78",
+            accessories: "Softbox"
+        )
         let table = try #require(tables([light]).first { $0.title == "LIGHTS" })
         let row = try #require(table.rows.first)
 
-        #expect(table.columns.map(\.title) == ["Name and role", "Power", "Color temperature", "Height", "Tilt",
-                                               "Aim", "Distance to subject"])
-        #expect(row.cells == ["Profoto D2", "1/4", "5600 K", "1,9 m", "-30°", "56°", "1.78 m"])
+        #expect(table.columns.map(\.title) == [
+            "Name and role", "Power", "Color temperature", "Height", "Tilt", "Distance to subject"
+        ])
+        #expect(row.cells == ["Profoto D2", "1/4", "5600 K", "1,9 m", "-30°", "1.78 m"])
         #expect(row.role == "Key" && row.accessories == "Softbox")
     }
 

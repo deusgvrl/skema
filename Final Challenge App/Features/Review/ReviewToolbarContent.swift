@@ -13,7 +13,7 @@ import SwiftUI
 struct ReviewToolbarContent: ToolbarContent {
     let viewModel: ReviewViewModel
     let undoManager: UndoManager?
-    let isFromLoadingScreen: Bool
+    let isFromScanScreen: Bool
 
     @Binding var activeSheetContent: DiagramSheetContent?
     @Binding var selectedNodeId: UUID?
@@ -86,13 +86,13 @@ struct ReviewToolbarContent: ToolbarContent {
         ) {
             Button("Discard Changes", role: .destructive) {
                 viewModel.discardEdits(undoManager: undoManager)
-                if !isFromLoadingScreen { onDismiss() }
+                if !isFromScanScreen { onDismiss() }
             }
         }
     }
 
     private var titleView: some View {
-        Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
+        Text(isFromScanScreen ? "Review Setup" : viewModel.draftSetup.setupName)
             .font(.headline)
             .foregroundStyle(DesignTokens.textPrimary)
     }
@@ -118,7 +118,7 @@ struct ReviewToolbarContent: ToolbarContent {
             selectedNodeId = nil
             activeSheetContent = nil
             viewModel.confirmEdits(undoManager: undoManager)
-            if !isFromLoadingScreen { onDismiss() }
+            if !isFromScanScreen { onDismiss() }
         }
         .buttonStyle(.glassProminent)
         .tint(DesignTokens.accentPrimary)

@@ -3,16 +3,19 @@ import SwiftUI
 struct LightingDiagramView: View {
     @Bindable var viewModel: ReviewViewModel
     var isReadOnly: Bool = false
+    var isExportedToPdf: Bool = false
     var undoManager: UndoManager?
 
     // Converted to Binding so parent controls selection lifecycle
     @Binding var selectedNodeId: UUID?
+    var isSubjectSelected: Bool = false
 
     var onNodeTap: ((Equipment) -> Void)?
     var onSubjectTap: (() -> Void)?
     var onEmptyTap: (() -> Void)?
 
     @State private var nodesSnapshot: [Equipment] = []
+    @State private var subjectRotationStart: Double = 0
 
     // Smooth Zoom & Pan States
     @State private var zoomScale: CGFloat = 1.0
@@ -23,25 +26,32 @@ struct LightingDiagramView: View {
     // Scale Meter Visibility State
     @State private var showScaleMeter: Bool = false
     @State private var hideScaleMeterTask: Task<Void, Never>?
+    var onNodeDragStart: ((Equipment) -> Void)?
 
     init(
         viewModel: ReviewViewModel,
         isReadOnly: Bool = false,
+        isExportedToPdf: Bool = false,
         undoManager: UndoManager? = nil,
         selectedNodeId: Binding<UUID?> = .constant(nil),
+        isSubjectSelected: Bool = false,
         initialZoomScale: CGFloat = 1.0,
         onNodeTap: ((Equipment) -> Void)? = nil,
         onSubjectTap: (() -> Void)? = nil,
-        onEmptyTap: (() -> Void)? = nil
+        onEmptyTap: (() -> Void)? = nil,
+        onNodeDragStart: ((Equipment) -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
+        self.isExportedToPdf = isExportedToPdf
         self.undoManager = undoManager
         self._selectedNodeId = selectedNodeId
+        self.isSubjectSelected = isSubjectSelected
         self._zoomScale = State(initialValue: initialZoomScale)
         self.onNodeTap = onNodeTap
         self.onSubjectTap = onSubjectTap
         self.onEmptyTap = onEmptyTap
+        self.onNodeDragStart = onNodeDragStart
     }
 
     var body: some View {
@@ -49,6 +59,12 @@ struct LightingDiagramView: View {
             let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
             let currentScale = zoomScale * magnifyBy
             let gridConfig = GridConfig.config(for: currentScale)
+
+            // Dynamic distance threshold evaluated cleanly per gesture frame
+            let minDistanceThreshold: Double = {
+                if isExportedToPdf { return 0.05 }
+                return max(0.15, 0.75 / Double(currentScale))
+            }()
 
             ZStack {
                 // Background Grid (Hides when isReadOnly is true)
@@ -80,18 +96,31 @@ struct LightingDiagramView: View {
                     title: "Subject",
                     icon: "person.fill",
                     position: subjectCenter,
-                    currentScale: currentScale
-                ) {
-                    onSubjectTap?()
-                }
+                    currentScale: currentScale,
+                    isSelected: isSubjectSelected,
+                    isReadOnly: isReadOnly,
+                    rotationAngle: $viewModel.draftSetup.subjectRotationAngle,
+                    onTap: { onSubjectTap?() },
+                    onGestureStart: {
+                        subjectRotationStart = viewModel.draftSetup.subjectRotationAngle
+                    },
+                    onGestureEnd: {
+                        guard !isReadOnly else { return }
+                        let finalAngle = viewModel.draftSetup.subjectRotationAngle
+                        // Reset to the start value so the undo registration captures the real old value
+                        viewModel.draftSetup.subjectRotationAngle = subjectRotationStart
+                        viewModel.updateSubjectRotation(
+                            oldValue: subjectRotationStart,
+                            newValue: finalAngle,
+                            undoManager: undoManager
+                        )
+                    }
+                )
 
-                // Distance Labels: display down to 0.35 m so equipment at studio distances (< 1.5 m) keep labels
-                let minDistanceThreshold = 0.05
-
+                // Distance Labels
                 ForEach(Array(viewModel.nodes.enumerated()), id: \.element.id) { _, node in
                     let distanceValue = Double("\(node.distance)") ?? (hypot(node.position.x, node.position.y) / 100)
 
-                    // Skip distance label if node is placed directly on subject center
                     if node.position != .zero && distanceValue >= minDistanceThreshold {
                         let deltaX = node.position.x
                         let deltaY = node.position.y
@@ -112,12 +141,6 @@ struct LightingDiagramView: View {
                             .font(.caption2.weight(.semibold))
                             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                             .foregroundStyle(DesignTokens.textSecondary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(DesignTokens.pageBackground.opacity(0.9))
-                            )
                             .fixedSize()
                             .rotationEffect(.degrees(angle))
                             .scaleEffect(1 / currentScale)
@@ -146,6 +169,7 @@ struct LightingDiagramView: View {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     selectedNodeId = node.id
                                 }
+                                onNodeDragStart?(node)
                                 nodesSnapshot = viewModel.nodes.map { $0.clone() }
                             }
                         },
@@ -216,7 +240,6 @@ struct LightingDiagramView: View {
             )
         }
         .clipped()
-        // Scale Meter Overlay (Only visible when isReadOnly is false)
         .overlay(alignment: .topLeading) {
             if !isReadOnly {
                 let activeScale = zoomScale * magnifyBy
@@ -232,8 +255,4 @@ struct LightingDiagramView: View {
             }
         }
     }
-}
-
-#Preview {
-    LightingDiagramView(viewModel: ReviewViewModel(), isReadOnly: false, undoManager: nil)
 }

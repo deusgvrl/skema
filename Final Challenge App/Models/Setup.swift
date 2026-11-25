@@ -2,20 +2,6 @@ import SwiftUI
 import SwiftData
 import Foundation
 
-extension Setup {
-    /// The earliest reference photo, the same one the setup's detail screen shows first.
-    var coverImage: ReferenceImage? {
-        referenceImages.min { $0.createdAt < $1.createdAt }
-    }
-
-    /// "SS" for "Skincare / soft daylight": shown instead of a cover photo when there is none.
-    var initials: String {
-        let words = setupName.split(whereSeparator: { $0 == " " || $0 == "/" }).prefix(2)
-        let letters = words.compactMap(\.first).map { String($0).uppercased() }
-        return letters.isEmpty ? "?" : letters.joined()
-    }
-}
-
 /// A saved lighting setup. Fields are added with A10-13.
 @Model
 final class Setup {
@@ -25,18 +11,17 @@ final class Setup {
     var project: String
     var notes: String
     var subjectHeight: String = ""
-    /// Set on the first Save only, never changed after (A10-93).
-    /// Optional on purpose: no migration for the MVP, so setups saved before this field still load.
+
+    // Subject Orientation (Matching Equipment's horizontalAim / rotationAngle)
+    var subjectHorizontalAim: String = "0"
+    var subjectRotationAngle: Double = 0.0
+
     var firstSavedDate: Date?
-    /// Set when the setup is moved to Recently Deleted, nil otherwise (A10-95).
-    /// Optional on purpose, so setups saved before this field still load.
     var deletedDate: Date?
 
-    // 1-to-Many Relationship: Deleting a setup deletes its equipment
     @Relationship(deleteRule: .cascade, inverse: \Equipment.setup)
     var nodes: [Equipment] = []
 
-    // 1-to-Many Relationship: Deleting a setup deletes its reference photos
     @Relationship(deleteRule: .cascade, inverse: \ReferenceImage.setup)
     var referenceImages: [ReferenceImage] = []
 
@@ -46,7 +31,9 @@ final class Setup {
         client: String = "",
         project: String = "",
         notes: String = "",
-        subjectHeight: String = ""
+        subjectHeight: String = "",
+        subjectHorizontalAim: String = "0",
+        subjectRotationAngle: Double = 0.0
     ) {
         self.id = id
         self.setupName = setupName
@@ -54,6 +41,8 @@ final class Setup {
         self.project = project
         self.notes = notes
         self.subjectHeight = subjectHeight
+        self.subjectHorizontalAim = subjectHorizontalAim
+        self.subjectRotationAngle = subjectRotationAngle
     }
 }
 
@@ -93,6 +82,34 @@ extension Setup {
 
         for node in nodes {
             node.pointToSubject()
+        }
+    }
+
+    /// The earliest reference photo, the same one the setup's detail screen shows first.
+    var coverImage: ReferenceImage? {
+        referenceImages.min { $0.createdAt < $1.createdAt }
+    }
+
+    /// "SS" for "Skincare / soft daylight": shown instead of a cover photo when there is none.
+    var initials: String {
+        let words = setupName.split(whereSeparator: { $0 == " " || $0 == "/" }).prefix(2)
+        let letters = words.compactMap(\.first).map { String($0).uppercased() }
+        return letters.isEmpty ? "?" : letters.joined()
+    }
+
+    /// Updates `subjectHorizontalAim` string (e.g. "45") from `subjectRotationAngle`
+    func syncSubjectHorizontalAimFromRotation() {
+        let displayAngle = (360 - Int(subjectRotationAngle)) % 360
+        self.subjectHorizontalAim = "\(displayAngle)"
+    }
+
+    /// Updates `subjectRotationAngle` from a typed numeric `subjectHorizontalAim` string
+    func syncSubjectRotationFromHorizontalAim() {
+        let normalized = subjectHorizontalAim.replacingOccurrences(of: ",", with: ".")
+        let cleaned = normalized.replacingOccurrences(of: "[^0-9.-]", with: "", options: .regularExpression)
+        if let displayAngle = Double(cleaned) {
+            let rawAngle = (360.0 - displayAngle).truncatingRemainder(dividingBy: 360.0)
+            self.subjectRotationAngle = rawAngle < 0 ? rawAngle + 360.0 : rawAngle
         }
     }
 }

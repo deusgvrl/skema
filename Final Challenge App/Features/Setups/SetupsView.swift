@@ -37,7 +37,7 @@ struct SetupsView: View {
             .fullScreenCover(item: $reviewViewModel) { reviewModel in
                 NavigationStack {
                     ReviewView(
-                        isFromLoadingScreen: true,
+                        isFromScanScreen: true,
                         viewModel: reviewModel,
                         onDismissToSetups: {
                             reviewViewModel = nil

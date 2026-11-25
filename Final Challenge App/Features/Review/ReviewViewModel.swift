@@ -134,6 +134,19 @@ final class ReviewViewModel: Identifiable {
         undoManager?.setActionName("Change Subject Height")
         updateUndoState(undoManager: undoManager)
     }
+
+    func updateSubjectRotation(oldValue: Double, newValue: Double, undoManager: UndoManager?) {
+        guard oldValue != newValue else { return }
+
+        draftSetup.subjectRotationAngle = newValue
+        storageController.save()
+
+        undoManager?.registerUndo(withTarget: self) { target in
+            target.updateSubjectRotation(oldValue: newValue, newValue: oldValue, undoManager: undoManager)
+        }
+        undoManager?.setActionName("Rotate Subject")
+        updateUndoState(undoManager: undoManager)
+    }
 }
 
 // MARK: - View and edit mode (Sketch R04, R04m, R04mx)
