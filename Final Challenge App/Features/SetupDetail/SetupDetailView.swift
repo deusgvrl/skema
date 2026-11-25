@@ -58,10 +58,16 @@ struct SetupDetailView: View {
             }
 
             if isEditing,
-               case .equipment(let nodeId) = activeSheetContent,
+               let content = activeSheetContent,
                quickActionsOpacity > 0.01 {
+                let nodeId: UUID? = {
+                    if case .equipment(let id) = content { return id }
+                    return nil
+                }()
+
                 NodeQuickActionsToolbar(
                     nodeId: nodeId,
+                    showsDelete: nodeId != nil,
                     onDelete: { id in
                         quickDeleteNode(id: id)
                     },
@@ -164,9 +170,14 @@ private extension SetupDetailView {
             viewModel: viewModel.reviewViewModel,
             undoManager: undoManager,
             selectedNodeId: $selectedNodeId,
+            isSubjectSelected: {
+                if case .subject = activeSheetContent { return true }
+                return false
+            }(),
             onNodeTap: { node in handleNodeTap(node) },
             onSubjectTap: { handleSubjectTap() },
-            onEmptyTap: { handleEmptyTap() }
+            onEmptyTap: { handleEmptyTap() },
+            onNodeDragStart: { node in handleNodeDragStart(node) }
         )
         .ignoresSafeArea(edges: .bottom)
     }
@@ -203,6 +214,12 @@ private extension SetupDetailView {
     }
 
     func handleSubjectTap() {
+        if !isEditing {
+            withAnimation {
+                viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
         }
@@ -212,6 +229,13 @@ private extension SetupDetailView {
 
     func handleEmptyTap() {
         resetSheetState()
+    }
+
+    func handleNodeDragStart(_ node: Equipment) {
+        if case .equipment(let id) = activeSheetContent, id == node.id { return }
+
+        selectedNodeId = node.id
+        activeSheetContent = .equipment(node.id)
     }
 
     func quickDeleteNode(id: UUID) {
@@ -229,10 +253,20 @@ private extension SetupDetailView {
     func shareTapped() {
         selectedNodeId = nil
         activeSheetContent = nil
+
         let base = PDFLayout.diagramCanvasSize
         let nodes = viewModel.reviewViewModel.nodes
-        let canvas = DiagramCanvas.size(fitting: nodes.map(\.position), base: base)
-        let diagram = PDFDiagramView(nodes: nodes)
+        let subjectAngle = viewModel.reviewViewModel.draftSetup.subjectRotationAngle
+
+        // Instantiate view to access autoScale property
+        let pdfView = PDFDiagramView(nodes: nodes, subjectRotationAngle: subjectAngle)
+        let scale = pdfView.autoScale
+
+        // Scale position points for bounding canvas calculation
+        let scaledPositions = nodes.map { CGPoint(x: $0.position.x * scale, y: $0.position.y * scale) }
+        let canvas = DiagramCanvas.size(fitting: scaledPositions, base: base)
+
+        let diagram = pdfView
             .frame(width: canvas.width, height: canvas.height)
             .environment(\.colorScheme, .light)
 

@@ -4,7 +4,7 @@ import SwiftUI
 /// Opens in view mode (Next, pencil); the pencil enters edit mode (undo/redo, ✓, +). Moving items
 /// keeps the long-press-then-drag gesture and only works in edit mode.
 struct ReviewView: View {
-    let isFromLoadingScreen: Bool
+    let isFromScanScreen: Bool
     @Bindable var viewModel: ReviewViewModel
     var onDismissToSetups: (() -> Void)?
 
@@ -38,11 +38,11 @@ struct ReviewView: View {
     }
 
     init(
-        isFromLoadingScreen: Bool,
+        isFromScanScreen: Bool,
         viewModel: ReviewViewModel,
         onDismissToSetups: (() -> Void)? = nil
     ) {
-        self.isFromLoadingScreen = isFromLoadingScreen
+        self.isFromScanScreen = isFromScanScreen
         self.viewModel = viewModel
         self.onDismissToSetups = onDismissToSetups
     }
@@ -54,6 +54,10 @@ struct ReviewView: View {
                 viewModel: viewModel,
                 undoManager: undoManager,
                 selectedNodeId: $selectedNodeId,
+                isSubjectSelected: {
+                    if case .subject = activeSheetContent { return true }
+                    return false
+                }(),
                 onNodeTap: { node in
                     handleNodeTap(node)
                 },
@@ -62,23 +66,32 @@ struct ReviewView: View {
                 },
                 onEmptyTap: {
                     handleEmptyTap()
-                }
+                },
+                onNodeDragStart: { node in handleNodeDragStart(node) }
             )
             .ignoresSafeArea(edges: .bottom)
 
             // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
             if viewModel.isEditingDiagram,
-               case .equipment(let nodeId) = activeSheetContent,
+               let content = activeSheetContent,
                quickActionsOpacity > 0.01 {
+
+                let nodeId: UUID? = {
+                    if case .equipment(let id) = content { return id }
+                    return nil
+                }()
+
                 NodeQuickActionsToolbar(
                     nodeId: nodeId,
-                    onDelete: quickDeleteNode(id:),
+                    showsDelete: nodeId != nil,
+                    onDelete: { id in
+                        quickDeleteNode(id: id)
+                    },
                     onAdd: {
                         resetSheetState()
                         isAddingNode = true
                     }
                 )
-
                 .padding(.bottom, currentSheetHeight + 8)
                 .opacity(quickActionsOpacity)
                 .scaleEffect(quickActionsScale)
@@ -93,7 +106,7 @@ struct ReviewView: View {
             ReviewToolbarContent(
                 viewModel: viewModel,
                 undoManager: undoManager,
-                isFromLoadingScreen: isFromLoadingScreen,
+                isFromScanScreen: isFromScanScreen,
                 activeSheetContent: $activeSheetContent,
                 selectedNodeId: $selectedNodeId,
                 isAddingNode: $isAddingNode,
@@ -115,7 +128,7 @@ struct ReviewView: View {
             )
         }
         .onAppear {
-            if (!isFromLoadingScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
+            if (!isFromScanScreen || viewModel.nodes.isEmpty) && !viewModel.isEditingDiagram {
                 viewModel.beginEditing(undoManager: undoManager)
             }
         }
@@ -231,7 +244,13 @@ struct ReviewView: View {
         activeSheetContent = .equipment(node.id)
     }
 
-    private func handleSubjectTap() {
+    func handleSubjectTap() {
+        if !viewModel.isEditingDiagram {
+            withAnimation {
+                viewModel.beginEditing(undoManager: undoManager)
+            }
+        }
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             selectedDetent = .height(76)
         }
@@ -247,10 +266,18 @@ struct ReviewView: View {
         }
     }
 
+    func handleNodeDragStart(_ node: Equipment) {
+        // Only switch if a different item is currently active
+        if case .equipment(let id) = activeSheetContent, id == node.id { return }
+
+        selectedNodeId = node.id
+        activeSheetContent = .equipment(node.id)
+    }
+
     // MARK: - Helpers
 
     private func closeReview() {
-        if isFromLoadingScreen {
+        if isFromScanScreen {
             showsSaveSetupAlert = true
         } else {
             dismiss()
@@ -264,7 +291,7 @@ struct ReviewView: View {
             selectedNodeId = nil
             activeSheetContent = nil
             viewModel.discardEdits(undoManager: undoManager)
-            if !isFromLoadingScreen { dismiss() }
+            if !isFromScanScreen { dismiss() }
         }
     }
 
@@ -279,6 +306,6 @@ struct ReviewView: View {
 
 #Preview {
     NavigationStack {
-        ReviewView(isFromLoadingScreen: true, viewModel: ReviewViewModel())
+        ReviewView(isFromScanScreen: true, viewModel: ReviewViewModel())
     }
 }

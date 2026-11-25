@@ -31,20 +31,20 @@ enum PDFEquipmentTables {
         }
     }
 
-    // MARK: Tables (the widths of each add up to `PDFLayout.contentWidth`)
+    // MARK: Tables (the widths of each add up to `PDFLayout.contentWidth` = 523)
 
     private static func cameras(_ items: [Equipment]) -> PDFTable {
         PDFTable(
             title: "CAMERA",
             columns: [
-                .init(title: "Name / role", width: 149),
-                .init(title: "Lens", width: 44),
-                .init(title: "ISO", width: 40),
-                .init(title: "Aperture", width: 52),
-                .init(title: "Shutter speed", width: 46),
-                .init(title: "White balance", width: 50),
-                .init(title: "Height", width: 46),
-                .init(title: "Tilt", width: 36),
+                .init(title: "Name / role", width: 160),
+                .init(title: "Lens", width: 42),
+                .init(title: "ISO", width: 38),
+                .init(title: "Aperture", width: 50),
+                .init(title: "Shutter speed", width: 44),
+                .init(title: "White balance", width: 48),
+                .init(title: "Height", width: 44),
+                .init(title: "Tilt", width: 37),
                 .init(title: "Distance to subject", width: 60)
             ],
             rows: items.map { item in
@@ -61,18 +61,17 @@ enum PDFEquipmentTables {
         PDFTable(
             title: "LIGHTING",
             columns: [
-                .init(title: "Name / role", width: 170),
-                .init(title: "Power", width: 50),
-                .init(title: "Color temperature", width: 70),
-                .init(title: "Height", width: 52),
-                .init(title: "Tilt", width: 44),
-                .init(title: "Horizontal aim", width: 62),
-                .init(title: "Distance to subject", width: 75)
+                .init(title: "Name / role", width: 160),
+                .init(title: "Power", width: 55),
+                .init(title: "Color temperature", width: 78),
+                .init(title: "Height", width: 55),
+                .init(title: "Tilt", width: 50),
+                .init(title: "Distance to subject", width: 125)
             ],
             rows: items.map { item in
                 row(for: item, values: [
                     value(item.power), value(item.colorTemp, unit: " K"), value(item.height, unit: " m"),
-                    value(item.tilt, unit: "°"), value(item.horizontalAim, unit: "°"),
+                    value(item.tilt, unit: "°"),
                     value(item.distance, unit: " m")
                 ])
             }
@@ -82,7 +81,7 @@ enum PDFEquipmentTables {
     private static func subject(height: String) -> PDFTable {
         PDFTable(
             title: "SUBJECT",
-            columns: [.init(title: "Name", width: 170), .init(title: "Height from floor", width: 353)],
+            columns: [.init(title: "Name", width: 160), .init(title: "Height from floor", width: 363)],
             rows: [.init(cells: ["Subject", value(height, unit: " m")])]
         )
     }
@@ -90,7 +89,7 @@ enum PDFEquipmentTables {
     private static func accessories(_ items: [Equipment]) -> PDFTable {
         PDFTable(
             title: "ACCESSORIES",
-            columns: [.init(title: "Name", width: 170), .init(title: "Notes", width: 353)],
+            columns: [.init(title: "Name", width: 160), .init(title: "Notes", width: 363)],
             rows: items.map { .init(cells: [value($0.name), value($0.notes)]) }
         )
     }
