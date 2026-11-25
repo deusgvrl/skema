@@ -11,7 +11,6 @@ struct EquipmentFormView: View {
     let undoManager: UndoManager?
     var isReadOnly: Bool = false
 
-    @State private var isDeleteAlert: Bool = false
     @State private var isDiscardAlertPresented: Bool = false
     @State private var isDirty: Bool = false
     @State private var isSwitchingNode: Bool = false
@@ -161,16 +160,6 @@ struct EquipmentFormView: View {
                 isDirty = false
                 isSwitchingNode = false
             }
-        }
-        .alert("Delete Equipment", isPresented: $isDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                formViewModel.deleteNode(undoManager: undoManager) {
-                    dismiss()
-                }
-            }
-        } message: {
-            Text("Are you sure you want to remove this equipment?")
         }
     }
 }

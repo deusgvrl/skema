@@ -406,14 +406,6 @@ extension ScanViewModel {
         return ScanOverlay.screenBox(of: bounds.corners, camera: camera, screenSize: size)
     }
 
-    /// "Light 1 · 1.52 m · 1.20 m" once measured; just the name before that.
-    func tagText(for item: ScanItem) -> String {
-        guard let values = Self.values(of: item.result, hasFloor: floorY != nil), let height = values.height else {
-            return "\(item.name) ✓"
-        }
-        return "\(item.name) · \(Self.metres(values.distance)) m · \(Self.metres(height)) m"
-    }
-
     func isSaved(_ item: ScanItem) -> Bool {
         Self.values(of: item.result, hasFloor: floorY != nil) != nil
     }
