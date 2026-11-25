@@ -10,7 +10,7 @@ import UIKit
 
 /// A smooth zooming and panning container backed by UIKit's `UIScrollView`.
 /// Replaces manual DragGesture and MagnifyGesture with native momentum, 2-finger pan,
-/// pinch-to-zoom, rubber-banding, and double-tap zoom matching FullScreenImageView.
+/// pinch-to-zoom, and rubber-banding matching FullScreenImageView.
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     @Binding var zoomScale: CGFloat
     let minScale: CGFloat
@@ -26,7 +26,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     init(
         zoomScale: Binding<CGFloat>,
         minScale: CGFloat = 0.3,
-        maxScale: CGFloat = 4.0,
+        maxScale: CGFloat = 8.0,
         canvasSize: CGSize = CGSize(width: 3000, height: 3000),
         isReadOnly: Bool = false,
         interactiveCenters: [CGPoint] = [],
@@ -66,24 +66,25 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         scrollView.decelerationRate = .normal
         scrollView.delaysContentTouches = false
         scrollView.canCancelContentTouches = true
+        scrollView.scrollsToTop = false
         scrollView.backgroundColor = .clear
-
-        let doubleTap = UITapGestureRecognizer(
-            target: context.coordinator,
-            action: #selector(Coordinator.handleDoubleTap(_:))
-        )
-        doubleTap.numberOfTapsRequired = 2
 
         let singleTap = UITapGestureRecognizer(
             target: context.coordinator,
             action: #selector(Coordinator.handleSingleTap(_:))
         )
         singleTap.numberOfTapsRequired = 1
-        singleTap.require(toFail: doubleTap)
 
-        scrollView.addGestureRecognizer(doubleTap)
         scrollView.addGestureRecognizer(singleTap)
-        scrollView.panGestureRecognizer.delegate = context.coordinator
+
+        scrollView.shouldBlockPan = { [weak coordinator = context.coordinator] gesture in
+            coordinator?.shouldBlockPan(gesture) ?? false
+        }
+
+        scrollView.onLayout = { [weak coordinator = context.coordinator, weak scrollView] in
+            guard let coordinator, let scrollView else { return }
+            coordinator.centerContentIfNeeded(in: scrollView)
+        }
 
         let hostedView = context.coordinator.hostingController.view!
         hostedView.backgroundColor = .clear
@@ -98,23 +99,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     func updateUIView(_ uiView: DiagramUIScrollView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.hostingController.rootView = content
-
-        let hostedView = context.coordinator.hostingController.view!
-        if hostedView.frame.size != canvasSize {
-            hostedView.frame = CGRect(origin: .zero, size: canvasSize)
-            uiView.contentSize = CGSize(
-                width: canvasSize.width * uiView.zoomScale,
-                height: canvasSize.height * uiView.zoomScale
-            )
-        }
-
-        // Center on initial layout once geometry is valid
-        if !context.coordinator.hasCenteredInitialContent && uiView.bounds.width > 0 {
-            context.coordinator.hasCenteredInitialContent = true
-            let initialX = (canvasSize.width - uiView.bounds.width) / 2
-            let initialY = (canvasSize.height - uiView.bounds.height) / 2
-            uiView.contentOffset = CGPoint(x: initialX, y: initialY)
-        }
+        context.coordinator.centerContentIfNeeded(in: uiView)
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
@@ -122,6 +107,30 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         let hostingController: UIHostingController<Content>
         weak var scrollView: DiagramUIScrollView?
         var hasCenteredInitialContent = false
+
+        func centerContentIfNeeded(in uiView: UIScrollView) {
+            guard !hasCenteredInitialContent, uiView.bounds.width > 0, uiView.bounds.height > 0 else { return }
+            hasCenteredInitialContent = true
+            let initialX = (parent.canvasSize.width * uiView.zoomScale - uiView.bounds.width) / 2
+            let initialY = (parent.canvasSize.height * uiView.zoomScale - uiView.bounds.height) / 2
+            uiView.contentOffset = CGPoint(x: initialX, y: initialY)
+        }
+
+        func shouldBlockPan(_ gesture: UIGestureRecognizer) -> Bool {
+            guard let scrollView else { return false }
+            if parent.isReadOnly { return false }
+            if gesture.numberOfTouches >= 2 { return false }
+
+            let hostedView = hostingController.view!
+            let location = gesture.location(in: hostedView)
+            // Screen hit target is 52pt; in canvas coordinates it shrinks by 1 / zoomScale
+            let currentScale = max(0.1, scrollView.zoomScale)
+            let itemHitRadius: CGFloat = 52.0 / currentScale
+
+            return parent.interactiveCenters.contains {
+                hypot(location.x - $0.x, location.y - $0.y) <= itemHitRadius
+            }
+        }
 
         init(_ parent: ZoomableScrollView) {
             self.parent = parent
@@ -148,27 +157,6 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
             parent.onEmptyTap?()
         }
 
-        @objc func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
-            guard let scrollView else { return }
-            let hostedView = hostingController.view!
-
-            if scrollView.zoomScale > (parent.minScale + 0.15) {
-                scrollView.setZoomScale(1.0, animated: true)
-            } else {
-                let targetScale: CGFloat = min(2.5, parent.maxScale)
-                let tapLocation = recognizer.location(in: hostedView)
-                let width = scrollView.bounds.width / targetScale
-                let height = scrollView.bounds.height / targetScale
-                let zoomRect = CGRect(
-                    x: tapLocation.x - (width / 2),
-                    y: tapLocation.y - (height / 2),
-                    width: width,
-                    height: height
-                )
-                scrollView.zoom(to: zoomRect, animated: true)
-            }
-        }
-
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             guard let scrollView, gestureRecognizer == scrollView.panGestureRecognizer else {
                 return true
@@ -178,13 +166,14 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
                 return true
             }
 
-            if touch.numberOfTouches >= 2 {
+            if gestureRecognizer.numberOfTouches >= 2 {
                 return true
             }
 
             let hostedView = hostingController.view!
             let locationInCanvas = touch.location(in: hostedView)
-            let itemHitRadius: CGFloat = 52.0
+            let currentScale = max(0.1, scrollView.zoomScale)
+            let itemHitRadius: CGFloat = 52.0 / currentScale
 
             for center in parent.interactiveCenters {
                 let distance = hypot(locationInCanvas.x - center.x, locationInCanvas.y - center.y)
@@ -199,4 +188,23 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
 }
 
 // A specialized UIScrollView subclass for diagram interaction
-final class DiagramUIScrollView: UIScrollView {}
+final class DiagramUIScrollView: UIScrollView {
+    /// Callback when bounds change or layout occurs to guarantee initial centering
+    var onLayout: (() -> Void)?
+
+    /// Return true if a single-finger pan starting at this point (in the scroll view's
+    /// content/hosted view coordinates) should be blocked, e.g. because it hit an item.
+    var shouldBlockPan: ((UIGestureRecognizer) -> Bool)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?()
+    }
+
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === panGestureRecognizer, shouldBlockPan?(gestureRecognizer) == true {
+            return false
+        }
+        return super.gestureRecognizerShouldBegin(gestureRecognizer)
+    }
+}

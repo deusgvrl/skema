@@ -19,6 +19,7 @@ struct LightingDiagramView: View {
 
     // Smooth Zoom & Scale States
     @State private var zoomScale: CGFloat = 1.0
+    @State private var overlayScale: CGFloat = 1.0
 
     // Scale Meter Visibility State
     @State private var showScaleMeter: Bool = false
@@ -55,13 +56,13 @@ struct LightingDiagramView: View {
 
     var body: some View {
         let subjectCenter = CGPoint(x: canvasDimension / 2, y: canvasDimension / 2)
-        let currentScale = zoomScale
-        let gridConfig = GridConfig.config(for: currentScale)
+        let diagramScale = zoomScale
+        let gridConfig = GridConfig.config(for: diagramScale)
 
         // Dynamic distance threshold evaluated cleanly per gesture frame
         let minDistanceThreshold: Double = {
             if isExportedToPdf { return 0.05 }
-            return max(0.15, 0.75 / Double(currentScale))
+            return max(0.15, 0.75 / Double(diagramScale))
         }()
 
         let interactiveCenters: [CGPoint] = [subjectCenter] + viewModel.nodes.map {
@@ -71,7 +72,7 @@ struct LightingDiagramView: View {
         ZoomableScrollView(
             zoomScale: $zoomScale,
             minScale: 0.3,
-            maxScale: 4.0,
+            maxScale: 8.0,
             canvasSize: CGSize(width: canvasDimension, height: canvasDimension),
             isReadOnly: isReadOnly,
             interactiveCenters: interactiveCenters,
@@ -81,7 +82,8 @@ struct LightingDiagramView: View {
                 }
                 onEmptyTap?()
             },
-            onZoomChanged: { _ in
+            onZoomChanged: { scale in
+                overlayScale = scale
                 guard !isReadOnly else { return }
                 hideScaleMeterTask?.cancel()
                 if !showScaleMeter {
@@ -109,7 +111,7 @@ struct LightingDiagramView: View {
                 // Background Grid (Hides when isReadOnly is true)
                 if !isReadOnly {
                     GridPattern(step: gridConfig.stepInPoints)
-                        .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
+                        .stroke(DesignTokens.diagramGrid, lineWidth: 1 / diagramScale)
                         .frame(width: canvasDimension, height: canvasDimension)
                         .position(subjectCenter)
                 }
@@ -127,7 +129,7 @@ struct LightingDiagramView: View {
                 }
                 .stroke(
                     DesignTokens.diagramGuide,
-                    style: StrokeStyle(lineWidth: 1 / currentScale, dash: [4 / currentScale, 3 / currentScale])
+                    style: StrokeStyle(lineWidth: 1 / diagramScale, dash: [4 / diagramScale, 3 / diagramScale])
                 )
 
                 // Subject Card
@@ -135,7 +137,7 @@ struct LightingDiagramView: View {
                     title: "Subject",
                     icon: "person.fill",
                     position: subjectCenter,
-                    currentScale: currentScale,
+                    currentScale: diagramScale,
                     isSelected: isSubjectSelected,
                     isReadOnly: isReadOnly,
                     rotationAngle: $viewModel.draftSetup.subjectRotationAngle,
@@ -182,7 +184,7 @@ struct LightingDiagramView: View {
                             .foregroundStyle(DesignTokens.textSecondary)
                             .fixedSize()
                             .rotationEffect(.degrees(angle))
-                            .scaleEffect(1 / currentScale)
+                            .scaleEffect(1 / diagramScale)
                             .position(x: posX, y: posY)
                             .transition(.opacity)
                     }
@@ -195,7 +197,7 @@ struct LightingDiagramView: View {
                         subjectCenter: subjectCenter,
                         isSelected: selectedNodeId == node.id,
                         isReadOnly: isReadOnly,
-                        zoomScale: currentScale,
+                        zoomScale: diagramScale,
                         onTap: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedNodeId = node.id
@@ -223,10 +225,11 @@ struct LightingDiagramView: View {
             .frame(width: canvasDimension, height: canvasDimension)
             .background(DesignTokens.pageBackground)
         }
+        )
         .clipped()
         .overlay(alignment: .topLeading) {
             if !isReadOnly {
-                let activeScale = zoomScale
+                let activeScale = overlayScale
                 let activeConfig = GridConfig.config(for: activeScale)
 
                 ScaleMeterView(
