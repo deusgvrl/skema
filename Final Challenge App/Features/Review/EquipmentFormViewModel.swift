@@ -90,7 +90,7 @@ final class EquipmentFormViewModel {
 
     /// Resets all draft inputs to blank/default states for creating new equipment
     func resetToDefaults() {
-        category = .light
+        category = .camera
         name = ""
         role = ""
         power = ""
