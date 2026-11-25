@@ -253,10 +253,20 @@ private extension SetupDetailView {
     func shareTapped() {
         selectedNodeId = nil
         activeSheetContent = nil
+
         let base = PDFLayout.diagramCanvasSize
         let nodes = viewModel.reviewViewModel.nodes
-        let canvas = DiagramCanvas.size(fitting: nodes.map(\.position), base: base)
-        let diagram = PDFDiagramView(nodes: nodes)
+        let subjectAngle = viewModel.reviewViewModel.draftSetup.subjectRotationAngle
+
+        // Instantiate view to access autoScale property
+        let pdfView = PDFDiagramView(nodes: nodes, subjectRotationAngle: subjectAngle)
+        let scale = pdfView.autoScale
+
+        // Scale position points for bounding canvas calculation
+        let scaledPositions = nodes.map { CGPoint(x: $0.position.x * scale, y: $0.position.y * scale) }
+        let canvas = DiagramCanvas.size(fitting: scaledPositions, base: base)
+
+        let diagram = pdfView
             .frame(width: canvas.width, height: canvas.height)
             .environment(\.colorScheme, .light)
 
