@@ -5,7 +5,8 @@
 //  Created by Amadeus Gavriel on 24/11/26.
 //
 //  The Metal renderer: its uniforms for one frame (R4), that its shaders and pipelines build, and that its outline
-//  pass really hides a box behind a nearer LiDAR depth. Shared camera: fx = fy = 1500, centre (960, 720),
+//  pass really hides a box behind a nearer LiDAR depth; a box off the screen loses its buffers and gets them back
+//  (O6–O7, A10-121). Shared camera: fx = fy = 1500, centre (960, 720),
 //  1920 x 1440 picture, no turn or move, shown on a 390 x 844 portrait view.
 //
 
@@ -84,6 +85,53 @@ struct ScanMetalRendererTests {
         let oneLayer = Int((OutlineLayout.opacity * 255).rounded())
         #expect(abs(result.commonRed - oneLayer) <= 12,
                 "Most common line value \(result.commonRed), one layer \(oneLayer). Histogram: \(result.histogram)")
+    }
+
+    @Test("O6: a box off the screen is not drawn and loses its GPU buffers")
+    func anOffScreenBoxIsNotDrawnAndLosesItsBuffers() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let buffers = OutlineBuffers(device: device)
+        let ahead = UUID()
+        let behind = UUID()
+        let boxes = [ahead: cube(atZ: -2), behind: cube(atZ: 2)]
+        buffers.update(boxes) { _ in 0.005 }
+        try #require(buffers.entries[behind] != nil)
+
+        let visible = ScanMetalRenderer.visibleOutlines(boxes, camera: sharedCamera())
+        buffers.update(visible) { _ in 0.005 }
+
+        #expect(Set(visible.keys) == [ahead])
+        #expect(buffers.entries[ahead] != nil)
+        #expect(buffers.entries[behind] == nil)
+    }
+
+    @Test("O7: a box back in the view is built again")
+    func aBoxBackInViewIsBuiltAgain() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let buffers = OutlineBuffers(device: device)
+        let ahead = UUID()
+        let behind = UUID()
+        let boxes = [ahead: cube(atZ: -2), behind: cube(atZ: 2)]
+        let camera = sharedCamera()
+        // Both boxes had buffers; looking ahead, the second box loses them.
+        buffers.update(boxes) { _ in 0.005 }
+        buffers.update(ScanMetalRenderer.visibleOutlines(boxes, camera: camera)) { _ in 0.005 }
+        try #require(buffers.entries[behind] == nil)
+
+        // The camera turns half a circle around the up axis: it looks along +z now, so only the second box is ahead.
+        let turned = CameraModel(intrinsics: camera.intrinsics, imageResolution: camera.imageResolution,
+                                 cameraToWorld: float4x4(simd_quatf(angle: .pi, axis: SIMD3(0, 1, 0))))
+        let visible = ScanMetalRenderer.visibleOutlines(boxes, camera: turned)
+        buffers.update(visible) { _ in 0.005 }
+
+        #expect(Set(visible.keys) == [behind])
+        #expect(buffers.entries[behind] != nil)
+        #expect(buffers.entries[ahead] == nil)
+    }
+
+    /// A 20 cm cube on the camera's centre line, `depthZ` metres along the z axis.
+    private func cube(atZ depthZ: Float) -> WorldBox {
+        WorldBox(min: SIMD3(-0.1, -0.1, depthZ - 0.1), max: SIMD3(0.1, 0.1, depthZ + 0.1))
     }
 
     /// Draws one box with the renderer's outline pass into a 64 x 128 bgra8Unorm target cleared to black, with a

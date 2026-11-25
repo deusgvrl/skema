@@ -69,7 +69,7 @@ final class ScanViewModel {
     @ObservationIgnored private var framesTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
     @ObservationIgnored private var measurements = ScanMeasurements()
-    /// Stands for the subject in `measurements` and `viewSpreads`.
+    /// Stands for the subject in `measurements` and `viewSpreads`. Internal so tests can read it.
     @ObservationIgnored let subjectID = UUID()
     @ObservationIgnored private var kindCounts: [ScanTapKind: Int] = [:]
     @ObservationIgnored private var latestFrame: ScanFrame?
@@ -288,40 +288,59 @@ final class ScanViewModel {
 
     // MARK: Painting
 
-    /// Takes one frame: collects the column of the subject and of every item and refreshes the live results.
-    /// Internal so tests can call it.
-    func collect(from frame: ScanFrame) {
+    /// Takes one frame: collects the column of the subject and of every item that is in view (A10-121) and refreshes
+    /// the live results. An item out of view keeps everything it has. Internal so tests can call it.
+    /// - Returns: the ids (the subject's too) whose LiDAR was sampled in this frame. Empty when the frame has no depth
+    ///   or there is no floor.
+    @discardableResult
+    func collect(from frame: ScanFrame) -> Set<UUID> {
         camera = frame.camera
         // A frame that finds the floor moves the scan on to the subject. A tap's own frame does not (`tap`): the tap
         // keeps the kind it was made with.
         if updateFloor(from: frame) { advance() }
-        guard let depth = frame.depth, let floorY else { return }
+        guard let depth = frame.depth, let floorY else { return [] }
         let heights = (floorY + Self.columnFloorGap)...(floorY + Self.columnHeight)
-        func paint(around anchor: SIMD3<Float>, for id: UUID) -> Int {
+        /// What one paint of a column did: `painted` points in this frame (for the walk-around, `see`) and `fresh`
+        /// new ones kept (for the box). Nil when the column is out of view and nothing was sampled (A10-121).
+        func paint(around anchor: SIMD3<Float>, for id: UUID) -> (painted: Int, fresh: Int)? {
+            guard Self.isInView(anchor, floorY: floorY, camera: frame.camera) else { return nil }
             let points = DepthSampler.columnPoints(around: [anchor], radius: Self.columnRadius, betweenY: heights,
                                                    depth: depth, camera: frame.camera)
-            measurements.add(points: points, to: id, camera: frame.camera)
-            return points.count
+            let fresh = measurements.add(points: points, to: id, camera: frame.camera)
+            return (points.count, fresh)
         }
-        if let subject {
-            let count = paint(around: subject, for: subjectID)
-            see(subjectID, at: subject, pointCount: count, camera: frame.camera)
-            subjectBounds = measurements.bounds(for: subjectID).map { WorldBox(min: $0.min, max: $0.max) }
+        var sampled: Set<UUID> = []
+        if let subject, let result = paint(around: subject, for: subjectID) {
+            sampled.insert(subjectID)
+            see(subjectID, at: subject, pointCount: result.painted, camera: frame.camera)
+            if result.fresh > 0 {
+                subjectBounds = measurements.bounds(for: subjectID).map { WorldBox(min: $0.min, max: $0.max) }
+            }
         }
         for item in items {
-            let count: Int
+            let painted: Int
             if item.kind == .light {
-                // A10-106: a light is the surface painted from its tap; its outline is its grown box.
-                count = paintSurface(of: item, depth: depth, camera: frame.camera, floorY: floorY)
+                // A10-106: a light is the surface painted from its tap; its outline is its grown box. The grown box
+                // can change with no new point (a new small box, the oldest one dropped), so it is read again after
+                // every paint; it is a cheap union of at most 30 boxes.
+                guard let count = paintSurface(of: item, depth: depth, camera: frame.camera, floorY: floorY) else {
+                    continue
+                }
+                painted = count
                 itemBounds[item.id] = measurements.bigBox(for: item.id)
             } else {
-                count = paint(around: item.anchor, for: item.id)
-                itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
+                guard let result = paint(around: item.anchor, for: item.id) else { continue }
+                painted = result.painted
+                if result.fresh > 0 {
+                    itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
+                }
             }
-            see(item.id, at: item.anchor, pointCount: count, camera: frame.camera)
+            sampled.insert(item.id)
+            see(item.id, at: item.anchor, pointCount: painted, camera: frame.camera)
         }
         refreshResults()
         updateDone()
+        return sampled
     }
 
     /// A frame that gave the item enough points counts as a view of it from where the phone is.
@@ -347,9 +366,9 @@ final class ScanViewModel {
     }
 
     /// One frame of a light: the paint bucket from its tapped point, where the point is in this frame's picture.
-    /// - Returns: how many points it painted.
-    private func paintSurface(of item: ScanItem, depth: DepthFrame, camera: CameraModel, floorY: Float) -> Int {
-        guard let pixel = DepthSampler.project(item.anchor, camera: camera) else { return 0 }
+    /// - Returns: how many points it painted, or nil when the tapped point is not in the picture (nothing painted).
+    private func paintSurface(of item: ScanItem, depth: DepthFrame, camera: CameraModel, floorY: Float) -> Int? {
+        guard let pixel = DepthSampler.project(item.anchor, camera: camera) else { return nil }
         let points = DepthGrouping.surface(fromNormalized: pixel / camera.imageResolution, depth: depth, camera: camera,
                                            floorY: floorY)
         measurements.addSurface(points: points, to: item.id, camera: camera)
@@ -359,7 +378,7 @@ final class ScanViewModel {
     /// The live results, and the values written onto the draft equipment as soon as they exist, so what a tag says
     /// is saved really is on the equipment.
     private func refreshResults() {
-        let results = measurements.results(subject: subjectID, floorY: floorY ?? 0)
+        let results = measurements.cachedResults(subject: subjectID, floorY: floorY ?? 0)
         subjectResult = subject == nil ? nil : results[subjectID]
         for index in items.indices {
             items[index].result = results[items[index].id]

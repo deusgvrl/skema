@@ -20,11 +20,17 @@ public struct EquipmentPoints: Sendable {
     /// Adds world points of the equipment (a painted column, `DepthSampler.columnPoints`). A point farther than
     /// `DepthSampler.maxRange` from `camera` is dropped, a cell that already has a point is skipped, and only far points
     /// (and none near) make the item `outOfRange`.
-    public mutating func add(points newPoints: [SIMD3<Float>], camera: CameraModel) {
+    ///
+    /// Returns true when the points changed: a new cell got a point, or `sawPointsBeyondRange` turned on.
+    @discardableResult
+    public mutating func add(points newPoints: [SIMD3<Float>], camera: CameraModel) -> Bool {
+        let countBefore = points.count
+        let sawBeyondBefore = sawPointsBeyondRange
         let toCamera = camera.cameraToWorld.inverse
         let near = newPoints.filter { -(toCamera * SIMD4<Float>($0, 1)).z <= DepthSampler.maxRange }
         if near.isEmpty, !newPoints.isEmpty { sawPointsBeyondRange = true }
         insert(near)
+        return points.count != countBefore || sawPointsBeyondRange != sawBeyondBefore
     }
 
     /// Keeps each point whose 1 cm cell has no point yet.
@@ -64,12 +70,25 @@ public struct ScanMeasurements: Sendable {
     private var rules: [UUID: CentreRule] = [:]
     /// The small boxes of equipment collected with `addSurface`, newest last.
     private var boxes: [UUID: [WorldBox]] = [:]
+    /// The centres of each item as `cachedResults` last worked them out. An item leaves it when it changes.
+    private var cachedCentres: [UUID: EquipmentCentres] = [:]
+    /// The subject the cached centres were worked out for (the subject decides how its own centres are found).
+    private var cachedSubject: UUID?
+    /// How many times the centres of one item were worked out by `cachedResults` (tests and profiling read it).
+    public private(set) var centresCalculations = 0
 
     public init() {}
 
     /// Adds world points for the equipment `id` (see `EquipmentPoints.add(points:camera:)`).
-    public mutating func add(points: [SIMD3<Float>], to id: UUID, camera: CameraModel) {
-        equipment[id, default: EquipmentPoints()].add(points: points, camera: camera)
+    /// Returns how many new points were kept. An item that changed without a new point (it was only seen too far
+    /// away) still works out its centres again at the next `cachedResults`.
+    @discardableResult
+    public mutating func add(points: [SIMD3<Float>], to id: UUID, camera: CameraModel) -> Int {
+        let countBefore = equipment[id]?.points.count ?? 0
+        if equipment[id, default: EquipmentPoints()].add(points: points, camera: camera) {
+            cachedCentres[id] = nil
+        }
+        return (equipment[id]?.points.count ?? 0) - countBefore
     }
 
     /// Forgets everything collected for the equipment `id`. An id that was never added does nothing.
@@ -77,6 +96,7 @@ public struct ScanMeasurements: Sendable {
         equipment[id] = nil
         rules[id] = nil
         boxes[id] = nil
+        cachedCentres[id] = nil
     }
 
     /// The smallest box (world, axis-aligned) holding every point kept for the equipment `id`; nil before any.
@@ -102,6 +122,8 @@ public struct ScanMeasurements: Sendable {
         var kept = boxes[id, default: []]
         kept.append(box)
         boxes[id] = Array(kept.suffix(Self.maxKeptBoxes))
+        // A new small box changes how the item is measured, even when none of its points was new.
+        cachedCentres[id] = nil
     }
 
     /// The grown box of the equipment `id`: the union of its kept small boxes. Nil before its first small box.
@@ -113,21 +135,17 @@ public struct ScanMeasurements: Sendable {
     /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light uses `.middle`.
     public mutating func setRule(_ rule: CentreRule, for id: UUID) {
         rules[id] = rule
+        cachedCentres[id] = nil
     }
 
-    /// The centres of every piece of equipment, or the reason there are none (see `EquipmentPoints.scanResult`).
-    private func centres(subject: UUID) -> [UUID: EquipmentCentres] {
-        var centres: [UUID: EquipmentCentres] = [:]
-        for (id, points) in equipment {
-            // A10-106 commit 7: an item with a big box is measured from the box (`results`), so the centres of its
-            // points would be thrown away; only its status is worked out.
-            if boxes[id]?.isEmpty == false {
-                centres[id] = EquipmentCentres(status: points.status, baseCentre: nil, topCentre: nil)
-            } else {
-                centres[id] = points.scanResult(isSubject: id == subject, rule: rules[id] ?? .topPoint)
-            }
+    /// The centres of the equipment `id`, or the reason there are none (see `EquipmentPoints.scanResult`).
+    private func centres(of id: UUID, points: EquipmentPoints, subject: UUID) -> EquipmentCentres {
+        // A10-106 commit 7: an item with a big box is measured from the box (`results`), so the centres of its
+        // points would be thrown away; only its status is worked out.
+        if boxes[id]?.isEmpty == false {
+            return EquipmentCentres(status: points.status, baseCentre: nil, topCentre: nil)
         }
-        return centres
+        return points.scanResult(isSubject: id == subject, rule: rules[id] ?? .topPoint)
     }
 
     /// The result for every piece of equipment, measured against the floor at `floorY` and the equipment `subject`.
@@ -135,7 +153,39 @@ public struct ScanMeasurements: Sendable {
     /// A distance or floor position needs both the equipment and the subject to be measured, so without a measured
     /// subject they are all nil. A height needs only the equipment itself.
     public func results(subject: UUID, floorY: Float) -> [UUID: EquipmentResult] {
-        let centres = centres(subject: subject)
+        var centres: [UUID: EquipmentCentres] = [:]
+        for (id, points) in equipment {
+            centres[id] = self.centres(of: id, points: points, subject: subject)
+        }
+        return results(from: centres, subject: subject, floorY: floorY)
+    }
+
+    /// The same values as `results(subject:floorY:)`, but the centres of an item are worked out again only when the
+    /// item changed since the last call: new points, a new small box, a new rule, or the item was removed. A call with
+    /// another `subject` starts again. For the scan loop, which asks for results every frame.
+    public mutating func cachedResults(subject: UUID, floorY: Float) -> [UUID: EquipmentResult] {
+        if cachedSubject != subject {
+            cachedCentres = [:]
+            cachedSubject = subject
+        }
+        var centres: [UUID: EquipmentCentres] = [:]
+        for (id, points) in equipment {
+            if let known = cachedCentres[id] {
+                centres[id] = known
+            } else {
+                let worked = self.centres(of: id, points: points, subject: subject)
+                cachedCentres[id] = worked
+                centresCalculations += 1
+                centres[id] = worked
+            }
+        }
+        return results(from: centres, subject: subject, floorY: floorY)
+    }
+
+    /// Turns the centres of every item into results (shared by `results` and `cachedResults`).
+    private func results(
+        from centres: [UUID: EquipmentCentres], subject: UUID, floorY: Float
+    ) -> [UUID: EquipmentResult] {
         let subjectCentres = centres[subject]
         var results: [UUID: EquipmentResult] = [:]
         for (id, found) in centres {

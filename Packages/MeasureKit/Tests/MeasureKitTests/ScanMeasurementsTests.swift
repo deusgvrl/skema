@@ -333,3 +333,124 @@ struct CentreRulePerItemTests {
         #expect(near(try #require(scan.results(subject: subject, floorY: 0)[light]?.height), 1.2, 0.03))
     }
 }
+
+/// O8 (A10-121): an item's centres are worked out again only after the item changed.
+@Suite("Centres cache")
+struct CentresCacheTests {
+    private let floorY: Float = -0.7
+    private let subject = UUID()
+    private let item = UUID()
+
+    /// A camera `metres` further along x: the same wall then lands `metres` to the right in the world.
+    private func camera(movedAlongX metres: Float) -> CameraModel {
+        var pose = matrix_identity_float4x4
+        pose.columns.3 = SIMD4(metres, 0, 0, 1)
+        return makeCamera(pose: pose)
+    }
+
+    /// A scan with a subject and an item, both seeing a wall 2 m away.
+    private func twoItemScan() -> ScanMeasurements {
+        var scan = ScanMeasurements()
+        scan.add(points: wallPoints(depth: 2), to: subject, camera: makeCamera())
+        scan.add(points: wallPoints(depth: 2), to: item, camera: makeCamera())
+        return scan
+    }
+
+    @Test("C1: a point in a known cell is not new")
+    func aPointInAKnownCellIsNotNew() {
+        var scan = ScanMeasurements()
+        let points = (0..<10).map { SIMD3<Float>(Float($0) * 0.1, 0.5, -2) }
+
+        let first = scan.add(points: points, to: item, camera: makeCamera())
+        let second = scan.add(points: points, to: item, camera: makeCamera())
+
+        #expect(first == 10)
+        #expect(second == 0)
+    }
+
+    @Test("C2: results without new points are not calculated again")
+    func resultsWithoutNewPointsAreNotCalculatedAgain() {
+        var scan = twoItemScan()
+
+        let first = scan.cachedResults(subject: subject, floorY: floorY)
+        let callsAfterFirst = scan.centresCalculations
+        let second = scan.cachedResults(subject: subject, floorY: floorY)
+
+        #expect(callsAfterFirst == 2)
+        #expect(scan.centresCalculations == 2)
+        #expect(first == second)
+    }
+
+    @Test("C3: only the changed item is calculated again")
+    func onlyTheChangedItemIsCalculatedAgain() {
+        var scan = twoItemScan()
+        _ = scan.cachedResults(subject: subject, floorY: floorY)
+        let callsAfterFirst = scan.centresCalculations
+
+        let moved = camera(movedAlongX: 1)
+        let added = scan.add(points: wallPoints(depth: 2, camera: moved), to: item, camera: moved)
+        let results = scan.cachedResults(subject: subject, floorY: floorY)
+
+        #expect(added > 0)
+        #expect(scan.centresCalculations == callsAfterFirst + 1)
+        #expect(results == scan.results(subject: subject, floorY: floorY))
+    }
+
+    /// What happens to an item between two calls of `cachedResults`.
+    enum Change: CaseIterable, Sendable {
+        case ruleChanged, removedAndAddedAgain, surfaceAdded, farPointsOnly
+    }
+
+    @Test("C4: a change makes the item calculate again", arguments: Change.allCases)
+    func aChangeMakesTheItemCalculateAgain(change: Change) throws {
+        var scan = twoItemScan()
+        // An item that has no point yet: its entry exists, so the far case can change it.
+        let farItem = UUID()
+        scan.add(points: [], to: farItem, camera: makeCamera())
+        let before = scan.cachedResults(subject: subject, floorY: floorY)
+        let callsBefore = scan.centresCalculations
+        #expect(callsBefore == 3)
+        #expect(try #require(before[farItem]).status == .tooFewPoints)
+
+        switch change {
+        case .ruleChanged:
+            scan.setRule(.middle, for: item)
+        case .removedAndAddedAgain:
+            // An empty add makes no change by itself, so only remove can empty the cache here (as a re-tapped
+            // subject: remove, then a column with no points yet).
+            scan.remove(item)
+            scan.add(points: [], to: item, camera: makeCamera())
+        case .surfaceAdded:
+            // The same points again: none is new, but 20 or more of them make a small box.
+            scan.addSurface(points: wallPoints(depth: 2), to: item, camera: makeCamera())
+        case .farPointsOnly:
+            scan.add(points: wallPoints(depth: 6), to: farItem, camera: makeCamera())
+        }
+        let after = scan.cachedResults(subject: subject, floorY: floorY)
+
+        #expect(scan.centresCalculations == callsBefore + 1)
+        #expect(after == scan.results(subject: subject, floorY: floorY))
+        if change == .surfaceAdded {
+            #expect(after[item]?.pointCount == before[item]?.pointCount)
+        }
+        if change == .farPointsOnly {
+            #expect(try #require(after[farItem]).status == .outOfRange)
+        }
+        if change == .removedAndAddedAgain {
+            #expect(try #require(after[item]).status == .tooFewPoints)
+        }
+    }
+
+    @Test("C5: cached results match results")
+    func cachedResultsMatchResults() {
+        var scan = twoItemScan()
+        let moved = camera(movedAlongX: 1)
+        scan.add(points: wallPoints(depth: 2, camera: moved), to: item, camera: moved)
+
+        let cached = scan.cachedResults(subject: subject, floorY: floorY)
+
+        #expect(cached == scan.results(subject: subject, floorY: floorY))
+        // The two views of the wall overlap, so there are more than 128 points but fewer than 256.
+        #expect((cached[item]?.pointCount ?? 0) > 128)
+    }
+}

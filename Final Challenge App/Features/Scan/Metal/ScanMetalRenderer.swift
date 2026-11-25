@@ -25,7 +25,7 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
     /// The colour format of the view and of both pipelines. The view must use the same one.
     static let colorPixelFormat: MTLPixelFormat = .bgra8Unorm
 
-    /// The boxes to outline, by light. The GPU buffers follow this on the next draw.
+    /// The boxes to outline, by item id. On the next draw, the GPU buffers follow the ones in view (`visibleOutlines`).
     var outlines: [UUID: WorldBox] = [:]
 
     private let session: ARSession
@@ -96,6 +96,12 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
         )
     }
 
+    /// The boxes the camera can see (A10-121). Only these get GPU buffers: a box that is off the screen loses its
+    /// buffers (`OutlineBuffers.update` drops a missing id) and builds them again when it is back in view.
+    nonisolated static func visibleOutlines(_ outlines: [UUID: WorldBox], camera: CameraModel) -> [UUID: WorldBox] {
+        outlines.filter { FieldOfView.contains($0.value, camera: camera) }
+    }
+
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     /// One frame: one command buffer, one render pass. With no AR frame (or no camera picture) the view is only
@@ -136,9 +142,9 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
         cameraTextures.flush()
     }
 
-    /// Encodes the camera quad (when `picture` is given), then the outlines of `outlines`, into an open render pass.
-    /// A line can be hidden only when `sceneDepth` (the LiDAR depth and its confidence) is given. `viewSize` is in
-    /// points.
+    /// Encodes the camera quad (when `picture` is given), then the outlines of the boxes in view, into an open render
+    /// pass. A line can be hidden only when `sceneDepth` (the LiDAR depth and its confidence) is given. `viewSize` is
+    /// in points.
     func encode(into encoder: any MTLRenderCommandEncoder, camera: CameraModel, viewSize: CGSize,
                 picture: (luma: any MTLTexture, chroma: any MTLTexture)?,
                 sceneDepth: (depth: any MTLTexture, confidence: any MTLTexture)?) {
@@ -156,7 +162,7 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
         let cameraPosition = SIMD3(camera.cameraToWorld.columns.3.x, camera.cameraToWorld.columns.3.y,
                                    camera.cameraToWorld.columns.3.z)
         let focalLength = ScanProjection.focalLength(camera: camera, viewSize: viewSize)
-        outlineBuffers.update(outlines) { box in
+        outlineBuffers.update(Self.visibleOutlines(outlines, camera: camera)) { box in
             OutlineMesh.radius(for: box, cameraPosition: cameraPosition, focalLength: focalLength)
         }
         guard !outlineBuffers.entries.isEmpty else { return }
