@@ -17,11 +17,8 @@ struct LightingDiagramView: View {
     @State private var nodesSnapshot: [Equipment] = []
     @State private var subjectRotationStart: Double = 0
 
-    // Smooth Zoom & Pan States
+    // Smooth Zoom & Scale States
     @State private var zoomScale: CGFloat = 1.0
-    @GestureState private var magnifyBy: CGFloat = 1.0
-    @State private var offset: CGSize = .zero
-    @GestureState private var dragOffset: CGSize = .zero
 
     // Scale Meter Visibility State
     @State private var showScaleMeter: Bool = false
@@ -54,25 +51,67 @@ struct LightingDiagramView: View {
         self.onNodeDragStart = onNodeDragStart
     }
 
+    private let canvasDimension: CGFloat = 3000
+
     var body: some View {
-        GeometryReader { geo in
-            let subjectCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            let currentScale = zoomScale * magnifyBy
-            let gridConfig = GridConfig.config(for: currentScale)
+        let subjectCenter = CGPoint(x: canvasDimension / 2, y: canvasDimension / 2)
+        let currentScale = zoomScale
+        let gridConfig = GridConfig.config(for: currentScale)
 
-            // Dynamic distance threshold evaluated cleanly per gesture frame
-            let minDistanceThreshold: Double = {
-                if isExportedToPdf { return 0.05 }
-                return max(0.15, 0.75 / Double(currentScale))
-            }()
+        // Dynamic distance threshold evaluated cleanly per gesture frame
+        let minDistanceThreshold: Double = {
+            if isExportedToPdf { return 0.05 }
+            return max(0.15, 0.75 / Double(currentScale))
+        }()
 
-            ZStack {
+        let interactiveCenters: [CGPoint] = [subjectCenter] + viewModel.nodes.map {
+            CGPoint(x: subjectCenter.x + $0.position.x, y: subjectCenter.y + $0.position.y)
+        }
+
+        ZoomableScrollView(
+            zoomScale: $zoomScale,
+            minScale: 0.3,
+            maxScale: 4.0,
+            canvasSize: CGSize(width: canvasDimension, height: canvasDimension),
+            isReadOnly: isReadOnly,
+            interactiveCenters: interactiveCenters,
+            onEmptyTap: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedNodeId = nil
+                }
+                onEmptyTap?()
+            },
+            onZoomChanged: { _ in
+                guard !isReadOnly else { return }
+                hideScaleMeterTask?.cancel()
+                if !showScaleMeter {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showScaleMeter = true
+                    }
+                }
+            },
+            onZoomEnded: {
+                guard !isReadOnly else { return }
+                hideScaleMeterTask?.cancel()
+                hideScaleMeterTask = Task {
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    if !Task.isCancelled {
+                        await MainActor.run {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                showScaleMeter = false
+                            }
+                        }
+                    }
+                }
+            },
+            content: {
+                ZStack {
                 // Background Grid (Hides when isReadOnly is true)
                 if !isReadOnly {
                     GridPattern(step: gridConfig.stepInPoints)
                         .stroke(DesignTokens.diagramGrid, lineWidth: 1 / currentScale)
-                        .frame(width: 6000, height: 6000)
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .frame(width: canvasDimension, height: canvasDimension)
+                        .position(subjectCenter)
                 }
 
                 // Connecting Lines
@@ -181,68 +220,13 @@ struct LightingDiagramView: View {
                     )
                 }
             }
-            .offset(
-                x: offset.width + dragOffset.width,
-                y: offset.height + dragOffset.height
-            )
-            .scaleEffect(currentScale)
+            .frame(width: canvasDimension, height: canvasDimension)
             .background(DesignTokens.pageBackground)
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    selectedNodeId = nil
-                }
-                onEmptyTap?()
-            }
-            .gesture(
-                DragGesture()
-                    .updating($dragOffset) { value, state, _ in
-                        state = CGSize(
-                            width: value.translation.width / currentScale,
-                            height: value.translation.height / currentScale
-                        )
-                    }
-                    .onEnded { value in
-                        offset.width += value.translation.width / currentScale
-                        offset.height += value.translation.height / currentScale
-                    }
-            )
-            .simultaneousGesture(
-                MagnifyGesture()
-                    .updating($magnifyBy) { value, state, _ in
-                        state = value.magnification
-                    }
-                    .onChanged { _ in
-                        guard !isReadOnly else { return }
-                        hideScaleMeterTask?.cancel()
-                        if !showScaleMeter {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                showScaleMeter = true
-                            }
-                        }
-                    }
-                    .onEnded { value in
-                        zoomScale *= value.magnification
-                        zoomScale = max(0.3, min(zoomScale, 8.0))
-
-                        guard !isReadOnly else { return }
-                        hideScaleMeterTask?.cancel()
-                        hideScaleMeterTask = Task {
-                            try? await Task.sleep(nanoseconds: 1_200_000_000)
-                            if !Task.isCancelled {
-                                await MainActor.run {
-                                    withAnimation(.easeInOut(duration: 0.4)) {
-                                        showScaleMeter = false
-                                    }
-                                }
-                            }
-                        }
-                    }
-            )
         }
         .clipped()
         .overlay(alignment: .topLeading) {
             if !isReadOnly {
-                let activeScale = zoomScale * magnifyBy
+                let activeScale = zoomScale
                 let activeConfig = GridConfig.config(for: activeScale)
 
                 ScaleMeterView(
