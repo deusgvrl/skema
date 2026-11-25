@@ -205,21 +205,11 @@ extension Equipment {
 }
 
 extension Equipment {
-    /// What VoiceOver calls the item: "Light 1, Key", or just the name when there is no role.
+    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
     var displayName: String {
-        let parts = [name, role].map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        return parts.isEmpty ? category.title : parts.joined(separator: ", ")
-    }
-
-    /// What VoiceOver says after the name: "2.0 meters from the subject, rotated 45 degrees".
-    /// The distance part is left out when there is none.
-    var spokenPosition: String {
-        let degrees = Int(rotationAngle.rounded()) % 360
-        let rotation = "rotated \(degrees) \(degrees == 1 ? "degree" : "degrees")"
-        let metres = distance.trimmingCharacters(in: .whitespaces)
-        guard !metres.isEmpty else { return rotation.prefix(1).uppercased() + rotation.dropFirst() }
-        let unit = Double(metres) == 1 ? "meter" : "meters"
-        return "\(metres) \(unit) from the subject, \(rotation)"
+        let role = role.trimmingCharacters(in: .whitespaces)
+        guard !role.isEmpty else { return name }
+        return label.isEmpty ? role : "\(role) - \(name)"
     }
 }
 

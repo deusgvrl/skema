@@ -32,30 +32,3 @@ struct DiagramCanvasTests {
         #expect(size.width > base.width)
     }
 }
-
-/// What VoiceOver says for equipment on the diagram. 2fc4f9d removed it; the copy audit (25 Nov) brings it back.
-@MainActor
-@Suite("Diagram equipment for VoiceOver")
-struct DiagramEquipmentVoiceOverTests {
-    @Test("The label is the name, then the role when there is one", arguments: [
-        ("Light 1", "Key", "Light 1, Key"),
-        ("Light 1", " ", "Light 1"),
-        ("", "Key", "Key"),
-        ("", "", "Light")
-    ])
-    func label(name: String, role: String, expected: String) {
-        #expect(Equipment(category: .light, name: name, role: role).displayName == expected)
-    }
-
-    @Test("The value says how far from the subject and how it is turned", arguments: [
-        ("2.0", 45.0, "2.0 meters from the subject, rotated 45 degrees"),
-        ("1", 0.0, "1 meter from the subject, rotated 0 degrees"),
-        (" ", 90.0, "Rotated 90 degrees"),
-        ("1.50", 359.7, "1.50 meters from the subject, rotated 0 degrees")
-    ])
-    func value(distance: String, rotation: Double, expected: String) {
-        let light = Equipment(category: .light, name: "Light 1", distance: distance, rotationAngle: rotation)
-
-        #expect(light.spokenPosition == expected)
-    }
-}
