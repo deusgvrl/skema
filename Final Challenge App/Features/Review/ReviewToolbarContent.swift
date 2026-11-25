@@ -75,7 +75,7 @@ struct ReviewToolbarContent: ToolbarContent {
         ) {
             Button("Save Setup") { navigateToProjectDetails = true }
                 .keyboardShortcut(.defaultAction)
-            Button("Discard", role: .destructive) {
+            Button("Discard Scan", role: .destructive) {
                 onDiscardSetup()
             }
         }
@@ -92,15 +92,9 @@ struct ReviewToolbarContent: ToolbarContent {
     }
 
     private var titleView: some View {
-        VStack(spacing: 2) {
-            Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
-                .font(.headline)
-                .foregroundStyle(DesignTokens.textPrimary)
-            Text(viewModel.layoutSubtitle)
-                .font(.caption)
-                .foregroundStyle(DesignTokens.textSecondary)
-        }
-        .accessibilityElement(children: .combine)
+        Text(isFromLoadingScreen ? "Review Setup" : viewModel.draftSetup.setupName)
+            .font(.headline)
+            .foregroundStyle(DesignTokens.textPrimary)
     }
 
     private var undoRedoButtons: some View {

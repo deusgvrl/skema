@@ -55,12 +55,12 @@ struct ProjectDetailsView: View {
             }
             .listRowBackground(DesignTokens.formRowBackground)
 
-            Section(header: FormSectionHeader("Organization · Optional")) {
+            Section(header: FormSectionHeader("Client & Project (Optional)")) {
                 DetailsRow("Client") {
                     ClientField(client: $draftClient, savedClients: viewModel.savedClients)
                 }
                 DetailsRow("Project") {
-                    TextField("Project", text: $draftProject, prompt: Text("None"))
+                    TextField("Project", text: $draftProject, prompt: Text("e.g. Spring catalog"))
                 }
             }
             .listRowBackground(DesignTokens.formRowBackground)
@@ -71,21 +71,12 @@ struct ProjectDetailsView: View {
                     .foregroundStyle(DesignTokens.textPrimary)
             } header: {
                 FormSectionHeader("Notes")
-            } footer: {
-                if setup.firstSavedDate == nil {
-                    Text("""
-                        Camera settings live with each camera in Equipment. \
-                        You can add reference photos from the shoot later in References.
-                        """)
-                        .font(.footnote)
-                        .foregroundStyle(DesignTokens.textSecondary)
-                }
             }
             .listRowBackground(DesignTokens.formRowBackground)
         }
         .scrollContentBackground(.hidden)
         .background(DesignTokens.pageBackground.ignoresSafeArea())
-        .navigationTitle("Project Details")
+        .navigationTitle("Setup Details")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isPresentedModally)
         .toolbar {
@@ -126,7 +117,7 @@ struct ProjectDetailsView: View {
             }
             .keyboardShortcut(.defaultAction)
         } message: {
-            Text("Something went wrong while saving. Try again. Your details are still here.")
+            Text("Your details are still here. Try again.")
         }
     }
 

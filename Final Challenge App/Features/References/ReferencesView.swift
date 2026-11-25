@@ -70,7 +70,7 @@ struct ReferencesView: View {
                 referencesViewModel.imageIndexToDelete = nil
             }
         } message: {
-            Text("It will be removed from this setup's references.")
+            Text("It will be removed from this setup.")
         }
         .fullScreenCover(isPresented: $referencesViewModel.showCameraDenied, onDismiss: {
             if referencesViewModel.openLibraryAfterDenied {
@@ -123,8 +123,8 @@ struct ReferencesView: View {
             Label("No References Yet", systemImage: "photo")
         } description: {
             Text("""
-            Add any photos from the shoot, like the final shot, the product, or the set, \
-            so you can match this setup next time. Tap + to add a reference.
+            Add photos from the shoot, like the final shot or the set, \
+            so you can match this setup next time. Tap + to add one.
             """)
         }
     }
@@ -136,7 +136,7 @@ struct ReferencesView: View {
                 title: "Camera Access Is Off",
                 systemImage: "video.slash",
                 message: Text("""
-                    Lighting Memory needs the camera to take reference photos. \
+                    Skema Photo needs the camera to take reference photos. \
                     Turn it on in Settings, or choose a photo from your library.
                     """)
             ) {
@@ -146,7 +146,7 @@ struct ReferencesView: View {
                     }
                 }
 
-                Button("Choose From Library") {
+                Button("Choose from Library") {
                     referencesViewModel.openLibraryAfterDenied = true
                     referencesViewModel.showCameraDenied = false
                 }

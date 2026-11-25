@@ -98,23 +98,6 @@ struct ReviewEditSessionTests {
         #expect(viewModel.nodes.map(\.name) == ["Profoto D2", "Before edit mode"])
     }
 
-    @Test("Subtitle counts lights only, singular and plural", arguments: [
-        (0, "Estimated layout · 0 lights"),
-        (1, "Estimated layout · 1 light"),
-        (4, "Estimated layout · 4 lights")
-    ])
-    func layoutSubtitle(lights: Int, expected: String) {
-        let setup = Setup(setupName: "Studio A")
-        setup.nodes.append(Equipment(category: .camera, label: "C1", name: "GFX"))
-        for index in 0..<lights {
-            setup.nodes.append(Equipment(category: .light, label: "L\(index + 1)", name: "Light"))
-        }
-        storage.addSetup(setup)
-        let viewModel = ReviewViewModel(setup: setup, storageController: storage)
-
-        #expect(viewModel.layoutSubtitle == expected)
-    }
-
     @Test("Chips follow the team's display order: lights, accessories, cameras, each by label (A10-96)")
     func chipOrder() {
         let setup = Setup(setupName: "Studio A")

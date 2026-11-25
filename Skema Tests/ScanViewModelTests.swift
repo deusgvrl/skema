@@ -209,7 +209,10 @@ struct ScanViewModelTests {
     @Test("Each session state shows the right screen", arguments: [
         (ScanSessionState.failed(.cameraDenied), ScanScreen.cameraDenied),
         (.failed(.lidarUnsupported), .lidarUnsupported),
-        (.failed(.sessionFailed("Sensor failed")), .failed("Sensor failed"))
+        // Never iOS's own error text (copy audit, 24 Nov).
+        (.failed(.sessionFailed("Sensor failed")),
+         .failed("Something interrupted the scan. Close it and start again.")),
+        (.failed(.alreadyStarted), .failed("Something interrupted the scan. Close it and start again."))
     ])
     func mapsStates(state: ScanSessionState, expected: ScanScreen) {
         let viewModel = makeViewModel(camera: FakeCameraPermission(status: .authorized))

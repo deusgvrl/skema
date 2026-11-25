@@ -97,7 +97,7 @@ struct NodeView: View {
 
                 // 2. Role Subtitle on the same level (e.g. "- Camera 2")
                 if zoomScale >= 1.75 && !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("•")
+                    Text("·")
                         .font(.caption)
                         .foregroundStyle(DesignTokens.textPrimary)
 

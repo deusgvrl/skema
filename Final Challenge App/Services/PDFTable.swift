@@ -12,7 +12,7 @@ struct PDFTable {
         let cells: [String]
         /// Under the name, in grey. Empty leaves the line out.
         var role = ""
-        /// A full-width line under the cells. Nil for tables without one.
+        /// A full-width line under the cells. Nil for tables without one, and when the item has none.
         var accessories: String?
     }
 
@@ -41,7 +41,7 @@ extension PageWriter {
             let height = Self.height(of: row, columns: table.columns)
             if cursorY + height > PDFLayout.contentBottom {
                 startPage()
-                drawHeading("\(table.title) (continued)")
+                drawHeading("\(table.title) (CONTINUED)")
                 drawHeader(table.columns, height: headerHeight)
             }
             draw(row, columns: table.columns, height: height)

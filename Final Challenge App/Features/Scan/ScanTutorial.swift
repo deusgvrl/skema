@@ -33,7 +33,7 @@ enum ScanStep: Int, CaseIterable {
         switch self {
         case .floor: "Heights are measured from it"
         case .subject, .camera, .light: "Walk up to it first"
-        case .finish: "Or tap Finish Scan if that's all"
+        case .finish: "Or tap Finish Scan if that’s all"
         }
     }
 

@@ -35,10 +35,10 @@ enum PDFEquipmentTables {
 
     private static func cameras(_ items: [Equipment]) -> PDFTable {
         PDFTable(
-            title: "CAMERA",
+            title: "CAMERAS",
             columns: [
-                .init(title: "Name / role", width: 149),
-                .init(title: "Lens", width: 44),
+                .init(title: "Name and role", width: 149),
+                .init(title: "Focal length", width: 44),
                 .init(title: "ISO", width: 40),
                 .init(title: "Aperture", width: 52),
                 .init(title: "Shutter speed", width: 46),
@@ -59,14 +59,14 @@ enum PDFEquipmentTables {
 
     private static func lights(_ items: [Equipment]) -> PDFTable {
         PDFTable(
-            title: "LIGHTING",
+            title: "LIGHTS",
             columns: [
-                .init(title: "Name / role", width: 170),
+                .init(title: "Name and role", width: 170),
                 .init(title: "Power", width: 50),
                 .init(title: "Color temperature", width: 70),
                 .init(title: "Height", width: 52),
                 .init(title: "Tilt", width: 44),
-                .init(title: "Horizontal aim", width: 62),
+                .init(title: "Aim", width: 62),
                 .init(title: "Distance to subject", width: 75)
             ],
             rows: items.map { item in
@@ -101,8 +101,14 @@ enum PDFEquipmentTables {
         PDFTable.Row(
             cells: [value(item.name)] + values,
             role: item.role.trimmingCharacters(in: .whitespacesAndNewlines),
-            accessories: value(item.accessories)
+            accessories: optionalValue(item.accessories)
         )
+    }
+
+    /// The value, or nil when empty, for a line that is left out rather than showing a dash.
+    private static func optionalValue(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// The value with its unit, or a dash when empty. The unit is only added after a number, so one the user typed

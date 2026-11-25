@@ -148,7 +148,7 @@ final class ScanViewModel {
 
     var arSession: ARSession? { scan?.session as? ARSession }
 
-    /// ✕ asks "Leave this scan?" first only while scanning; the message screens leave straight away.
+    /// ✕ asks to leave the scan first only while scanning; the message screens leave straight away.
     var asksBeforeLeaving: Bool { screen == .scanning }
 
     /// Finish Scan: a subject, one camera and one light, all done, and nothing still being scanned
@@ -592,10 +592,10 @@ extension ScanViewModel {
         }
     }
 
+    /// iOS's own error text is written for developers, so the screen says what to do instead.
     private static func message(for error: ScanSessionError) -> String {
         switch error {
-        case .sessionFailed(let description): description
-        case .alreadyStarted: "The scan was already started."
+        case .sessionFailed, .alreadyStarted: "Something interrupted the scan. Close it and start again."
         case .cameraDenied, .lidarUnsupported: ""
         }
     }

@@ -62,8 +62,15 @@ final class SetupsViewModel {
     /// The alert text: saved setups can be recovered for 30 days, drafts cannot.
     func deleteMessage(for setup: Setup) -> String {
         setup.firstSavedDate == nil
-            ? "This draft will be deleted. This can't be undone."
-            : "This setup will move to Recently Deleted for \(RecentlyDeleted.keepDays) days."
+            ? "This draft will be deleted. This can’t be undone."
+            : "You can recover it from Recently Deleted for \(RecentlyDeleted.keepDays) days."
+    }
+
+    /// Under a card's name: the client when grouped by month, the project when grouped by client (the client is
+    /// already the heading). Empty when that field is.
+    func cardSubtitle(for setup: Setup) -> String {
+        let field = grouping == .byClient ? setup.project : setup.client
+        return field.trimmingCharacters(in: .whitespaces)
     }
 
     func deleteTapped(_ setup: Setup) {

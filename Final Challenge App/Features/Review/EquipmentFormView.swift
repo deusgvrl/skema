@@ -183,7 +183,7 @@ private extension EquipmentFormView {
         Section(header: FormSectionHeader("Equipment")) {
             Picker("Category", selection: $formViewModel.category) {
                 ForEach(EquipmentCategory.allCases) { cat in
-                    Text(cat.rawValue).tag(cat)
+                    Text(cat.title).tag(cat)
                 }
             }
             .pickerStyle(.menu)
@@ -201,10 +201,10 @@ private extension EquipmentFormView {
 
             if formViewModel.category != .accessory {
                 HStack {
-                    Text("Role / label")
+                    Text("Role")
                     Spacer()
                     let rolePrompt = formViewModel.category == .light
-                        ? "e.g. Accent light"
+                        ? "e.g. Key light"
                         : "e.g. Second camera"
                     TextField(rolePrompt, text: $formViewModel.role)
                         .multilineTextAlignment(.trailing)
@@ -248,7 +248,7 @@ private extension EquipmentFormView {
         if formViewModel.category == .camera {
             Section(header: FormSectionHeader("Lens")) {
                 HStack {
-                    Text("Lens")
+                    Text("Focal length")
                     Spacer()
                     TextField("e.g. 50", text: $formViewModel.lens)
                         .multilineTextAlignment(.trailing)
@@ -333,7 +333,7 @@ private extension EquipmentFormView {
 
                 if formViewModel.category == .light {
                     HStack {
-                        Text("Horizontal aim")
+                        Text("Aim")
                         Spacer()
                         TextField("e.g. 0", text: $formViewModel.horizontalAim)
                             .multilineTextAlignment(.trailing)
@@ -360,15 +360,6 @@ private extension EquipmentFormView {
                 }
             } header: {
                 FormSectionHeader("Position & Direction")
-            } footer: {
-                if viewModel.draftSetup.firstSavedDate == nil {
-                    Text(isReadOnly ? "Viewing equipment details from read-only mode." : """
-                        It's placed next to the subject for now. You can drag it to the right spot \
-                        on the diagram, or change these values anytime later.
-                        """)
-                    .font(.footnote)
-                    .foregroundStyle(DesignTokens.textSecondary)
-                }
             }
             .listRowBackground(DesignTokens.formRowBackground)
         }

@@ -80,14 +80,17 @@ struct ScanView: View {
                     }
                 }
                 // A popover on the X (like Reminders); tapping outside it keeps scanning. "Leave", not "Cancel", so the
-                // destructive button is never confused with the one that keeps the scan.
-                .confirmationDialog("Leave this scan?", isPresented: $showsLeaveAlert, titleVisibility: .visible) {
+                // destructive button is never confused with the one that keeps the scan. One line and no title, like
+                // the other close dialogs (copy audit, 25 Nov).
+                .confirmationDialog(
+                    "Are you sure you want to leave this scan? Everything you tapped will be lost.",
+                    isPresented: $showsLeaveAlert,
+                    titleVisibility: .visible
+                ) {
                     Button("Leave Scan", role: .destructive) {
                         leave()
                     }
                     Button("Keep Scanning", role: .cancel) {}
-                } message: {
-                    Text("Everything you tapped will be lost.")
                 }
             }
             if viewModel.screen == .scanning {
@@ -203,7 +206,7 @@ struct ScanView: View {
             title: "Camera Access Is Off",
             systemImage: "video.slash",
             message: Text("""
-                Lighting Memory needs the camera to scan your set. \
+                Skema Photo needs the camera to scan your set. \
                 Turn it on in Settings, or add your equipment by hand.
                 """)
         ) {
@@ -223,7 +226,7 @@ struct ScanView: View {
 
     private var lidarUnsupported: some View {
         ScanMessageView(
-            title: "LiDAR Not Available",
+            title: "This iPhone Can’t Scan",
             systemImage: "iphone.slash",
             message: Text("""
                 Scanning needs an iPhone with LiDAR, such as an iPhone Pro. \

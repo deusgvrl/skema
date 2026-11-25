@@ -24,6 +24,7 @@ struct NodeQuickActionsToolbar: View {
                     .frame(width: 45, height: 45)
                     .background(.regularMaterial, in: Circle())
             }
+            .accessibilityLabel("Delete")
             .glassEffect(.clear.interactive())
 
             Spacer()
