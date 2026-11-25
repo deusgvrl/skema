@@ -119,6 +119,31 @@ struct NodeView: View {
         .position(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
         .highPriorityGesture(TapGesture().onEnded { if !isRotating { onTap() } })
         .gesture(isReadOnly ? nil : dragGesture)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(node.displayName)
+        .accessibilityValue(node.spokenPosition)
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
+        .accessibilityActions {
+            // Turning without the handle; left out in read-only mode, where the diagram can't change (copy audit).
+            if !isReadOnly {
+                Button("Rotate 45° Clockwise") {
+                    node.rotationAngle = (node.rotationAngle + 45).truncatingRemainder(dividingBy: 360)
+                    node.syncHorizontalAimFromRotation()
+                }
+                Button("Rotate 45° Counterclockwise") {
+                    node.rotationAngle = (node.rotationAngle - 45 + 360).truncatingRemainder(dividingBy: 360)
+                    node.syncHorizontalAimFromRotation()
+                }
+                Button("Point to Subject") { node.pointToSubject() }
+            }
+        }
+    }
+
+    /// Says the result, not the gesture (copy audit rule 6). The actions only turn it, and only outside read-only mode.
+    private var accessibilityHint: String {
+        guard isSelected else { return "Selects this equipment." }
+        return isReadOnly ? "Selected." : "Selected. Use Actions to turn it."
     }
 
     // MARK: - Gestures & Helpers
