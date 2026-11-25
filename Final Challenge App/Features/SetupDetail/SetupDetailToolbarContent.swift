@@ -25,9 +25,12 @@ struct SetupDetailToolbarContent: ToolbarContent {
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
 
     var body: some ToolbarContent {
-        if isEditing { editToolbar }
-        principalToolbar
-        if !isEditing { moreMenuToolbar }
+        if isEditing {
+            editToolbar
+        } else {
+            principalToolbar
+            moreMenuToolbar
+        }
         bottomToolbar
     }
 

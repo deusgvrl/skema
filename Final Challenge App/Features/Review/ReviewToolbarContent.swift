@@ -40,8 +40,10 @@ struct ReviewToolbarContent: ToolbarContent {
             closeButton
         }
 
-        ToolbarItem(placement: .principal) {
-            titleView
+        if !viewModel.isEditingDiagram {
+            ToolbarItem(placement: .principal) {
+                titleView
+            }
         }
 
         if viewModel.isEditingDiagram {
@@ -96,9 +98,6 @@ struct ReviewToolbarContent: ToolbarContent {
             Text(isFromScanScreen ? "Review Setup" : viewModel.draftSetup.setupName)
                 .font(.headline)
                 .foregroundStyle(DesignTokens.textPrimary)
-//            Text(viewModel.layoutSubtitle)
-//                .font(.caption)
-//                .foregroundStyle(DesignTokens.textSecondary)
         }
         .accessibilityElement(children: .combine)
     }
