@@ -116,7 +116,7 @@ struct SetupsView: View {
         }
     }
 
-    /// A heading (a month, "Not saved" or a client) over a 2-column grid of setups (Sketch UT Review A-S02).
+    /// A heading (a month, "Not Saved" or a client) over a 2-column grid of setups (Sketch UT Review A-S02).
     private func gridSection(title: String, setups: [Setup]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
@@ -134,13 +134,13 @@ struct SetupsView: View {
                                 storageController: viewModel.storageController
                             )
                         } label: {
-                            SetupGridItem(setup: setup)
+                            SetupGridItem(setup: setup, subtitle: viewModel.cardSubtitle(for: setup))
                         }
                         .buttonStyle(.plain)
                         .contextMenu { deleteButton(for: setup) }
                     } else {
                         NavigationLink(value: setup) {
-                            SetupGridItem(setup: setup)
+                            SetupGridItem(setup: setup, subtitle: viewModel.cardSubtitle(for: setup))
                         }
                         .buttonStyle(.plain)
                         .contextMenu { deleteButton(for: setup) }
@@ -165,7 +165,7 @@ struct SetupsView: View {
         Menu {
             // Every row has an icon, so all titles line up in one column.
             Picker("Group By", selection: Bindable(viewModel).grouping) {
-                Label("Recent", systemImage: "clock").tag(SetupsGrouping.recent)
+                Label("By Month", systemImage: "calendar").tag(SetupsGrouping.recent)
                 Label("By Client", systemImage: "person.2").tag(SetupsGrouping.byClient)
             }
             .pickerStyle(.inline)
@@ -198,8 +198,8 @@ private struct SetupsEmptyStateView: View {
             }
         } description: {
             Text("""
-                Scan your first lighting setup. The diagram, \
-                equipment and references are saved here, so you can rebuild it next time.
+                Scan your first lighting setup. Its diagram, equipment and reference photos \
+                are saved here, so you can set it up again next time.
                 """)
             .font(.subheadline)
             .foregroundStyle(DesignTokens.textSecondary)
@@ -300,7 +300,7 @@ private struct SetupsBottomBarView: View {
     }
 
     private var savedToast: some View {
-        ToastBar(systemImage: "checkmark", message: "Setup Saved")
+        ToastBar(systemImage: "checkmark", message: "Setup saved")
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .task {
                 try? await Task.sleep(for: .seconds(3))

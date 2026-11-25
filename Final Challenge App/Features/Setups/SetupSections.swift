@@ -16,7 +16,7 @@ struct ClientGroup: Identifiable {
 
 /// Builds the setups list headings (A10-94). Pure: same setups in, same sections out.
 enum SetupSections {
-    static let notSavedTitle = "Not saved"
+    static let notSavedTitle = "Not Saved"
     static let noClientTitle = "No Client"
 
     static func recent(from setups: [Setup], calendar: Calendar = .current) -> [SetupSection] {

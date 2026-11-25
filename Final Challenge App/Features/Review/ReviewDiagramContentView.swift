@@ -126,7 +126,7 @@ struct ReviewViewModeTip: Tip {
 
 struct ReviewEditModeTip: Tip {
     var title: Text {
-        Text("Drag equipment to move, rotate, or edit details")
+        Text("Drag equipment to move it, or its handle to rotate it. Tap it to edit.")
     }
 }
 

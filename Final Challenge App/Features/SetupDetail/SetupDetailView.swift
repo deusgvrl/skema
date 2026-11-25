@@ -127,12 +127,12 @@ struct SetupDetailView: View {
             }
         }
         .quickLookPreview($viewModel.pdfURL)
-        .alert("Couldn't Create PDF", isPresented: $viewModel.isPDFFailedAlertPresented) {
+        .alert("Couldn’t Create PDF", isPresented: $viewModel.isPDFFailedAlertPresented) {
             Button("Cancel", role: .cancel) { }
             Button("Try Again") { shareTapped() }
                 .keyboardShortcut(.defaultAction)
         } message: {
-            Text("Something went wrong while building this PDF. Your setup is safe, so try again.")
+            Text("Your setup is safe. Try again.")
         }
         .alert("Delete This Setup?", isPresented: $viewModel.isDeleteAlertPresented) {
             Button("Cancel", role: .cancel) { }
@@ -150,7 +150,7 @@ private extension SetupDetailView {
     @ViewBuilder
     var tabPicker: some View {
         if !isEditing {
-            Picker("Tabs", selection: $viewModel.selectedTab) {
+            Picker("View", selection: $viewModel.selectedTab) {
                 Text("Diagram").tag(0)
                 Text("References").tag(1)
             }

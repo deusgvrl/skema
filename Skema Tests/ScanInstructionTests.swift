@@ -24,7 +24,7 @@ struct ScanInstructionTests {
         (.subject, "Tap the subject", "Walk up to it first"),
         (.camera, "Tap the camera", "Walk up to it first"),
         (.light, "Tap a light", "Walk up to it first"),
-        (.finish, "Tap the next light", "Or tap Finish Scan if that's all")
+        (.finish, "Tap the next light", "Or tap Finish Scan if that’s all")
     ])
     func steps(step: ScanStep, main: String, detail: String) {
         #expect(instruction(step: step) == ScanInstruction(main: main, detail: detail, style: .step))
@@ -46,7 +46,7 @@ struct ScanInstructionTests {
     func scanningTooFar() {
         let shown = instruction(scanning: ScanScanning(name: "Light 1", isTooFar: true))
 
-        #expect(shown.main == "Walk closer to Light 1" && shown.detail == "It's more than 5 m away")
+        #expect(shown.main == "Walk closer to Light 1" && shown.detail == "It’s more than 5 m away")
         #expect(!shown.isBlocking)
     }
 
@@ -77,7 +77,7 @@ struct ScanInstructionTests {
 
     @Test("What a tap did has its lines", arguments: [
         (ScanFeedback.pointAtFloorFirst, ["Point at the floor first"]),
-        (.cannotMeasure, ["Can't measure that spot", "Tap a spot nearer to you"]),
+        (.cannotMeasure, ["Can’t measure that spot", "Tap a spot nearer to you"]),
         (.alreadyAdded(light: 1), ["Light 1 already added"]),
         (.alreadyAdded(light: 3), ["Light 3 already added"]),
         (.finishFirst("Light 1"), ["Finish Light 1 first", "Walk around it until its tag turns green"]),
@@ -132,7 +132,7 @@ struct ScanInstructionTests {
         let noFeedback = instruction(step: .camera, done: .subject, problem: .moreLight, scanning: scanning)
         let noProblem = instruction(step: .camera, done: .subject, scanning: scanning)
 
-        #expect(all.main == "Can't measure that spot")
+        #expect(all.main == "Can’t measure that spot")
         #expect(noFeedback.main == "More light needed")
         #expect(noProblem.main == "Subject done")
         #expect(instruction(step: .camera, scanning: scanning).main == "Walk around the camera")

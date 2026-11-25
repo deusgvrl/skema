@@ -131,7 +131,7 @@ final class PDFRenderer {
             let rest = NSRange(location: fitted, length: remaining.length - fitted)
             remaining = remaining.attributedSubstring(from: rest)
             pages.startPage()
-            pages.drawHeading("Notes (continued)")
+            pages.drawHeading("NOTES (CONTINUED)")
         }
     }
 

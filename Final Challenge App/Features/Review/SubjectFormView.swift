@@ -39,12 +39,16 @@ struct SubjectFormView: View {
             Form {
                 Section(
                     header: FormSectionHeader("Position"),
-                    footer: Text(isReadOnly ? "Viewing subject details in read-only mode." : """
-                        Set the distance from the floor to the bottom of your subject \
-                        (e.g., tabletop height, posing stool, or floor).
-                        """)
-                        .font(.footnote)
-                        .foregroundStyle(DesignTokens.textSecondary)
+                    footer: Group {
+                        if !isReadOnly {
+                            Text("""
+                                The height of the subject’s base, like a tabletop or a posing stool. \
+                                Use 0 if it’s on the floor.
+                                """)
+                                .font(.footnote)
+                                .foregroundStyle(DesignTokens.textSecondary)
+                        }
+                    }
                 ) {
                     HStack {
                         Text("Height from floor")

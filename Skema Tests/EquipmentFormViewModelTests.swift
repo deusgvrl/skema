@@ -82,6 +82,28 @@ struct EquipmentFormViewModelTests {
         #expect(reviewVM.nodes.first?.lens == "24-70mm f/2.8")
     }
 
+    @Test("Equipment added by hand gets no label (no more E1, E2…)")
+    func newEquipmentHasNoLabel() {
+        let storage = StorageController(inMemory: true)
+        let setup = Setup(setupName: "Label Test")
+        storage.addSetup(setup)
+        let reviewVM = ReviewViewModel(setup: setup)
+        let formVM = EquipmentFormViewModel(editingNodeId: nil, reviewViewModel: reviewVM)
+        formVM.name = "Profoto D2"
+
+        formVM.saveNode(undoManager: nil) {}
+
+        #expect(reviewVM.nodes.first?.label == "")
+    }
+
+    @Test("The category picker says Accessory; the saved value stays Accessories", arguments: [
+        (EquipmentCategory.camera, "Camera"), (.light, "Light"), (.accessory, "Accessory")
+    ])
+    func categoryTitles(category: EquipmentCategory, title: String) {
+        #expect(category.title == title)
+        #expect(EquipmentCategory.accessory.rawValue == "Accessories")
+    }
+
     @Test("saveNode updates existing node properties when editing")
     func testSaveExistingNode() {
         let storage = StorageController(inMemory: true)

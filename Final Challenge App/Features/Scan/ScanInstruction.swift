@@ -25,7 +25,7 @@ enum ScanFeedback: Equatable {
     var main: String {
         switch self {
         case .pointAtFloorFirst: "Point at the floor first"
-        case .cannotMeasure: "Can't measure that spot"
+        case .cannotMeasure: "Can’t measure that spot"
         case .alreadyAdded(let light): "Light \(light) already added"
         case .finishFirst(let name): "Finish \(name) first"
         case .addFirst(.subject): "Add the subject first"
@@ -114,7 +114,7 @@ struct ScanInstruction: Hashable {
             return ScanInstruction(main: done.line, detail: nil, style: .done)
         }
         if let scanning, scanning.isTooFar {
-            return ScanInstruction(main: "Walk closer to \(scanning.name)", detail: "It's more than 5 m away",
+            return ScanInstruction(main: "Walk closer to \(scanning.name)", detail: "It’s more than 5 m away",
                                    style: .step)
         }
         if let scanning {

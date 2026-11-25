@@ -174,7 +174,7 @@ struct ScanOneItemTests {
 
         #expect(viewModel.items.last?.result?.status == .outOfRange)
         #expect(viewModel.instruction.main == "Walk closer to Light 1")
-        #expect(viewModel.instruction.detail == "It's more than 5 m away")
+        #expect(viewModel.instruction.detail == "It’s more than 5 m away")
     }
 
     @Test("The ring fills: half for enough points, half for the walk")

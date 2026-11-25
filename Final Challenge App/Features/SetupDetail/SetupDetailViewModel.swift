@@ -69,8 +69,8 @@ final class SetupDetailViewModel {
     /// The alert text: saved setups can be recovered for 30 days, drafts cannot (A10-95).
     var deleteMessage: String {
         setup.firstSavedDate == nil
-            ? "This draft will be deleted. This can't be undone."
-            : "This setup will move to Recently Deleted for \(RecentlyDeleted.keepDays) days."
+            ? "This draft will be deleted. This can’t be undone."
+            : "You can recover it from Recently Deleted for \(RecentlyDeleted.keepDays) days."
     }
 
     func deleteSetup(completion: () -> Void) {

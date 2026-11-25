@@ -100,7 +100,7 @@ struct DiagramEntity: View {
             .onTapGesture { if !isRotating { onTap() } }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(title)
-            .accessibilityHint("Double tap to select or view details")
+            .accessibilityHint("Shows the subject’s details.")
             .accessibilityAddTraits(.isButton)
 
             // Rotation handle layer (outside the circle)

@@ -43,3 +43,40 @@ struct SetupsViewModelTests {
         #expect(viewModel.isShowingScan)
     }
 }
+
+@MainActor
+@Suite("Setups view model: copy (audit 24–25 Nov)")
+struct SetupsCopyTests {
+    private func viewModel(grouping: SetupsGrouping = .recent) -> SetupsViewModel {
+        let viewModel = SetupsViewModel(storageController: StorageController(inMemory: true))
+        viewModel.grouping = grouping
+        return viewModel
+    }
+
+    @Test("The delete alert says a saved setup can be recovered, and a draft can’t")
+    func deleteMessages() {
+        let saved = Setup(setupName: "Shoe shoot")
+        saved.firstSavedDate = Date()
+
+        #expect(viewModel().deleteMessage(for: saved) == "You can recover it from Recently Deleted for 30 days.")
+        #expect(viewModel().deleteMessage(for: Setup()) == "This draft will be deleted. This can’t be undone.")
+    }
+
+    @Test("A card shows the client by month and the project by client, with no light count", arguments: [
+        (SetupsGrouping.recent, "Aesop"), (.byClient, "Spring catalog")
+    ])
+    func cardSubtitle(grouping: SetupsGrouping, expected: String) {
+        let setup = Setup(setupName: "Hero shot", client: " Aesop ", project: "Spring catalog ")
+        setup.nodes = [Equipment(category: .light, name: "Light 1")]
+
+        #expect(viewModel(grouping: grouping).cardSubtitle(for: setup) == expected)
+    }
+
+    @Test("A card with no client or project has no subtitle", arguments: [SetupsGrouping.recent, .byClient])
+    func cardSubtitleEmpty(grouping: SetupsGrouping) {
+        let setup = Setup(setupName: "Hero shot", client: "  ", project: "")
+        setup.nodes = [Equipment(category: .light, name: "Light 1")]
+
+        #expect(viewModel(grouping: grouping).cardSubtitle(for: setup).isEmpty)
+    }
+}

@@ -35,10 +35,10 @@ enum PDFEquipmentTables {
 
     private static func cameras(_ items: [Equipment]) -> PDFTable {
         PDFTable(
-            title: "CAMERA",
+            title: "CAMERAS",
             columns: [
-                .init(title: "Name / role", width: 160),
-                .init(title: "Lens", width: 42),
+                .init(title: "Name and role", width: 160),
+                .init(title: "Focal length", width: 42),
                 .init(title: "ISO", width: 38),
                 .init(title: "Aperture", width: 50),
                 .init(title: "Shutter speed", width: 44),
@@ -59,9 +59,9 @@ enum PDFEquipmentTables {
 
     private static func lights(_ items: [Equipment]) -> PDFTable {
         PDFTable(
-            title: "LIGHTING",
+            title: "LIGHTS",
             columns: [
-                .init(title: "Name / role", width: 160),
+                .init(title: "Name and role", width: 160),
                 .init(title: "Power", width: 55),
                 .init(title: "Color temperature", width: 78),
                 .init(title: "Height", width: 55),
@@ -100,8 +100,14 @@ enum PDFEquipmentTables {
         PDFTable.Row(
             cells: [value(item.name)] + values,
             role: item.role.trimmingCharacters(in: .whitespacesAndNewlines),
-            accessories: value(item.accessories)
+            accessories: optionalValue(item.accessories)
         )
+    }
+
+    /// The value, or nil when empty, for a line that is left out rather than showing a dash.
+    private static func optionalValue(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// The value with its unit, or a dash when empty. The unit is only added after a number, so one the user typed
