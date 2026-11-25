@@ -18,6 +18,10 @@ struct SubjectFormView: View {
 
     @Binding var selectedDetent: PresentationDetent
 
+    private var hasChanged: Bool {
+        sanitizeDecimalInput(heightText) != sanitizeDecimalInput(initialSubjectHeight)
+    }
+
     init(
         viewModel: ReviewViewModel,
         undoManager: UndoManager?,
@@ -82,27 +86,28 @@ struct SubjectFormView: View {
 
         if !isReadOnly {
             ToolbarItem(placement: .confirmationAction) {
-                if selectedDetent == .large || selectedDetent == .medium {
-                    Button("Done", systemImage: "checkmark") {
-                        let normalizedHeight = sanitizeDecimalInput(heightText)
-                        viewModel.updateSubjectHeight(
-                            oldValue: initialSubjectHeight,
-                            newValue: normalizedHeight,
-                            undoManager: undoManager
-                        )
-                        dismiss()
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(DesignTokens.accentPrimary)
-                } else {
-                    Button("Edit Details", systemImage: "pencil.and.list.clipboard") {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            selectedDetent = .large
+                Group {
+                    if selectedDetent == .large || selectedDetent == .medium {
+                        Button("Done", systemImage: "checkmark") {
+                            let normalizedHeight = sanitizeDecimalInput(heightText)
+                            viewModel.updateSubjectHeight(
+                                oldValue: initialSubjectHeight,
+                                newValue: normalizedHeight,
+                                undoManager: undoManager
+                            )
+                            dismiss()
+                        }
+                    } else {
+                        Button("Edit Details", systemImage: "checkmark") {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selectedDetent = .large
+                            }
                         }
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(DesignTokens.accentPrimary)
                 }
+                .buttonStyle(.glassProminent)
+                .tint(DesignTokens.accentPrimary)
+                .disabled(!hasChanged)
             }
         }
     }
