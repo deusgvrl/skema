@@ -23,7 +23,8 @@ struct PDFDiagramView: View {
 
     /// Calculates scale factor:
     /// - Scales DOWN (below 1.0, down to 0.05x) for far equipment (> 15m) so canvas bounds never clip.
-    /// - Scales UP (above 1.0, up to 4.5x) for tight setups (< 50cm) to expand close clusters and prevent icon overlaps.
+    /// - Scales UP (above 1.0, up to 4.5x) for tight setups (< 50cm) to expand close clusters
+    ///   and prevent icon overlaps.
     /// Icons, labels, and text remain at 100% fixed printable size in both cases.
     var autoScale: CGFloat {
         let activeNodes = nodes.filter { $0.position != .zero }
@@ -164,53 +165,66 @@ struct PDFDiagramView: View {
     private func categoryDetailsView(for node: Equipment) -> some View {
         switch node.category {
         case .camera:
-            let hasLens = !node.lens.trimmingCharacters(in: .whitespaces).isEmpty
-            let hasAperture = !node.aperture.trimmingCharacters(in: .whitespaces).isEmpty
-            let hasIso = !node.iso.trimmingCharacters(in: .whitespaces).isEmpty
+            cameraDetailsView(for: node)
+        case .light:
+            lightDetailsView(for: node)
+        case .accessory:
+            accessoryDetailsView(for: node)
+        }
+    }
 
-            if hasLens || hasAperture || hasIso {
-                HStack(spacing: 3) {
-                    if hasLens {
-                        Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens)mm")
-                    }
-                    if hasAperture {
-                        if hasLens {
-                            Text("•").foregroundStyle(Color.gray)
-                        }
-                        Text(node.aperture)
-                    }
-                    if hasIso {
-                        if hasLens || hasAperture {
-                            Text("•").foregroundStyle(Color.gray)
-                        }
-                        Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
-                    }
+    @ViewBuilder
+    private func cameraDetailsView(for node: Equipment) -> some View {
+        let hasLens = !node.lens.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasAperture = !node.aperture.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasIso = !node.iso.trimmingCharacters(in: .whitespaces).isEmpty
+
+        if hasLens || hasAperture || hasIso {
+            HStack(spacing: 3) {
+                if hasLens {
+                    Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens)mm")
                 }
+                if hasAperture {
+                    if hasLens {
+                        Text("•").foregroundStyle(Color.gray)
+                    }
+                    Text(node.aperture)
+                }
+                if hasIso {
+                    if hasLens || hasAperture {
+                        Text("•").foregroundStyle(Color.gray)
+                    }
+                    Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
+                }
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(Color.black.opacity(0.75))
+        } else if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(node.role)
                 .font(.system(size: 9))
                 .foregroundStyle(Color.black.opacity(0.75))
-            } else if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text(node.role)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.black.opacity(0.75))
-            }
+        }
+    }
 
-        case .light:
-            if !node.power.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text(node.power)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.black.opacity(0.75))
-            } else if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text(node.role)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.black.opacity(0.75))
-            }
+    @ViewBuilder
+    private func lightDetailsView(for node: Equipment) -> some View {
+        if !node.power.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(node.power)
+                .font(.system(size: 9))
+                .foregroundStyle(Color.black.opacity(0.75))
+        } else if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(node.role)
+                .font(.system(size: 9))
+                .foregroundStyle(Color.black.opacity(0.75))
+        }
+    }
 
-        case .accessory:
-            if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text(node.role)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.black.opacity(0.75))
-            }
+    @ViewBuilder
+    private func accessoryDetailsView(for node: Equipment) -> some View {
+        if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(node.role)
+                .font(.system(size: 9))
+                .foregroundStyle(Color.black.opacity(0.75))
         }
     }
 
@@ -221,7 +235,8 @@ struct PDFDiagramView: View {
         let posX = node.position.x * scale
         let posY = node.position.y * scale
 
-        if posX != 0 || posY != 0, let labelPos = calculateDistanceLabelPosition(posX: posX, posY: posY, centre: centre) {
+        if posX != 0 || posY != 0,
+           let labelPos = calculateDistanceLabelPosition(posX: posX, posY: posY, centre: centre) {
             let metres = hypot(node.position.x, node.position.y) / Equipment.pointsPerMeter
             let text = node.distance.isEmpty ? String(format: "%.2f", metres) : node.distance
 
@@ -313,14 +328,16 @@ struct PDFDiagramView: View {
             Equipment(
                 category: .camera,
                 name: "Nikon",
-                position: CGPoint(x: 0, y: 24), lens: "30mm",
+                position: CGPoint(x: 0, y: 24),
+                lens: "30mm",
                 iso: "100",
                 aperture: "F2.8"
             ),
             Equipment(
                 category: .light,
                 name: "W200",
-                position: CGPoint(x: 25, y: -20), power: "1/120"
+                position: CGPoint(x: 25, y: -20),
+                power: "1/120"
             )
         ],
         subjectRotationAngle: 45.0
