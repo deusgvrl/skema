@@ -119,11 +119,11 @@ struct SetupDetailToolbarContent: ToolbarContent {
     private var moreMenuToolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                Button("Edit Project Details", systemImage: "pencil") {
+                Button("Edit Setup Details", systemImage: "pencil") {
                     onResetSheetState()
                     viewModel.isEditingProjectDetails = true
                 }
-                Button("Share", systemImage: "square.and.arrow.up") {
+                Button("Share PDF", systemImage: "square.and.arrow.up") {
                     onShare()
                 }
                 .disabled(viewModel.isPreparingPDF)
@@ -159,7 +159,7 @@ struct SetupDetailToolbarContent: ToolbarContent {
                         referencesViewModel.showPhotoPicker = true
                     }
                 } label: {
-                    Label("Add Image", systemImage: "plus")
+                    Label("Add Photo", systemImage: "plus")
                 }
             }
         }

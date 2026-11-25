@@ -16,7 +16,7 @@ struct ClientField: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            TextField("Client", text: $client, prompt: Text("None"))
+            TextField("Client", text: $client, prompt: Text("e.g. Bloom Skincare"))
                 .focused($isFocused)
                 .textInputAutocapitalization(.words)
                 .submitLabel(.done)

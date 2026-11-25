@@ -182,17 +182,17 @@ struct PDFDiagramView: View {
         if hasLens || hasAperture || hasIso {
             HStack(spacing: 3) {
                 if hasLens {
-                    Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens)mm")
+                    Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens) mm")
                 }
                 if hasAperture {
                     if hasLens {
-                        Text("•").foregroundStyle(Color.gray)
+                        Text("·").foregroundStyle(Color.gray)
                     }
                     Text(node.aperture)
                 }
                 if hasIso {
                     if hasLens || hasAperture {
-                        Text("•").foregroundStyle(Color.gray)
+                        Text("·").foregroundStyle(Color.gray)
                     }
                     Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
                 }

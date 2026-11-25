@@ -24,4 +24,19 @@ struct SetupDetailViewModelTests {
 
         #expect(viewModel.formattedSubtitle == expected)
     }
+
+    @Test("The delete alert says a saved setup can be recovered, and a draft can’t")
+    func deleteMessages() {
+        let storage = StorageController(inMemory: true)
+        let saved = Setup(setupName: "Candle")
+        saved.firstSavedDate = Date()
+        let draft = Setup()
+        storage.addSetup(saved)
+        storage.addSetup(draft)
+
+        #expect(SetupDetailViewModel(setup: saved, storageController: storage).deleteMessage
+            == "You can recover it from Recently Deleted for 30 days.")
+        #expect(SetupDetailViewModel(setup: draft, storageController: storage).deleteMessage
+            == "This draft will be deleted. This can’t be undone.")
+    }
 }

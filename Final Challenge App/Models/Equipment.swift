@@ -219,6 +219,15 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case accessory = "Accessories"
 
     var id: String { self.rawValue }
+
+    /// The name the app shows. The saved value stays `rawValue`, so "Accessories" still loads.
+    var title: String {
+        switch self {
+        case .camera: "Camera"
+        case .light: "Light"
+        case .accessory: "Accessory"
+        }
+    }
 }
 
 extension EquipmentCategory {

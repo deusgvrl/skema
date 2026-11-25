@@ -172,26 +172,6 @@ struct ReviewView: View {
 
     // MARK: - Node Actions
 
-    private func duplicateNode(id: UUID) {
-        guard let original = viewModel.nodes.first(where: { $0.id == id }) else { return }
-        let oldNodes = viewModel.nodes.map { $0.clone() }
-
-        let duplicate = original.clone()
-        duplicate.id = UUID()
-        duplicate.name = "\(original.name) Copy"
-        duplicate.position = CGPoint(x: original.position.x + 24, y: original.position.y + 24)
-
-        viewModel.nodes.append(duplicate)
-        viewModel.applyStateChange(oldNodes: oldNodes, undoManager: undoManager)
-
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            selectedNodeId = duplicate.id
-            activeSheetContent = .equipment(duplicate.id)
-            selectedDetent = .height(76)
-        }
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-    }
-
     private func quickDeleteNode(id: UUID) {
         guard let index = viewModel.nodes.firstIndex(where: { $0.id == id }) else { return }
         let oldNodes = viewModel.nodes.map { $0.clone() }

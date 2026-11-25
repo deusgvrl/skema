@@ -34,7 +34,7 @@ struct ScanStepTests {
     func details() {
         #expect(ScanStep.allCases.map(\.detail) == [
             "Heights are measured from it", "Walk up to it first", "Walk up to it first", "Walk up to it first",
-            "Or tap Finish Scan if that's all"
+            "Or tap Finish Scan if that’s all"
         ])
     }
 

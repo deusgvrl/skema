@@ -2,25 +2,17 @@
 //  SetupGridItem.swift
 //  Final Challenge App
 //
-//  One setup in the 2-column Setups grid: square artwork, then the name and "Client · N lights"
-//  (Sketch UT Review A-S02 / A-S03, no card).
+//  One setup in the 2-column Setups grid: square artwork, then the name and the client (By Month) or the project
+//  (By Client) (Sketch UT Review A-S02 / A-S03, no card; copy audit 24 Nov).
 //
 
 import SwiftUI
 
 struct SetupGridItem: View {
     let setup: Setup
-
-    private var lightsCount: Int {
-        setup.nodes.filter { $0.category == .light }.count
-    }
-
-    /// "Aesop · 4 lights", or just the lights when there is no client.
-    private var subtitle: String {
-        let lights = "\(lightsCount) \(lightsCount == 1 ? "light" : "lights")"
-        let client = setup.client.trimmingCharacters(in: .whitespaces)
-        return client.isEmpty ? lights : "\(client) · \(lights)"
-    }
+    /// The client or the project, depending on the grouping (`SetupsViewModel.cardSubtitle`).
+    /// Empty leaves the line blank.
+    let subtitle: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -31,7 +23,8 @@ struct SetupGridItem: View {
                     .font(.subheadline)
                     .foregroundStyle(DesignTokens.textPrimary)
                     .lineLimit(1)
-                Text(subtitle)
+                // Always one line tall, so cards in a row are the same height when one has no client or project.
+                Text(subtitle.isEmpty ? " " : subtitle)
                     .font(.footnote)
                     .foregroundStyle(DesignTokens.textSecondary)
                     .lineLimit(1)
@@ -87,8 +80,8 @@ struct SetupThumbnail: View {
 
 #Preview {
     LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible())], spacing: 18) {
-        SetupGridItem(setup: Setup(setupName: "Perfume / low key", client: "Maison Noir"))
-        SetupGridItem(setup: Setup(setupName: "Skincare / soft daylight", client: "Aesop"))
+        SetupGridItem(setup: Setup(setupName: "Perfume / low key"), subtitle: "Maison Noir")
+        SetupGridItem(setup: Setup(setupName: "Skincare / soft daylight"), subtitle: "")
     }
     .padding()
 }

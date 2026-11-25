@@ -97,7 +97,7 @@ struct PDFRendererTests {
         }
     }
 
-    @Test("Case 3: page 2 has the subject, camera, lighting and accessories tables, in that order")
+    @Test("Case 3: page 2 has the subject, cameras, lights and accessories tables, in that order")
     func equipmentPage() throws {
         // Arrange
         let setup = baseSetup()
@@ -110,7 +110,7 @@ struct PDFRendererTests {
             #expect(page2.contains(expected), "Page 2 should contain \"\(expected)\".")
         }
         let inOrder = [
-            "SUBJECT", "CAMERA", "Camera body", "LIGHTING", "Key light", "Fill light", "ACCESSORIES", "Softbox"
+            "SUBJECT", "CAMERAS", "Camera body", "LIGHTS", "Key light", "Fill light", "ACCESSORIES", "Softbox"
         ]
         let positions = inOrder.compactMap { page2.range(of: $0)?.lowerBound }
         #expect(positions.count == inOrder.count, "Every table title and item should be on page 2.")
@@ -181,7 +181,7 @@ struct PDFRendererTests {
         // Assert
         #expect(pdf.pageCount == 3, "Long notes should add one page.")
         let page2 = text(of: pdf, page: 1)
-        #expect(page2.contains("Notes (continued)"), "Page 2 should continue the notes.")
+        #expect(page2.contains("NOTES (CONTINUED)"), "Page 2 should continue the notes.")
         #expect(!page2.contains("Equipment Details"), "Equipment must start on a new page after the notes.")
         #expect(text(of: pdf, page: 2).contains("Equipment Details"), "Page 3 should have the equipment.")
     }
@@ -202,7 +202,7 @@ struct PDFRendererTests {
         #expect(firstPage != nil && lastPage != nil, "Both the first and the last light should be found.")
         if let firstPage, let lastPage {
             #expect(lastPage > firstPage, "The last row should be on a later page than the first.")
-            #expect(pages[lastPage].contains("LIGHTING (continued)"), "A later page should repeat the table title.")
+            #expect(pages[lastPage].contains("LIGHTS (CONTINUED)"), "A later page should repeat the table title.")
             #expect(pages[lastPage].contains("Power"), "A later page should repeat the column titles.")
         }
         var sizes: [CGFloat] = []
@@ -292,7 +292,7 @@ struct PDFEquipmentTablesTests {
     func shape() {
         let all = tables([Equipment(category: .camera), Equipment(category: .light), Equipment(category: .accessory)])
 
-        #expect(all.map(\.title) == ["SUBJECT", "CAMERA", "LIGHTING", "ACCESSORIES"])
+        #expect(all.map(\.title) == ["SUBJECT", "CAMERAS", "LIGHTS", "ACCESSORIES"])
         for table in all {
             #expect(table.columns.reduce(0) { $0 + $1.width } == PDFLayout.contentWidth, "\(table.title) width")
             #expect(table.rows.allSatisfy { $0.cells.count == table.columns.count }, "\(table.title) cells")
@@ -304,10 +304,10 @@ struct PDFEquipmentTablesTests {
         let camera = Equipment(category: .camera, name: "Sony A7 IV", role: "Main", lens: "50", iso: "100",
                                aperture: "f/8", shutterSpeed: "1/200", whiteBalance: "5600", height: "1.20",
                                tilt: "-5", distance: "1.77", accessories: "Tripod")
-        let table = try #require(tables([camera]).first { $0.title == "CAMERA" })
+        let table = try #require(tables([camera]).first { $0.title == "CAMERAS" })
         let row = try #require(table.rows.first)
 
-        #expect(table.columns.map(\.title) == ["Name / role", "Lens", "ISO", "Aperture", "Shutter speed",
+        #expect(table.columns.map(\.title) == ["Name and role", "Focal length", "ISO", "Aperture", "Shutter speed",
                                                "White balance", "Height", "Tilt", "Distance to subject"])
         #expect(row.cells == ["Sony A7 IV", "50 mm", "100", "f/8", "1/200", "5600 K", "1.20 m", "-5°", "1.77 m"])
         #expect(row.role == "Main" && row.accessories == "Tripod")
@@ -327,11 +327,11 @@ struct PDFEquipmentTablesTests {
             distance: "1.78",
             accessories: "Softbox"
         )
-        let table = try #require(tables([light]).first { $0.title == "LIGHTING" })
+        let table = try #require(tables([light]).first { $0.title == "LIGHTS" })
         let row = try #require(table.rows.first)
 
         #expect(table.columns.map(\.title) == [
-            "Name / role", "Power", "Color temperature", "Height", "Tilt", "Distance to subject"
+            "Name and role", "Power", "Color temperature", "Height", "Tilt", "Distance to subject"
         ])
         #expect(row.cells == ["Profoto D2", "1/4", "5600 K", "1,9 m", "-30°", "1.78 m"])
         #expect(row.role == "Key" && row.accessories == "Softbox")
@@ -342,7 +342,7 @@ struct PDFEquipmentTablesTests {
         let row = try #require(tables([Equipment(category: .light)]).last?.rows.first)
 
         #expect(row.cells.allSatisfy { $0 == "—" })
-        #expect(row.role.isEmpty && row.accessories == "—")
+        #expect(row.role.isEmpty && row.accessories == nil, "No “Accessories: —” line when there are none.")
     }
 
     @Test("A unit the user typed is not repeated")

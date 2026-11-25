@@ -124,17 +124,17 @@ struct NodeView: View {
             if hasLens || hasIso || hasAperture {
                 HStack(spacing: 4) {
                     if hasLens {
-                        Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens)mm")
+                        Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens) mm")
                     }
                     if hasAperture {
                         if hasLens {
-                            Text("•").foregroundStyle(DesignTokens.textSecondary)
+                            Text("·").foregroundStyle(DesignTokens.textSecondary)
                         }
                         Text(node.aperture)
                     }
                     if hasIso {
                         if hasLens || hasAperture {
-                            Text("•").foregroundStyle(DesignTokens.textSecondary)
+                            Text("·").foregroundStyle(DesignTokens.textSecondary)
                         }
                         Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
                     }

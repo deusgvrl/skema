@@ -132,7 +132,7 @@ struct SetupSectionsTests {
         #expect(sections[safe: 1]?.setups.map(\.setupName) == ["Lamp"])
     }
 
-    @Test("Case 8: drafts sit on top of Recent in a Not saved section")
+    @Test("Case 8: drafts sit on top of Recent in a Not Saved section")
     func draftsOnTopOfRecent() {
         // Arrange
         let draft = makeSetup("New Setup", saved: nil)
@@ -142,7 +142,7 @@ struct SetupSectionsTests {
         let sections = SetupSections.recent(from: [shoe, draft], calendar: calendar)
 
         // Assert
-        #expect(sections.map(\.title) == ["Not saved", "November 2026"])
+        #expect(sections.map(\.title) == ["Not Saved", "November 2026"])
         #expect(sections[safe: 0]?.setups.map(\.setupName) == ["New Setup"])
     }
 
@@ -156,7 +156,7 @@ struct SetupSectionsTests {
         let groups = SetupSections.byClient(from: [shoe, draft], calendar: calendar)
 
         // Assert
-        #expect(groups.map(\.title) == ["Not saved", "Apple"])
+        #expect(groups.map(\.title) == ["Not Saved", "Apple"])
         #expect(groups[safe: 0]?.sections.map(\.title) == [""], "Drafts have no month heading.")
         #expect(groups[safe: 0]?.sections.flatMap(\.setups).map(\.setupName) == ["New Setup"])
         #expect(groups[safe: 1]?.sections.flatMap(\.setups).map(\.setupName) == ["Shoe shoot"])

@@ -142,7 +142,6 @@ final class EquipmentFormViewModel {
         } else {
             let newNode = Equipment(
                 category: category,
-                label: "E\(reviewViewModel.nodes.count + 1)",
                 name: name,
                 role: role,
                 position: CGPoint(x: 0, y: -100),

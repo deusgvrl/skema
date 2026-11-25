@@ -163,7 +163,7 @@ struct FullScreenImageView: View {
                 deleteCurrentImage()
             }
         } message: {
-            Text("It will be removed from this setup's references.")
+            Text("It will be removed from this setup.")
         }
         .toolbar {
             ToolbarItem(placement: .principal) {

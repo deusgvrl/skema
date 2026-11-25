@@ -148,7 +148,7 @@ final class ScanViewModel {
 
     var arSession: ARSession? { scan?.session as? ARSession }
 
-    /// ✕ asks "Leave this scan?" first only while scanning; the message screens leave straight away.
+    /// ✕ asks to leave the scan first only while scanning; the message screens leave straight away.
     var asksBeforeLeaving: Bool { screen == .scanning }
 
     /// Finish Scan: a subject, one camera and one light, all done, and nothing still being scanned
@@ -406,14 +406,6 @@ extension ScanViewModel {
         return ScanOverlay.screenBox(of: bounds.corners, camera: camera, screenSize: size)
     }
 
-    /// "Light 1 · 1.52 m · 1.20 m" once measured; just the name before that.
-    func tagText(for item: ScanItem) -> String {
-        guard let values = Self.values(of: item.result, hasFloor: floorY != nil), let height = values.height else {
-            return "\(item.name) ✓"
-        }
-        return "\(item.name) · \(Self.metres(values.distance)) m · \(Self.metres(height)) m"
-    }
-
     func isSaved(_ item: ScanItem) -> Bool {
         Self.values(of: item.result, hasFloor: floorY != nil) != nil
     }
@@ -592,10 +584,10 @@ extension ScanViewModel {
         }
     }
 
+    /// iOS's own error text is written for developers, so the screen says what to do instead.
     private static func message(for error: ScanSessionError) -> String {
         switch error {
-        case .sessionFailed(let description): description
-        case .alreadyStarted: "The scan was already started."
+        case .sessionFailed, .alreadyStarted: "Something interrupted the scan. Close it and start again."
         case .cameraDenied, .lidarUnsupported: ""
         }
     }

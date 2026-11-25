@@ -161,12 +161,6 @@ extension ReviewViewModel {
         DisplayOrder.equipment(nodes)
     }
 
-    /// "Estimated layout · 4 lights" under the Review Setup title.
-    var layoutSubtitle: String {
-        let lights = nodes.filter { $0.category == .light }.count
-        return "Estimated layout · \(lights) \(lights == 1 ? "light" : "lights")"
-    }
-
     /// The pencil. Starts a clean undo history, so Discard only rolls back what happens in edit mode.
     func beginEditing(undoManager: UndoManager?) {
         undoManager?.removeAllActions()
