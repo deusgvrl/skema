@@ -25,9 +25,12 @@ struct SetupDetailToolbarContent: ToolbarContent {
     private var isEditing: Bool { viewModel.reviewViewModel.isEditingDiagram }
 
     var body: some ToolbarContent {
-        if isEditing { editToolbar }
-        principalToolbar
-        if !isEditing { moreMenuToolbar }
+        if isEditing {
+            editToolbar
+        } else {
+            principalToolbar
+            moreMenuToolbar
+        }
         bottomToolbar
     }
 
@@ -177,18 +180,6 @@ struct SetupDetailToolbarContent: ToolbarContent {
             }
             .buttonStyle(.glassProminent)
             .tint(DesignTokens.accentPrimary)
-        } else {
-            Button {
-                withAnimation {
-                    viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
-                }
-            } label: {
-                Image(systemName: "pencil")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.glassProminent)
-            .tint(DesignTokens.accentPrimary)
-        }
+        } 
     }
 }

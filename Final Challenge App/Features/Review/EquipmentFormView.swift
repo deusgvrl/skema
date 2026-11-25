@@ -108,24 +108,24 @@ struct EquipmentFormView: View {
 
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
-                        if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
-                            Button("Done", systemImage: "checkmark") {
-                                formViewModel.saveNode(undoManager: undoManager) {
-                                    dismiss()
+                        Group {
+                            if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
+                                Button("Done", systemImage: "checkmark") {
+                                    formViewModel.saveNode(undoManager: undoManager) {
+                                        dismiss()
+                                    }
+                                }
+                            } else {
+                                Button("Edit Details", systemImage: "checkmark") {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .large
+                                    }
                                 }
                             }
-                            .buttonStyle(.glassProminent)
-                            .tint(DesignTokens.accentPrimary)
-                            .disabled(!formViewModel.isFormValid)
-                        } else {
-                            Button("Edit Details", systemImage: "pencil.and.list.clipboard") {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .large
-                                }
-                            }
-                            .buttonStyle(.glassProminent)
-                            .tint(DesignTokens.accentPrimary)
                         }
+                        .buttonStyle(.glassProminent)
+                        .tint(DesignTokens.accentPrimary)
+                        .disabled(!formViewModel.isFormValid || (formViewModel.isEditing && !isDirty))
                     }
                 }
             }
@@ -161,6 +161,15 @@ struct EquipmentFormView: View {
                 isSwitchingNode = false
             }
         }
+    }
+
+    private func tiltOptions(current: Int) -> [Int] {
+        var steps = Array(stride(from: 90, through: -90, by: -5))
+        if !steps.contains(current) {
+            steps.append(current)
+            steps.sort(by: >)
+        }
+        return steps
     }
 }
 
@@ -308,16 +317,27 @@ private extension EquipmentFormView {
                     Text("m")
                         .foregroundStyle(DesignTokens.textSecondary)
                 }
-                HStack {
-                    Text("Tilt")
-                    Spacer()
-                    TextField("e.g. 0", text: $formViewModel.tilt)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(DesignTokens.textPrimary)
-                        .keyboardType(.numberPad)
-                        .disabled(isReadOnly)
-                    Text("°")
-                        .foregroundStyle(DesignTokens.textSecondary)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Vertical tilt")
+                        Spacer()
+                        Text("\(Int(formViewModel.tilt) ?? 0)°")
+                            .foregroundStyle(DesignTokens.textSecondary)
+                    }
+
+                    if !isReadOnly {
+                        Picker("Vertical tilt", selection: Binding(
+                            get: { Int(formViewModel.tilt) ?? 0 },
+                            set: { formViewModel.tilt = String($0) }
+                        )) {
+                            ForEach(tiltOptions(current: Int(formViewModel.tilt) ?? 0), id: \.self) { degrees in
+                                Text("\(degrees)°").tag(degrees)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120)
+                    }
                 }
 
                 HStack {

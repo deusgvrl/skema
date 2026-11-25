@@ -40,8 +40,10 @@ struct ReviewToolbarContent: ToolbarContent {
             closeButton
         }
 
-        ToolbarItem(placement: .principal) {
-            titleView
+        if !viewModel.isEditingDiagram {
+            ToolbarItem(placement: .principal) {
+                titleView
+            }
         }
 
         if viewModel.isEditingDiagram {
@@ -147,16 +149,6 @@ struct ReviewToolbarContent: ToolbarContent {
             }
             .buttonStyle(.glassProminent)
             .tint(DesignTokens.accentPrimary)
-        } else {
-            Button {
-                viewModel.beginEditing(undoManager: undoManager)
-            } label: {
-                Image(systemName: "pencil")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white)
-            }
-            .buttonStyle(.glassProminent)
-            .tint(DesignTokens.accentPrimary)
-        }
+        } 
     }
 }
