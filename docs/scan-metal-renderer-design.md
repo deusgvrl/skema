@@ -25,6 +25,8 @@
 - **D3. Projection: our own maths** (`ScanProjection`), with ARKit's iOS 27 API only as a phone check (M23). The full calculation, its sources and its checks are in the artifact "Scan Projection Maths": https://claude.ai/artifact/5omiruCsb8nR34GRHTBA2K (matrix verified against `ScanOverlay` in code to 0.00004 pt; Metal NDC rules verified on an Apple GPU).
 - **D4. Occlusion numbers:** margin **3 cm**, minimum confidence **1** (medium). Tune on the phone (M21).
 - Approach 1 (`MTKView` + `CVMetalTextureCache`) stays the recommendation.
+- **D6. Shaders in a `.metal` file** (Amadeus, 24 Nov; option 1). Xcode 27 does not include the Metal compiler by default. **Every developer and build machine must install it once:** Xcode → Settings → Components → Metal Toolchain → Get, or `xcodebuild -downloadComponent MetalToolchain`; check with `xcodebuild -showComponent MetalToolchain` (`Status: installed`). Tell the team before B reaches `dev`.
+- **D5. Do not wait for A10-117** (Amadeus, 24 Nov): parts 2 and 3 are built now in this local branch; the B ↔ A conflicts in `ScanSession.swift` and `ScanView.swift` are solved when the branches meet. This replaces "new files only until A is merged".
 
 ## 1. Intent
 

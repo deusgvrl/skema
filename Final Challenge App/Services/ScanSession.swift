@@ -10,6 +10,7 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
 
     private let supportsLiDAR: @Sendable () -> Bool
     private let supportsMesh: @Sendable () -> Bool
+    let renderer: ScanRendererChoice
     private let delegateQueue = DispatchQueue(label: "ScanSession.delegate", qos: .userInitiated)
     private let frameBroadcast = Broadcast<ScanFrame>(bufferSize: 1)
     private let stateBroadcast = Broadcast<ScanSessionState>(bufferSize: 8)
@@ -25,11 +26,13 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
         session: any ARSessionControlling = ARSession(),
         frameInterval: TimeInterval = 1.0 / 15.0,
         supportsLiDAR: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsLiDAR() },
-        supportsMesh: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsMesh() }
+        supportsMesh: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsMesh() },
+        renderer: ScanRendererChoice = ScanRendererChoice(defaults: .standard)
     ) {
         self.session = session
         self.supportsLiDAR = supportsLiDAR
         self.supportsMesh = supportsMesh
+        self.renderer = renderer
         self.store = Mutex(Store(throttle: FrameThrottle(minimumInterval: frameInterval)))
         super.init()
         session.delegateQueue = delegateQueue
@@ -82,7 +85,9 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
             current.state = .running
         }
         stateBroadcast.yield(.running)
-        session.run(Self.makeConfiguration(withMesh: supportsMesh()), options: [.resetTracking, .removeExistingAnchors])
+        // The room mesh only helps RealityKit hide the outline. Our own Metal view does not use it (D1).
+        let withMesh = supportsMesh() && renderer == .arView
+        session.run(Self.makeConfiguration(withMesh: withMesh), options: [.resetTracking, .removeExistingAnchors])
     }
 
     func stop() {

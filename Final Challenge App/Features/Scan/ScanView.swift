@@ -1,3 +1,4 @@
+import ARKit
 import SwiftUI
 
 /// The scan screen (LiDAR only, no object detection), guided step by step (Sketch UT Review T01–T10): point at the
@@ -32,8 +33,7 @@ struct ScanView: View {
             background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, outlines: viewModel.outlineBoxes,
-                                 onCoachingChange: { coaching in withAnimation { isCoaching = coaching } })
+                    cameraView(session: session)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.tap(atScreen: tap, screenSize: geometry.size)
@@ -124,6 +124,17 @@ struct ScanView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await viewModel.appBecameActive() }
+        }
+    }
+
+    /// The camera: our own Metal view when the launch argument asks for it, else the ARView as before.
+    @ViewBuilder
+    private func cameraView(session: ARSession) -> some View {
+        switch viewModel.rendererChoice {
+        case .metal: MetalScanView(session: session, outlines: viewModel.outlineBoxes)
+        case .arView:
+            RoomScanView(session: session, outlines: viewModel.outlineBoxes,
+                         onCoachingChange: { coaching in withAnimation { isCoaching = coaching } })
         }
     }
 

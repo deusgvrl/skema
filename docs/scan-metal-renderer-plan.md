@@ -89,3 +89,76 @@
 - **Part 2 — the renderer:** `CameraTextures`, `ScanShaders.metal`, `ScanMetalRenderer`, `MetalScanView`. Their approved cases are phone checks (M17–M24). Unit tests for them are not yet approved: Claude proposes them before building.
 - **Part 3 — the switch** (`ScanView` `if`, room mesh off in Metal mode, M26): after A10-117 is merged and B is rebased on it.
 - **CentreDotBuffers** (M25): after Richie's branch is merged.
+
+
+---
+
+# Part 2 and part 3 (approved 24 Nov: R1–R7; "do part 2 and 3, don't wait for A")
+
+**Decision (Amadeus, 24 Nov):** B does not wait for A10-117. Parts 2 and 3 are built now in this local branch. Where B and A change the same old file (`ScanSession.swift`, `ScanView.swift`), the conflict is solved when the branches meet; nothing is pushed until then.
+
+**Global constraints for part 2–3** (in addition to part 1's): only the files each task lists; the shader notes above are binding; the camera picture and the lines are drawn in ONE render pass of ONE command buffer per frame; the `ARView` path stays exactly as today when no launch argument is set (M26).
+
+### Task 5: `CameraTextures` (cases R1–R3)
+
+**Files:** Create `Final Challenge App/Features/Scan/Metal/CameraTextures.swift`; Test `Skema Tests/CameraTexturesTests.swift`.
+
+**Interfaces — Produces:** `final class CameraTextures`; `init?(device: any MTLDevice)` (nil only when `CVMetalTextureCacheCreate` fails); `func cameraTextures(from pixelBuffer: CVPixelBuffer) -> (y: CVMetalTexture, cbcr: CVMetalTexture)?` (Y = plane 0 `r8Unorm`, CbCr = plane 1 `rg8Unorm`; nil unless the format is `kCVPixelFormatType_420YpCbCr8BiPlanarFullRange`); `func depthTextures(depth: CVPixelBuffer, confidence: CVPixelBuffer?) -> (depth: CVMetalTexture, confidence: CVMetalTexture?)?` (depth `r32Float` only for `kCVPixelFormatType_DepthFloat32`; confidence `r8Uint` only for `kCVPixelFormatType_OneComponent8`). The caller keeps the `CVMetalTexture`s alive until its command buffer completes (Apple's rule; doc comment). Test buffers: `CVPixelBufferCreate` with `kCVPixelBufferMetalCompatibilityKey` and `kCVPixelBufferIOSurfacePropertiesKey`.
+
+- [ ] R1 a `kCVPixelFormatType_32BGRA` buffer → `cameraTextures` is nil. R2 a 16×12 420f buffer → Y 16×12 `r8Unorm`, CbCr 8×6 `rg8Unorm`. R3 a 256×192 DepthFloat32 + OneComponent8 → `r32Float` and `r8Uint`, both 256×192; a wrong depth format → nil.
+- [ ] RED, GREEN, mutations: drop the format check → R1 fails; swap the plane index → R2 fails.
+
+### Task 6: `ScanShaders.metal` (cases R5, R6)
+
+**Files:** Create `Final Challenge App/Features/Scan/Metal/ScanShaders.metal` and `Final Challenge App/Features/Scan/Metal/ScanUniforms.swift` (the Swift mirror of the shader's uniform struct); Test `Skema Tests/ScanShadersTests.swift`.
+
+**Interfaces — Produces:**
+- Metal: `struct ScanUniforms { float4x4 viewProjection; float2 quadTexCoords[4]; float2 pictureSize; float occlusionMargin; uint minConfidence; float maxRange; uint hasDepth; float4 lineColor; }` (exact order; Swift mirror with the same layout and a test that `MemoryLayout<ScanUniforms>.stride` equals the Metal size the test reads back, or equals a fixed number written in both files).
+- Metal functions: `cameraVertex` / `cameraFragment` (full-screen quad, 4 vertices, texture coordinates from `quadTexCoords`; YCbCr → RGB with Apple's `ycbcrToRGBTransform` from `ARFrame.h`); `outlineVertex` / `outlineFragment` (positions are `packed_float3`, stride 12; clip = viewProjection × position; the line depth = clip.w; the picture fraction for the depth lookup is affine in screen space: pass it `[[center_no_perspective]]` or compute it from `[[position]]`); one inline `bool occlusionIsHidden(float lineDepth, float sceneDepth, uint confidence, constant ScanUniforms&)` with the same 4 conditions as `OcclusionRule.isHidden`, written so that NaN fails every comparison (the project has `MTL_FAST_MATH = YES`); the depth texture is read with nearest sampling; `hasDepth == 0` → never hidden.
+- A small compute kernel `occlusionRuleKernel` (inputs: arrays of lineDepth, sceneDepth, confidence → output 0/1) that calls the same inline function, for test R5. Doc comment: "used by tests".
+
+- [ ] R5: for the M9–M13a inputs plus the 3 cm edge pair, the kernel's output equals `OcclusionRule.isHidden` for every input. R6: render `cameraFragment` into a 1×1 `rgba8Unorm` target with Y = 0.5, Cb = 0.25, Cr = 0.75 (as texture values) → the pixel equals Apple's matrix result within 1/255 (compute the expected value in the test with the same matrix).
+- [ ] RED, GREEN, mutations: drop the confidence condition in the Metal function → R5 fails; swap Cb and Cr → R6 fails.
+
+### Task 7: `ScanMetalRenderer` (case R4)
+
+**Files:** Create `Final Challenge App/Features/Scan/Metal/ScanMetalRenderer.swift`; Test `Skema Tests/ScanMetalRendererTests.swift`.
+
+**Interfaces — Consumes:** `CameraTextures` (T5), `ScanUniforms` + shaders (T6), `ScanProjection` (T3, incl. `focalLength(camera:viewSize:)`), `OutlineBuffers` (T4), `OcclusionRule` (T2), `CameraModel(_ camera: ARCamera)` (`ScanFrame+ARKit.swift`), `OutlineMesh.radius(for:cameraPosition:focalLength:)`.
+**Produces:** `@MainActor final class ScanMetalRenderer: NSObject, MTKViewDelegate`; `init?(device: any MTLDevice, session: ARSession)` (nil when the library or a pipeline cannot be made); `var outlines: [UUID: WorldBox]`; `static func uniforms(camera: CameraModel, viewSize: CGSize, hasDepth: Bool) -> ScanUniforms` (pure, for R4); `draw(in:)`: read `session.currentFrame`; no frame → clear only; make the textures; update `OutlineBuffers` with the radius from `OutlineMesh.radius` and `ScanProjection.focalLength`; one command buffer, one render pass: camera quad first, then the outlines (alpha blending, opacity `OutlineLayout.opacity`, white); keep the frame's `CVMetalTexture`s alive in `addCompletedHandler` (a `@Sendable` closure that only holds them).
+
+- [ ] R4: `uniforms(…)` for the shared camera (fx = fy = 1500, 1920×1440, identity, 390×844) → `viewProjection` equals `ScanProjection.viewProjection`; `quadTexCoords` equal `ScanProjection.pictureQuadTexCoords`; `occlusionMargin` 0.03, `minConfidence` 1, `maxRange` 5 (from `OcclusionRule`); `pictureSize` (1920, 1440); `hasDepth` follows the argument.
+- [ ] Also: `init?(device:session:)` returns non-nil with the simulator's device (the shaders compile and the pipelines build).
+- [ ] RED, GREEN, mutations: hard-code the margin → R4 fails.
+
+### Task 8: `MetalScanView` (case R7)
+
+**Files:** Create `Final Challenge App/Features/Scan/Metal/MetalScanView.swift`; Test `Skema Tests/MetalScanViewTests.swift`.
+
+**Interfaces — Produces:** `struct MetalScanView: UIViewRepresentable` with the same inputs as `RoomScanView` (`session: ARSession`, `outlines: [UUID: WorldBox]`); `static func makeMetalView(session: ARSession) -> MTKView?` (device, `colorPixelFormat = .bgra8Unorm`, no depth attachment, `framebufferOnly = true`, `preferredFramesPerSecond = 60`, the renderer as delegate kept by the coordinator) and `static func makeCoachingView(session: ARSession, in bounds: CGRect) -> ARCoachingOverlayView` (goal `.horizontalPlane`, `activatesAutomatically = true`, flexible width and height; same settings as Richie's branch). `updateUIView` passes `outlines` to the renderer.
+
+- [ ] R7: the coaching view from `makeCoachingView` has the session, goal `.horizontalPlane` and `activatesAutomatically`; `makeMetalView` gives a view whose delegate is a `ScanMetalRenderer` and whose `preferredFramesPerSecond` is 60.
+- [ ] RED, GREEN, mutations: wrong goal → R7 fails.
+
+### Task 9 (part 3): the room mesh is off in Metal mode (decision D1)
+
+**Files:** Modify `Final Challenge App/Services/ScanSession.swift`; Test `Skema Tests/ScanSessionTests.swift`.
+
+**Interfaces — Produces:** `ScanSession.init(…, renderer: ScanRendererChoice = ScanRendererChoice(defaults: .standard))` (last parameter); `start()` asks for the mesh only when `supportsMesh() && renderer == .arView`. (When A10-117 meets B, the condition becomes `supportsMesh() && renderSettings.roomMesh && renderer == .arView`.)
+
+- [ ] P1 (from D1): mesh supported, `renderer: .metal` → `sceneReconstruction == []`. Case 20 (existing) must still pass with `renderer: .arView`; pass `.arView` explicitly in the test helper so tests do not read `UserDefaults.standard`.
+- [ ] RED, GREEN, mutation: ignore the renderer → P1 fails.
+
+### Task 10 (part 3): the switch in `ScanView` (case M26)
+
+**Files:** Modify `Final Challenge App/Features/Scan/ScanView.swift` (the camera block only); Test: the existing suites (M26 = "all old tests pass") plus one small test.
+
+**Interfaces — Produces:** in `ScanView`, one `let rendererChoice = ScanRendererChoice(defaults: .standard)` read once; the camera block shows `MetalScanView(session:outlines:)` when `.metal`, else `RoomScanView` exactly as today. The tap gesture, the accessibility modifiers and `ScanTagsView` stay the same for both. `ScanViewModel` makes `ScanSession` with the same choice (so the mesh rule of Task 9 and the view agree).
+
+- [ ] Test: `ScanViewModel`'s default `makeScan` passes the choice through (or a factory function that a test can call) — one assertion that with `.metal` the session asks for no mesh.
+- [ ] The full suite one time (M26).
+
+### Part 2–3 finish
+
+- [ ] SwiftLint on the changed app files; MeasureKit `swift test`; the full app suite one time; the final review.
+- [ ] Phone checks for Amadeus (M17–M24), with `-scanRenderer metal`: the same 8 moments as "Part 1" (note §2e), plus look, lag and occlusion.

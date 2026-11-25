@@ -59,7 +59,9 @@ final class ScanViewModel {
     /// The subject's collected points, as a world box.
     private(set) var subjectBounds: WorldBox?
 
-    @ObservationIgnored private let makeScan: () -> ScanSession
+    @ObservationIgnored let makeScan: () -> ScanSession
+    /// Read once: the camera view and the scan (its mesh rule) must use the same choice.
+    let rendererChoice: ScanRendererChoice
     @ObservationIgnored private let cameraPermission: any CameraPermission
     @ObservationIgnored let storageController: StorageController
     @ObservationIgnored private var scan: ScanSession?
@@ -91,11 +93,13 @@ final class ScanViewModel {
     static let collectInterval: Double = 0.2
 
     init(
-        makeScan: @escaping () -> ScanSession = { ScanSession() },
+        makeScan: (() -> ScanSession)? = nil,
         camera: any CameraPermission = SystemCameraPermission(),
-        storageController: StorageController? = nil
+        storageController: StorageController? = nil,
+        rendererChoice: ScanRendererChoice = ScanRendererChoice(defaults: .standard)
     ) {
-        self.makeScan = makeScan
+        self.makeScan = makeScan ?? { ScanSession(renderer: rendererChoice) }
+        self.rendererChoice = rendererChoice
         self.cameraPermission = camera
         self.storageController = storageController ?? StorageController.shared
     }

@@ -360,3 +360,33 @@ func makeTrackingFrame(timestamp: TimeInterval, tracking: ScanTracking = .normal
         planes: []
     )
 }
+
+@MainActor
+@Suite("Scan: renderer choice (Metal renderer, part 2)")
+struct ScanRendererChoiceInViewModelTests {
+    let storage = StorageController(inMemory: true)
+
+    func makeViewModel(rendererChoice: ScanRendererChoice) -> ScanViewModel {
+        ScanViewModel(
+            camera: FakeCameraPermission(status: .authorized),
+            storageController: storage,
+            rendererChoice: rendererChoice
+        )
+    }
+
+    @Test("Case M26: with no launch argument the screen keeps the ARView, and its scan asks for the mesh")
+    func defaultIsArView() {
+        let viewModel = ScanViewModel(camera: FakeCameraPermission(status: .authorized), storageController: storage)
+
+        #expect(viewModel.rendererChoice == .arView)
+        #expect(viewModel.makeScan().renderer == .arView)
+    }
+
+    @Test("The scan is made with the same choice the screen uses, so .metal asks for no mesh")
+    func scanUsesTheScreensChoice() {
+        let viewModel = makeViewModel(rendererChoice: .metal)
+
+        #expect(viewModel.rendererChoice == .metal)
+        #expect(viewModel.makeScan().renderer == .metal)
+    }
+}

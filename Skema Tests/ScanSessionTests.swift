@@ -15,7 +15,7 @@ struct ScanSessionTests {
     let fake = FakeARSession()
 
     func makeScan(supportsLiDAR: Bool = true) -> ScanSession {
-        ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { supportsLiDAR })
+        ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { supportsLiDAR }, renderer: .arView)
     }
 
     @Test("It listens to ARKit on its own queue, not the main thread")
@@ -49,12 +49,26 @@ struct ScanSessionTests {
 
     @Test("Case 20 (A10-106): the scan asks for the room mesh only when supported", arguments: [true, false])
     func startAsksForTheMeshWhenSupported(supported: Bool) throws {
-        let scan = ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { supported })
+        let scan = ScanSession(
+            session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { supported }, renderer: .arView
+        )
 
         try scan.start()
 
         let configuration = try #require(fake.runs.first?.configuration as? ARWorldTrackingConfiguration)
         #expect(configuration.sceneReconstruction == (supported ? .mesh : []))
+    }
+
+    @Test("D1: with our own Metal view, the scan does not ask for the room mesh, even when supported")
+    func startSkipsTheMeshInMetalMode() throws {
+        let scan = ScanSession(
+            session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { true }, renderer: .metal
+        )
+
+        try scan.start()
+
+        let configuration = try #require(fake.runs.first?.configuration as? ARWorldTrackingConfiguration)
+        #expect(configuration.sceneReconstruction == [])
     }
 
     @Test("Start without LiDAR throws and never runs ARKit")
