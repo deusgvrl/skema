@@ -115,7 +115,7 @@ struct DiagramEntity: View {
                         .shadow(color: DesignTokens.accentPrimary.opacity(0.3), radius: 2)
                         .allowsHitTesting(false)
 
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Image(systemName: "arrow.trianglehead.clockwise.rotate.90")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(DesignTokens.accentPrimary)
                         .frame(width: 28, height: 28)

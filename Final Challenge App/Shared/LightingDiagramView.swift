@@ -143,7 +143,10 @@ struct LightingDiagramView: View {
                     isSelected: isSubjectSelected,
                     isReadOnly: isReadOnly,
                     rotationAngle: $viewModel.draftSetup.subjectRotationAngle,
-                    onTap: { onSubjectTap?() },
+                    onTap: {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onSubjectTap?()
+                    },
                     onGestureStart: {
                         subjectRotationStart = viewModel.draftSetup.subjectRotationAngle
                     },

@@ -182,7 +182,7 @@ struct FullScreenImageView: View {
                     if let currentRefImage {
                         let count = viewModel.referenceImages.count
                         let dateText = currentRefImage.formattedDateString
-                        Text("\(displayIndex) of \(count) · Added \(dateText)")
+                        Text("\(displayIndex) of \(count) | Added \(dateText)")
                             .font(.caption)
                             .foregroundStyle(DesignTokens.textSecondary)
                     } else {
@@ -198,7 +198,7 @@ struct FullScreenImageView: View {
                     Button {
                         setAsCoverImage()
                     } label: {
-                        Label("Set as Cover Photo", systemImage: "photo.artframe")
+                        Label("Set as Thumbnail", systemImage: "photo.artframe")
                     }
 
                     Divider()

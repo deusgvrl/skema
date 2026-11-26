@@ -56,7 +56,7 @@ struct RecentlyDeletedView: View {
     }
 
     private func row(_ setup: Setup) -> some View {
-        let details = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " · ")
+        let details = [setup.client, setup.project].filter { !$0.isEmpty }.joined(separator: " | ")
         let name = setup.setupName.isEmpty ? "Untitled Setup" : setup.setupName
 
         return HStack(spacing: 12) {

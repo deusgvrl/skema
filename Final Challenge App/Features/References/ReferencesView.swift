@@ -103,7 +103,7 @@ struct ReferencesView: View {
             Button {
                 viewModel.setAsCoverImage(at: index)
             } label: {
-                Label("Set as Cover Photo", systemImage: "photo.artframe")
+                Label("Set as Thumbnail", systemImage: "photo.artframe")
             }
 
             Divider()
