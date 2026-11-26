@@ -47,14 +47,103 @@ struct ScanSessionTests {
         #expect(run.options.contains(.removeExistingAnchors))
     }
 
-    @Test("Case 20 (A10-106): the scan asks for the room mesh only when supported", arguments: [true, false])
-    func startAsksForTheMeshWhenSupported(supported: Bool) throws {
-        let scan = ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { supported })
+    @Test("D1: the scan never asks ARKit for the room mesh, at the start or after the plane search stops")
+    func scanNeverAsksForTheMesh() throws {
+        let scan = makeScan()
 
         try scan.start()
+        scan.stopPlaneDetection()
 
-        let configuration = try #require(fake.runs.first?.configuration as? ARWorldTrackingConfiguration)
-        #expect(configuration.sceneReconstruction == (supported ? .mesh : []))
+        try #require(fake.runs.count == 2)
+        for run in fake.runs {
+            let configuration = try #require(run.configuration as? ARWorldTrackingConfiguration)
+            #expect(configuration.sceneReconstruction == [])
+        }
+    }
+
+    @Test("P2: stopping the plane search runs ARKit again without planes and without a reset")
+    func stopPlaneDetectionRunsWithoutPlanesAndWithoutReset() throws {
+        let scan = makeScan()
+        try scan.start()
+
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == 2)
+        let second = try #require(fake.runs.last)
+        let configuration = try #require(second.configuration as? ARWorldTrackingConfiguration)
+        #expect(configuration.planeDetection == [])
+        #expect(second.options == [])
+    }
+
+    @Test("P3: stopping the plane search keeps depth")
+    func stopPlaneDetectionKeepsDepth() throws {
+        let scan = makeScan()
+        try scan.start()
+
+        scan.stopPlaneDetection()
+
+        // The stop run, not the start run: there must be a second run without planes.
+        try #require(fake.runs.count == 2)
+        let configuration = try #require(fake.runs.last?.configuration as? ARWorldTrackingConfiguration)
+        #expect(configuration.planeDetection == [])
+        #expect(configuration.frameSemantics.contains(.sceneDepth))
+    }
+
+    @Test("P4: the plane search stops only once")
+    func stopPlaneDetectionRunsOnlyOnce() throws {
+        let scan = makeScan()
+        try scan.start()
+
+        scan.stopPlaneDetection()
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == 2)
+    }
+
+    @Test("P6: stopping the plane search does nothing when the scan is not running",
+          arguments: NotRunning.allCases)
+    func stopPlaneDetectionDoesNothingWhenNotRunning(situation: NotRunning) throws {
+        let scan = makeScan()
+        switch situation {
+        case .neverStarted:
+            break
+        case .stopped:
+            try scan.start()
+            scan.stop()
+        case .discarded:
+            try scan.start()
+            scan.discard()
+        }
+        let runsBefore = fake.runs.count
+
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == runsBefore)
+    }
+
+    /// P6: the ways a scan can be not running.
+    enum NotRunning: CaseIterable, Sendable {
+        case neverStarted, stopped, discarded
+    }
+
+    @Test("P7: stopping the plane search during an interruption does nothing; a call after it ends works")
+    func stopPlaneDetectionDuringAnInterruptionDoesNothing() throws {
+        let scan = makeScan()
+        try scan.start()
+        scan.setInterrupted(true)
+
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == 1)
+
+        scan.setInterrupted(false)
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == 2)
+        let second = try #require(fake.runs.last)
+        let configuration = try #require(second.configuration as? ARWorldTrackingConfiguration)
+        #expect(configuration.planeDetection == [])
+        #expect(second.options == [])
     }
 
     @Test("Start without LiDAR throws and never runs ARKit")

@@ -1,3 +1,4 @@
+import ARKit
 import SwiftUI
 
 /// The scan screen (LiDAR only, no object detection), guided step by step (Sketch UT Review T01–T10): point at the
@@ -17,7 +18,7 @@ struct ScanView: View {
     @State private var viewModel: ScanViewModel
     @State private var reviewViewModel: ReviewViewModel?
     @State private var showsLeaveAlert = false
-    /// Apple's coaching screen (`RoomScanView`) is showing: our instruction steps aside.
+    /// Apple's coaching screen (on `MetalScanView`) is showing: our instruction steps aside.
     @State private var isCoaching = false
     var onDismissToSetups: (() -> Void)?
 
@@ -32,8 +33,7 @@ struct ScanView: View {
             background
             if viewModel.screen == .scanning, let session = viewModel.arSession {
                 GeometryReader { geometry in
-                    RoomScanView(session: session, outlines: viewModel.outlineBoxes,
-                                 onCoachingChange: { coaching in withAnimation { isCoaching = coaching } })
+                    cameraView(session: session)
                         .ignoresSafeArea()
                         .onTapGesture { tap in
                             viewModel.tap(atScreen: tap, screenSize: geometry.size)
@@ -125,6 +125,13 @@ struct ScanView: View {
             guard phase == .active else { return }
             Task { await viewModel.appBecameActive() }
         }
+    }
+
+    /// The camera: our own Metal view (A10-121). It draws the picture and the outlines.
+    private func cameraView(session: ARSession) -> some View {
+        MetalScanView(session: session, outlines: viewModel.outlineBoxes, onCoachingChange: { coaching in
+            withAnimation { isCoaching = coaching }
+        })
     }
 
     private var usesCameraAppearance: Bool {
@@ -269,7 +276,7 @@ private struct ScanTagsView: View {
     }
 
     /// The tag just above the item's box (or at the tapped point while there is no box yet). The box itself is drawn
-    /// in 3D in the camera view (A10-106, `ScanOutlines`).
+    /// in 3D in the camera view (A10-106, `OutlineBuffers`).
     @ViewBuilder
     private func marker(_ tag: ScanTag, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
         if let point = box.map({ CGPoint(x: $0.midX, y: $0.minY - 20) }) ?? anchor {

@@ -9,7 +9,6 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
     let session: any ARSessionControlling
 
     private let supportsLiDAR: @Sendable () -> Bool
-    private let supportsMesh: @Sendable () -> Bool
     private let delegateQueue = DispatchQueue(label: "ScanSession.delegate", qos: .userInitiated)
     private let frameBroadcast = Broadcast<ScanFrame>(bufferSize: 1)
     private let stateBroadcast = Broadcast<ScanSessionState>(bufferSize: 8)
@@ -19,17 +18,17 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
         var state = ScanSessionState.idle
         var throttle: FrameThrottle
         var planes = PlaneStore()
+        /// False once `stopPlaneDetection` ran: ARKit no longer looks for planes.
+        var detectsPlanes = true
     }
 
     init(
         session: any ARSessionControlling = ARSession(),
         frameInterval: TimeInterval = 1.0 / 15.0,
-        supportsLiDAR: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsLiDAR() },
-        supportsMesh: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsMesh() }
+        supportsLiDAR: @escaping @Sendable () -> Bool = { ScanSession.deviceSupportsLiDAR() }
     ) {
         self.session = session
         self.supportsLiDAR = supportsLiDAR
-        self.supportsMesh = supportsMesh
         self.store = Mutex(Store(throttle: FrameThrottle(minimumInterval: frameInterval)))
         super.init()
         session.delegateQueue = delegateQueue
@@ -40,17 +39,12 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
         ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
     }
 
-    /// The room mesh (scene reconstruction) that RealityKit's occlusion uses to hide the outline behind real
-    /// surfaces (A10-106). Not every LiDAR iPhone may offer it, so the app asks.
-    static func deviceSupportsMesh() -> Bool {
-        ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
-    }
-
-    static func makeConfiguration(withMesh: Bool = false) -> ARWorldTrackingConfiguration {
+    /// LiDAR depth and (until `stopPlaneDetection`) floor planes. The scan never asks for the room mesh (D1): the Metal
+    /// view hides outlines with the LiDAR depth, not with a mesh.
+    static func makeConfiguration(detectsPlanes: Bool = true) -> ARWorldTrackingConfiguration {
         let configuration = ARWorldTrackingConfiguration()
         configuration.frameSemantics = [.sceneDepth]
-        configuration.planeDetection = [.horizontal]
-        if withMesh { configuration.sceneReconstruction = .mesh }
+        configuration.planeDetection = detectsPlanes ? [.horizontal] : []
         return configuration
     }
 
@@ -82,7 +76,20 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
             current.state = .running
         }
         stateBroadcast.yield(.running)
-        session.run(Self.makeConfiguration(withMesh: supportsMesh()), options: [.resetTracking, .removeExistingAnchors])
+        session.run(Self.makeConfiguration(), options: [.resetTracking, .removeExistingAnchors])
+    }
+
+    /// Stops ARKit's search for planes (A10-121). It runs the session once more with the same configuration minus plane
+    /// detection and with no run options, so tracking and the anchors stay. It does nothing when the scan is not
+    /// running or when the search is already off.
+    func stopPlaneDetection() {
+        let shouldStop = store.withLock { current -> Bool in
+            guard current.state == .running, current.detectsPlanes else { return false }
+            current.detectsPlanes = false
+            return true
+        }
+        guard shouldStop else { return }
+        session.run(Self.makeConfiguration(detectsPlanes: false), options: [])
     }
 
     func stop() {

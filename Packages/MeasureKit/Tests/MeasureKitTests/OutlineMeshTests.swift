@@ -3,35 +3,35 @@ import Testing
 import simd
 @testable import MeasureKit
 
-// A10-106 cases 21–22: each outline box is one mesh (Amadeus, 21 Nov), with the thickness set when it is built (T1).
+// A10-106 case 22 and A10-121 case K7: each outline box is one mesh of corner marks (Amadeus, 21 and 26 Nov), with the
+// thickness set when it is built (T1).
 
 @Suite("A10-106 outline mesh")
 struct OutlineMeshTests {
-    @Test("Case 21: a 10 cm box gives 12 dashes in one geometry; every index is valid; every point is near the box")
-    func oneGeometryForTheBox() {
-        let box = WorldBox(min: SIMD3(0, 0, 0), max: SIMD3(0.1, 0.1, 0.1))
+    @Test("K7: the mesh is the 24 arms of the padded box; every index is valid; nothing is near the middle of a long edge")
+    func theMeshIsTheArmsOfThePaddedBox() throws {
+        let box = WorldBox(min: SIMD3(0, 0, 0), max: SIMD3(0.2, 3, 0.2))
         let radius: Float = 0.004
 
         let geometry = OutlineMesh.geometry(of: box, radius: radius)
 
-        // Each 10 cm edge holds one dash (0–6 cm); 12 edges.
-        #expect(geometry.dashCount == 12)
+        #expect(geometry.armCount == 24)
         #expect(!geometry.positions.isEmpty)
         #expect(geometry.indices.count % 3 == 0)
         #expect(geometry.indices.allSatisfy { Int($0) < geometry.positions.count })
-        let low = box.min - SIMD3(repeating: radius + 1e-5), high = box.max + SIMD3(repeating: radius + 1e-5)
-        #expect(geometry.positions.allSatisfy { all($0 .>= low) && all($0 .<= high) })
-    }
-
-    @Test("Case 21: every dash has the same number of points and triangles")
-    func dashesAreAlike() {
-        let one = OutlineMesh.geometry(of: WorldBox(min: .zero, max: SIMD3(0.1, 0.1, 0.1)), radius: 0.004)
-        // A 25 cm cube: 3 dashes per edge (0–6, 10–16, 20–25), 36 in all.
-        let three = OutlineMesh.geometry(of: WorldBox(min: .zero, max: SIMD3(0.25, 0.25, 0.25)), radius: 0.004)
-
-        #expect(three.dashCount == 36)
-        #expect(three.positions.count == one.positions.count * 3)
-        #expect(three.indices.count == one.indices.count * 3)
+        // Every point is within the longest arm (12 cm) plus the radius of a corner of the padded box: the middle of the
+        // 3 m edges stays empty.
+        let padded = OutlineLayout.paddedBox(box)
+        let corners = padded.corners
+        let reach = OutlineLayout.cornerArmMax + radius + 1e-5
+        #expect(geometry.positions.allSatisfy { point in corners.contains { simd_distance($0, point) <= reach } })
+        // The arm length comes from the padded edges: x is 0.24 m padded, so its arm is 0.06 m (0.05 m unpadded).
+        // The x arm at the padded box's min corner ends there, plus the radius of its round end.
+        let nearTheMinCorner = geometry.positions.filter {
+            abs($0.y - padded.min.y) <= 0.01 && abs($0.z - padded.min.z) <= 0.01 && $0.x < padded.min.x + 0.12
+        }
+        let armEnd = try #require(nearTheMinCorner.map(\.x).max())
+        #expect(abs(armEnd - (padded.min.x + 0.06 + radius)) < 1e-4)
     }
 
     @Test("Case 22: a camera 2 m from the box centre, focal length 1000 pt, gives a 4 mm line radius")

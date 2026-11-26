@@ -56,7 +56,7 @@ nonisolated enum ScanGuidance: Equatable, Sendable {
     /// The tip for one frame, or nil when the scan is going well. A dark room comes first, whatever the tracking: in
     /// the dark, tracking keeps dropping to limited and back, and the tip must stay up through that instead of
     /// letting "Floor not found yet" or the step show in between. Otherwise there is a tip only while tracking is
-    /// normal (when it is limited, Apple's coaching screen in `RoomScanView` shows instead, as in Measure), then
+    /// normal (when it is limited, Apple's coaching screen on `MetalScanView` shows instead, as in Measure), then
     /// distance. `current` is the tip on the screen now: while it shows, its threshold is the "off" one (`litAbove`,
     /// `nearAgainShare`), so a value hovering at the edge can't make the line flicker.
     static func guidance(tracking: ScanTracking, ambientIntensity: Float?, depth: DepthFrame?,

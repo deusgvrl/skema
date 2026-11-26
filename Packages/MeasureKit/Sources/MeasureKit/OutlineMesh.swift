@@ -1,28 +1,27 @@
 import simd
 
-/// The triangles of one outline box (A10-106, 21 Nov): every dash of every edge in one list, so RealityKit draws the
-/// whole box as one mesh instead of about 1,500 entities. Pure maths, so it can be made off the main actor.
+/// The triangles of one outline box (A10-106, 21 Nov): the corner arms of the box in one list, so the Metal renderer
+/// draws the whole box from one vertex and index buffer (`OutlineBuffers`). Pure maths, so it can be made off the main
+/// actor.
 public struct OutlineGeometry: Sendable, Equatable {
     public var positions: [SIMD3<Float>] = []
     /// Three per triangle, each an index into `positions`.
     public var indices: [UInt32] = []
-    public var dashCount = 0
+    public var armCount = 0
 }
 
 public enum OutlineMesh {
-    /// Points around a dash's tube.
+    /// Points around an arm's tube.
     public static let sides = 8
-    /// Rings that round each end of a dash, from its tip to the tube.
+    /// Rings that round each end of an arm, from its tip to the tube.
     public static let capRings = 2
 
-    /// A10-106 case 21: every dash of the box's 12 edges (`OutlineLayout.dashes`) as a tube of `radius` with round
-    /// ends, all in one geometry.
+    /// A10-121 case K7: the 24 corner arms (`OutlineLayout.cornerArms`) of the padded box (`OutlineLayout.paddedBox`),
+    /// each as a tube of `radius` with round ends, all in one geometry.
     public static func geometry(of box: WorldBox, radius: Float) -> OutlineGeometry {
         var geometry = OutlineGeometry()
-        for edge in box.edges {
-            for dash in OutlineLayout.dashes(from: edge.start, to: edge.end) {
-                appendDash(from: dash.start, to: dash.end, radius: radius, to: &geometry)
-            }
+        for arm in OutlineLayout.cornerArms(of: OutlineLayout.paddedBox(box)) {
+            appendTube(from: arm.start, to: arm.end, radius: radius, to: &geometry)
         }
         return geometry
     }
@@ -33,9 +32,9 @@ public enum OutlineMesh {
         OutlineLayout.radius(distance: simd_distance(cameraPosition, (box.min + box.max) / 2), focalLength: focalLength)
     }
 
-    /// One dash: a tip point, `capRings` rings that widen to the tube at `start`, the same rings narrowing after
+    /// One arm: a tip point, `capRings` rings that widen to the tube at `start`, the same rings narrowing after
     /// `end`, and the other tip. Neighbouring rings are joined by quads (two triangles); each tip by a fan.
-    private static func appendDash(from start: SIMD3<Float>, to end: SIMD3<Float>, radius: Float,
+    private static func appendTube(from start: SIMD3<Float>, to end: SIMD3<Float>, radius: Float,
                                    to geometry: inout OutlineGeometry) {
         let length = simd_distance(start, end)
         guard length > 0 else { return }
@@ -70,6 +69,6 @@ public enum OutlineMesh {
                 geometry.indices += [ringPoint(ring, side), ringPoint(ring + 1, side + 1), ringPoint(ring + 1, side)]
             }
         }
-        geometry.dashCount += 1
+        geometry.armCount += 1
     }
 }

@@ -3,7 +3,8 @@ import Testing
 import simd
 @testable import MeasureKit
 
-// A10-106 cases 17–19: the maths of the 3D outline box (Amadeus, 21 Nov). The drawing itself is checked by hand.
+// A10-106 cases 17 and 19, and A10-121 cases K1–K6: the maths of the 3D outline box (Amadeus, 21 and 26 Nov). The drawing
+// itself is checked by hand.
 
 @Suite("A10-106 outline layout")
 struct OutlineLayoutTests {
@@ -23,22 +24,64 @@ struct OutlineLayoutTests {
         #expect(lengths == [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3])
     }
 
-    @Test("Case 18: a 45 cm edge gets dashes at 0–6, 10–16, 20–26, 30–36 and 40–45 cm")
-    func dashLayout() {
-        let dashes = OutlineLayout.dashes(from: SIMD3(0, 0, 0), to: SIMD3(0.45, 0, 0), dash: 0.06, gap: 0.04)
+    @Test("K1: the padded box grows 2 cm on every side except the bottom")
+    func thePaddedBoxGrowsTwoCentimetresExceptAtTheBottom() {
+        let box = WorldBox(min: SIMD3(0, 0, 0), max: SIMD3(1, 2, 3))
 
-        let spans = dashes.map { [($0.start.x * 100).rounded(), ($0.end.x * 100).rounded()] }
-        #expect(spans == [[0, 6], [10, 16], [20, 26], [30, 36], [40, 45]])
+        let padded = OutlineLayout.paddedBox(box)
+
+        #expect(padded.min == SIMD3(-0.02, 0, -0.02))
+        #expect(padded.max == SIMD3(1.02, 2.02, 3.02))
     }
 
-    @Test("Case 18: dashes follow the edge's direction, here down the y axis")
-    func dashesFollowTheEdge() throws {
-        let dashes = OutlineLayout.dashes(from: SIMD3(1, 0.2, 0), to: SIMD3(1, 0, 0), dash: 0.06, gap: 0.04)
+    @Test("K2: an arm is a quarter of its edge: 40 cm gives 10 cm")
+    func anArmIsAQuarterOfItsEdge() {
+        #expect(abs(OutlineLayout.armLength(ofEdge: 0.40) - 0.10) < 1e-6)
+    }
 
-        try #require(dashes.count == 2)
-        #expect(dashes.allSatisfy { $0.start.x == 1 && $0.end.x == 1 && $0.start.z == 0 })
-        #expect(abs(dashes[0].start.y - 0.2) < 1e-6 && abs(dashes[0].end.y - 0.14) < 1e-6)
-        #expect(abs(dashes[1].start.y - 0.1) < 1e-6 && abs(dashes[1].end.y - 0.04) < 1e-6)
+    @Test("K3: an arm is at least 3 cm: an 8 cm edge gives 3 cm")
+    func anArmIsAtLeastThreeCentimetres() {
+        #expect(abs(OutlineLayout.armLength(ofEdge: 0.08) - 0.03) < 1e-6)
+    }
+
+    @Test("K4: an arm is at most 12 cm: a 2 m edge gives 12 cm")
+    func anArmIsAtMostTwelveCentimetres() {
+        #expect(abs(OutlineLayout.armLength(ofEdge: 2.0) - 0.12) < 1e-6)
+    }
+
+    @Test("K5: an arm is never longer than half its edge: a 4 cm edge gives 2 cm")
+    func anArmIsNeverLongerThanHalfItsEdge() {
+        #expect(abs(OutlineLayout.armLength(ofEdge: 0.04) - 0.02) < 1e-6)
+    }
+
+    @Test("K6: a box has 3 arms at each of its 8 corners, pointing into the box, each with its own edge's arm length")
+    func aBoxHasThreeArmsAtEachCorner() {
+        let box = WorldBox(min: SIMD3(0, 0, 0), max: SIMD3(0.4, 2, 0.08))
+        // The arm length per axis: x 0.10 (a quarter), y 0.12 (the maximum), z 0.03 (the minimum).
+        let lengths: [Float] = [0.10, 0.12, 0.03]
+
+        let arms = OutlineLayout.cornerArms(of: box)
+
+        #expect(arms.count == 24)
+        var perCorner: [SIMD3<Float>: Int] = [:]
+        var axesPerCorner: [SIMD3<Float>: Set<Int>] = [:]
+        for arm in arms {
+            let atCorner = (0..<3).allSatisfy { arm.start[$0] == box.min[$0] || arm.start[$0] == box.max[$0] }
+            #expect(atCorner)
+            perCorner[arm.start, default: 0] += 1
+            let axes = (0..<3).filter { arm.start[$0] != arm.end[$0] }
+            guard axes.count == 1, let axis = axes.first else {
+                Issue.record("An arm must differ from its start on exactly one axis.")
+                continue
+            }
+            axesPerCorner[arm.start, default: []].insert(axis)
+            let towardsTheMiddle: Float = arm.start[axis] == box.min[axis] ? 1 : -1
+            #expect(abs((arm.end[axis] - arm.start[axis]) - towardsTheMiddle * lengths[axis]) < 1e-6)
+        }
+        #expect(perCorner.count == 8)
+        #expect(perCorner.values.allSatisfy { $0 == 3 })
+        // One arm along each axis at every corner, not three along the same one.
+        #expect(axesPerCorner.values.allSatisfy { $0 == [0, 1, 2] })
     }
 
     @Test("Case 19: with a 1000 pt focal length, a 4 pt line has a 4 mm radius at 2 m and 8 mm at 4 m")
