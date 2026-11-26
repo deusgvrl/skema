@@ -1,7 +1,8 @@
 import simd
 
-/// The triangles of one outline box (A10-106, 21 Nov): the corner arms of the box in one list, so RealityKit draws the
-/// whole box as one mesh instead of about 1,500 entities. Pure maths, so it can be made off the main actor.
+/// The triangles of one outline box (A10-106, 21 Nov): the corner arms of the box in one list, so the Metal renderer
+/// draws the whole box from one vertex and index buffer (`OutlineBuffers`). Pure maths, so it can be made off the main
+/// actor.
 public struct OutlineGeometry: Sendable, Equatable {
     public var positions: [SIMD3<Float>] = []
     /// Three per triangle, each an index into `positions`.

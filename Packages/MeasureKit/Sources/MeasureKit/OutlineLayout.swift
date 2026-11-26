@@ -1,7 +1,7 @@
 import simd
 
-/// The maths of the 3D outline box on the scan screen (A10-106, Amadeus, 21 Nov): white, 70%, corner marks with round
-/// ends, 4 pt thick at every distance (A10-121, 26 Nov: corner marks instead of dashed edges).
+/// The maths of the 3D outline box on the scan screen (A10-106, Amadeus, 21 Nov): green (#30D158), 70%, corner marks
+/// with round ends, 4 pt thick at every distance (A10-121, 26 Nov: corner marks instead of dashed edges).
 public enum OutlineLayout {
     /// The line's thickness on the screen, in points, at every distance.
     public static let thickness: Float = 4

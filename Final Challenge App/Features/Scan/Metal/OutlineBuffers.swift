@@ -25,6 +25,9 @@ nonisolated final class OutlineBuffers {
         let indexCount: Int
     }
 
+    /// A box that moved less than this (1 cm on every side) keeps its old buffers.
+    static let rebuildStep: Float = 0.01
+
     private(set) var entries: [UUID: Entry] = [:]
     private let device: any MTLDevice
 
@@ -53,10 +56,10 @@ nonisolated final class OutlineBuffers {
         }
     }
 
-    /// The same rule as `ScanOutlines`: moved by `rebuildStep` or more on any side.
+    /// Moved by `rebuildStep` or more on any side.
     private static func hasMoved(from old: WorldBox, to new: WorldBox) -> Bool {
-        simd_reduce_max(simd_abs(old.min - new.min)) >= ScanOutlines.rebuildStep
-            || simd_reduce_max(simd_abs(old.max - new.max)) >= ScanOutlines.rebuildStep
+        simd_reduce_max(simd_abs(old.min - new.min)) >= rebuildStep
+            || simd_reduce_max(simd_abs(old.max - new.max)) >= rebuildStep
     }
 
     private func makeEntry(for box: WorldBox, radius: Float) -> Entry? {

@@ -4,8 +4,8 @@
 //
 //  Created by Amadeus Gavriel on 24/11/26.
 //
-//  The scan screen's camera with the own Metal renderer (Metal renderer, part 2). It has the same inputs as
-//  RoomScanView, so the screen can choose between them.
+//  The scan screen's camera, drawn with our own Metal renderer (Metal renderer, part 2). It is the only camera view
+//  (A10-121).
 //
 
 import ARKit
@@ -25,8 +25,8 @@ struct MetalScanView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UIView {
         guard let view = Self.makeMetalView(session: session) else {
-            // No Metal device or no renderer: an empty view keeps the screen alive (the renderer choice should not pick
-            // Metal then).
+            // No Metal device or no renderer: an empty view keeps the screen alive (LiDAR iPhones always have Metal,
+            // so this should not happen).
             log.error("Metal scan view: Metal setup failed, showing an empty view")
             return UIView()
         }

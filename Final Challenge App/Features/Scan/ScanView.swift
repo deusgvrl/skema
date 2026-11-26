@@ -127,15 +127,9 @@ struct ScanView: View {
         }
     }
 
-    /// The camera: our own Metal view when the launch argument asks for it, else the ARView as before.
-    @ViewBuilder
+    /// The camera: our own Metal view (A10-121). It draws the picture and the outlines.
     private func cameraView(session: ARSession) -> some View {
-        switch viewModel.rendererChoice {
-        case .metal: MetalScanView(session: session, outlines: viewModel.outlineBoxes)
-        case .arView:
-            RoomScanView(session: session, outlines: viewModel.outlineBoxes,
-                         onCoachingChange: { coaching in withAnimation { isCoaching = coaching } })
-        }
+        MetalScanView(session: session, outlines: viewModel.outlineBoxes)
     }
 
     private var usesCameraAppearance: Bool {
@@ -280,7 +274,7 @@ private struct ScanTagsView: View {
     }
 
     /// The tag just above the item's box (or at the tapped point while there is no box yet). The box itself is drawn
-    /// in 3D in the camera view (A10-106, `ScanOutlines`).
+    /// in 3D in the camera view (A10-106, `OutlineBuffers`).
     @ViewBuilder
     private func marker(_ tag: ScanTag, box: CGRect?, anchor: CGPoint?, size: CGSize) -> some View {
         if let point = box.map({ CGPoint(x: $0.midX, y: $0.minY - 20) }) ?? anchor {

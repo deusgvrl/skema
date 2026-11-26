@@ -15,7 +15,7 @@ struct ScanSessionTests {
     let fake = FakeARSession()
 
     func makeScan(supportsLiDAR: Bool = true) -> ScanSession {
-        ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { supportsLiDAR }, renderer: .arView)
+        ScanSession(session: fake, frameInterval: 0.1, supportsLiDAR: { supportsLiDAR })
     }
 
     @Test("It listens to ARKit on its own queue, not the main thread")
@@ -47,28 +47,18 @@ struct ScanSessionTests {
         #expect(run.options.contains(.removeExistingAnchors))
     }
 
-    @Test("Case 20 (A10-106): the scan asks for the room mesh only when supported", arguments: [true, false])
-    func startAsksForTheMeshWhenSupported(supported: Bool) throws {
-        let scan = ScanSession(
-            session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { supported }, renderer: .arView
-        )
+    @Test("D1: the scan never asks ARKit for the room mesh, at the start or after the plane search stops")
+    func scanNeverAsksForTheMesh() throws {
+        let scan = makeScan()
 
         try scan.start()
+        scan.stopPlaneDetection()
 
-        let configuration = try #require(fake.runs.first?.configuration as? ARWorldTrackingConfiguration)
-        #expect(configuration.sceneReconstruction == (supported ? .mesh : []))
-    }
-
-    @Test("D1: with our own Metal view, the scan does not ask for the room mesh, even when supported")
-    func startSkipsTheMeshInMetalMode() throws {
-        let scan = ScanSession(
-            session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { true }, renderer: .metal
-        )
-
-        try scan.start()
-
-        let configuration = try #require(fake.runs.first?.configuration as? ARWorldTrackingConfiguration)
-        #expect(configuration.sceneReconstruction == [])
+        try #require(fake.runs.count == 2)
+        for run in fake.runs {
+            let configuration = try #require(run.configuration as? ARWorldTrackingConfiguration)
+            #expect(configuration.sceneReconstruction == [])
+        }
     }
 
     @Test("P2: stopping the plane search runs ARKit again without planes and without a reset")
@@ -85,19 +75,9 @@ struct ScanSessionTests {
         #expect(second.options == [])
     }
 
-    @Test("P3: stopping the plane search keeps depth and the mesh choice of start",
-          arguments: [
-              (ScanRendererChoice.arView, true, true),
-              (ScanRendererChoice.arView, false, false),
-              (ScanRendererChoice.metal, true, false)
-          ])
-    func stopPlaneDetectionKeepsDepthAndTheMeshChoice(
-        renderer: ScanRendererChoice, supportsMesh: Bool, expectsMesh: Bool
-    ) throws {
-        let scan = ScanSession(
-            session: fake, frameInterval: 0.1, supportsLiDAR: { true }, supportsMesh: { supportsMesh },
-            renderer: renderer
-        )
+    @Test("P3: stopping the plane search keeps depth")
+    func stopPlaneDetectionKeepsDepth() throws {
+        let scan = makeScan()
         try scan.start()
 
         scan.stopPlaneDetection()
@@ -107,7 +87,6 @@ struct ScanSessionTests {
         let configuration = try #require(fake.runs.last?.configuration as? ARWorldTrackingConfiguration)
         #expect(configuration.planeDetection == [])
         #expect(configuration.frameSemantics.contains(.sceneDepth))
-        #expect(configuration.sceneReconstruction == (expectsMesh ? .mesh : []))
     }
 
     @Test("P4: the plane search stops only once")

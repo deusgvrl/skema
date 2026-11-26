@@ -55,7 +55,7 @@ struct ScanMetalRendererTests {
         #expect(uniforms.maxRange == OcclusionRule.maxRange)
         #expect(uniforms.pictureSize == SIMD2(1920, 1440))
         #expect(uniforms.hasDepth == (hasDepth ? 1 : 0))
-        #expect(uniforms.lineColor == SIMD4(1, 1, 1, OutlineLayout.opacity))
+        #expect(uniforms.lineColor == SIMD4(0.188, 0.820, 0.345, OutlineLayout.opacity))
     }
 
     @Test("The shaders compile and the pipelines build on this device")
@@ -68,8 +68,8 @@ struct ScanMetalRendererTests {
     @Test("The outline pass hides a box behind nearer LiDAR depth and shows it in front of farther depth")
     func outlinePassUsesTheDepth() throws {
         // A 40 cm box 2 m in front of the camera (line depths 1.8 to 2.2 m).
-        let inFront = try whitePixelCount(sceneDepth: 1.0)
-        let behind = try whitePixelCount(sceneDepth: 3.0)
+        let inFront = try linePixelCount(sceneDepth: 1.0)
+        let behind = try linePixelCount(sceneDepth: 3.0)
 
         #expect(inFront == 0, "Scene depth 1 m is in front of the box: no line pixel may show")
         #expect(behind > 0, "Scene depth 3 m is behind the box: the lines must show")
@@ -80,20 +80,20 @@ struct ScanMetalRendererTests {
         let onMain = try renderOutline(sceneDepth: 3.0)
         let onRenderThread = try renderOutline(sceneDepth: 3.0, onRenderThread: true)
 
-        try #require(onMain.whitePixels > 0, "The main-thread picture has no line: nothing to compare")
+        try #require(onMain.linePixels > 0, "The main-thread picture has no line: nothing to compare")
         #expect(onRenderThread.pixels == onMain.pixels)
     }
 
-    @Test("A line is drawn once: the back face of a tube is culled, so no pixel gets two layers of white")
-    func outlineIsOneLayerOfWhite() throws {
+    @Test("A line is drawn once: the back face of a tube is culled, so no pixel gets two layers of green")
+    func outlineIsOneLayerOfGreen() throws {
         let result = try renderOutline(sceneDepth: 3.0)
 
-        // One layer: white at OutlineLayout.opacity over black is 0.7 x 255 = about 179. Two layers would be about 232.
-        // The brightest pixel is not used: where two different edges (or a corner) cross on the screen, two layers are
-        // right. The most common line value is one tube's own layer.
-        let oneLayer = Int((OutlineLayout.opacity * 255).rounded())
-        #expect(abs(result.commonRed - oneLayer) <= 12,
-                "Most common line value \(result.commonRed), one layer \(oneLayer). Histogram: \(result.histogram)")
+        // One layer: the line's green (0.820) at OutlineLayout.opacity over black is 0.820 x 0.7 x 255 = about 146.
+        // Two layers would be about 190. The brightest pixel is not used: where two different arms cross on the screen,
+        // two layers are right. The most common line value is one tube's own layer.
+        let oneLayer = Int((Self.lineGreen * OutlineLayout.opacity * 255).rounded())
+        #expect(abs(result.commonGreen - oneLayer) <= 12,
+                "Most common line value \(result.commonGreen), one layer \(oneLayer). Histogram: \(result.histogram)")
     }
 
     @Test("O6: a box off the screen is not drawn and loses its GPU buffers")
@@ -138,27 +138,30 @@ struct ScanMetalRendererTests {
         #expect(buffers.entries[ahead] == nil)
     }
 
+    /// The green of the outline colour (#30D158, the app's "captured" green), as `ScanMetalRenderer` sets it.
+    private static let lineGreen: Float = 0.820
+
     /// A 20 cm cube on the camera's centre line, `depthZ` metres along the z axis.
     private func cube(atZ depthZ: Float) -> WorldBox {
         WorldBox(min: SIMD3(-0.1, -0.1, depthZ - 0.1), max: SIMD3(0.1, 0.1, depthZ + 0.1))
     }
 
     /// Draws one box with the renderer's outline pass into a 64 x 128 bgra8Unorm target cleared to black, with a
-    /// 1 x 1 depth texture of `sceneDepth` metres and high confidence, and counts the white-ish pixels.
-    private func whitePixelCount(sceneDepth: Float) throws -> Int {
-        try renderOutline(sceneDepth: sceneDepth).whitePixels
+    /// 1 x 1 depth texture of `sceneDepth` metres and high confidence, and counts the line (green) pixels.
+    private func linePixelCount(sceneDepth: Float) throws -> Int {
+        try renderOutline(sceneDepth: sceneDepth).linePixels
     }
 
     private struct OutlineRender {
-        let whitePixels: Int
-        /// The most common non-black red value.
-        let commonRed: Int
+        let linePixels: Int
+        /// The most common non-black green value.
+        let commonGreen: Int
         let histogram: String
         /// Every byte of the target, to compare two renders exactly.
         let pixels: [UInt8]
     }
 
-    /// The render described at `whitePixelCount`, with its white-ish pixel count and its red values.
+    /// The render described at `linePixelCount`, with its line pixel count and its green values.
     /// `onRenderThread`: the encode call runs on a `RenderThread` (the test waits for it).
     private func renderOutline(sceneDepth: Float, onRenderThread: Bool = false) throws -> OutlineRender {
         let device = try #require(MTLCreateSystemDefaultDevice())
@@ -192,18 +195,18 @@ struct ScanMetalRendererTests {
         commands.waitUntilCompleted()
         #expect(commands.status == .completed)
 
-        // White at 70% over black is about 178 in every channel.
+        // The line's green at 70% over black is about 146 in the green channel; the background is black.
         let pixels = UnsafeBufferPointer(
             start: readBack.contents().bindMemory(to: UInt8.self, capacity: width * height * 4),
             count: width * height * 4
         )
         let starts = stride(from: 0, to: pixels.count, by: 4)
-        let white = starts.filter { pixels[$0] >= 128 && pixels[$0 + 1] >= 128 && pixels[$0 + 2] >= 128 }.count
-        // bgra8Unorm: the red channel is byte 2 of each pixel.
+        // bgra8Unorm: the green channel is byte 1 of each pixel.
+        let line = starts.filter { pixels[$0 + 1] >= 100 }.count
         var counts: [Int: Int] = [:]
-        for index in starts where pixels[index + 2] > 0 { counts[Int(pixels[index + 2]), default: 0] += 1 }
+        for index in starts where pixels[index + 1] > 0 { counts[Int(pixels[index + 1]), default: 0] += 1 }
         let top = counts.sorted { $0.value > $1.value }.prefix(6)
-        return OutlineRender(whitePixels: white, commonRed: top.first?.key ?? 0,
+        return OutlineRender(linePixels: line, commonGreen: top.first?.key ?? 0,
                              histogram: top.map { "\($0.key): \($0.value)" }.joined(separator: ", "),
                              pixels: Array(pixels))
     }

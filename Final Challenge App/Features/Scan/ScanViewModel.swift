@@ -60,8 +60,6 @@ final class ScanViewModel {
     private(set) var subjectBounds: WorldBox?
 
     @ObservationIgnored let makeScan: () -> ScanSession
-    /// Read once: the camera view and the scan (its mesh rule) must use the same choice.
-    let rendererChoice: ScanRendererChoice
     @ObservationIgnored private let cameraPermission: any CameraPermission
     @ObservationIgnored let storageController: StorageController
     @ObservationIgnored private(set) var scan: ScanSession?
@@ -97,11 +95,9 @@ final class ScanViewModel {
     init(
         makeScan: (() -> ScanSession)? = nil,
         camera: any CameraPermission = SystemCameraPermission(),
-        storageController: StorageController? = nil,
-        rendererChoice: ScanRendererChoice = ScanRendererChoice(defaults: .standard)
+        storageController: StorageController? = nil
     ) {
-        self.makeScan = makeScan ?? { ScanSession(renderer: rendererChoice) }
-        self.rendererChoice = rendererChoice
+        self.makeScan = makeScan ?? { ScanSession() }
         self.cameraPermission = camera
         self.storageController = storageController ?? StorageController.shared
     }

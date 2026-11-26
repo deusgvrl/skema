@@ -5,7 +5,7 @@
 //  Created by Amadeus Gavriel on 24/11/26.
 //
 //  Draws the scan screen with plain Metal (Metal renderer, part 2): the camera picture, then the box outlines on top.
-//  A line behind a real thing (by the LiDAR depth) is not drawn. It replaces ARView's RealityKit work on this screen.
+//  A line behind a real thing (by the LiDAR depth) is not drawn.
 //
 
 import ARKit
@@ -19,7 +19,7 @@ import simd
 nonisolated private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Skema", category: "MetalScan")
 
 /// The display link delegate of the Metal scan view. Each frame reads `session.currentFrame` and encodes one render
-/// pass: the camera quad first, then the outlines (white, `OutlineLayout.opacity`, blended over the picture).
+/// pass: the camera quad first, then the outlines (green #30D158, `OutlineLayout.opacity`, blended over the picture).
 ///
 /// It is used on the render thread only (A10-121, step 4): the display link calls it there, and its GPU buffers and
 /// texture cache are never touched from another thread. The main thread talks to it through the `OutlineInbox`.
@@ -98,7 +98,8 @@ nonisolated final class ScanMetalRenderer: NSObject, CAMetalDisplayLinkDelegate 
             minConfidence: UInt32(OcclusionRule.minConfidence),
             maxRange: OcclusionRule.maxRange,
             hasDepth: hasDepth ? 1 : 0,
-            lineColor: SIMD4(1, 1, 1, OutlineLayout.opacity)
+            // The app's captured green (#30D158): keep it the same as `ScanPalette.green`.
+            lineColor: SIMD4(0.188, 0.820, 0.345, OutlineLayout.opacity)
         )
     }
 

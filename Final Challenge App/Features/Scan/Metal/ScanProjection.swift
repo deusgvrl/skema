@@ -67,8 +67,7 @@ nonisolated enum ScanProjection {
         projectionMatrix(camera: camera, viewSize: viewSize, near: near, far: far) * camera.cameraToWorld.inverse
     }
 
-    /// The focal length in view points: fx times the fit scale (the scale the matrix uses). It is the same value
-    /// `RoomScanView.focalLength(of:)` gives for an ARView.
+    /// The focal length in view points: fx times the fit scale (the scale the matrix uses).
     static func focalLength(camera: CameraModel, viewSize: CGSize) -> Float {
         camera.intrinsics[0][0] * Fit(camera: camera, viewSize: viewSize).scale
     }
