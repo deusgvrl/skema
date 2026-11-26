@@ -180,6 +180,6 @@ struct SetupDetailToolbarContent: ToolbarContent {
             }
             .buttonStyle(.glassProminent)
             .tint(DesignTokens.accentPrimary)
-        } 
+        }
     }
 }

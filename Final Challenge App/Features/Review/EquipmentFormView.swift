@@ -12,8 +12,6 @@ struct EquipmentFormView: View {
     var isReadOnly: Bool = false
 
     @State private var isDiscardAlertPresented: Bool = false
-    @State private var isDirty: Bool = false
-    @State private var isSwitchingNode: Bool = false
 
     private var editingNode: Equipment? {
         viewModel.nodes.first { $0.id == editingNodeId }
@@ -85,7 +83,7 @@ struct EquipmentFormView: View {
 
                 ToolbarItem(placement: .cancellationAction) {
                     Button(isReadOnly ? "Close" : "Cancel", systemImage: "xmark") {
-                        if !isReadOnly && isDirty {
+                        if !isReadOnly && formViewModel.hasChanges {
                             isDiscardAlertPresented = true
                         } else {
                             dismiss()
@@ -100,7 +98,6 @@ struct EquipmentFormView: View {
                     ) {
                         Button("Discard Changes", role: .destructive) {
                             formViewModel.loadData()
-                            isDirty = false
                             dismiss()
                         }
                     }
@@ -109,56 +106,29 @@ struct EquipmentFormView: View {
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
                         Group {
-                            if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium {
+                            if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium || selectedDetent == .height(76) {
                                 Button("Done", systemImage: "checkmark") {
-                                    formViewModel.saveNode(undoManager: undoManager) {
-                                        dismiss()
-                                    }
+                                    formViewModel.saveNode(undoManager: undoManager) { dismiss() }
                                 }
-                            } else {
-                                Button("Edit Details", systemImage: "checkmark") {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .large
-                                    }
-                                }
+                                .disabled(!formViewModel.isFormValid || !formViewModel.hasChanges)
                             }
                         }
                         .buttonStyle(.glassProminent)
                         .tint(DesignTokens.accentPrimary)
-                        .disabled(!formViewModel.isFormValid || (formViewModel.isEditing && !isDirty))
                     }
                 }
             }
         }
-        .onChange(of: formViewModel.category) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.name) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.role) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.distance) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.horizontalAim) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.height) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.tilt) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.colorTemp) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.whiteBalance) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.power) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.accessories) { _, _ in if !isSwitchingNode { isDirty = true } }
-        .onChange(of: formViewModel.notes) { _, _ in if !isSwitchingNode { isDirty = true } }
         .onAppear {
             formViewModel.loadData()
-            isDirty = false
             if editingNodeId != nil {
                 selectedDetent = .height(76)
             }
         }
         .onChange(of: editingNodeId) { _, newId in
-            isSwitchingNode = true
-            formViewModel.switchToNode(id: newId)
-            isDirty = false
+            formViewModel.switchToNode(id: newId)   // loadData() resets the baseline
             withAnimation(.easeInOut(duration: 0.25)) {
                 selectedDetent = .height(76)
-            }
-            DispatchQueue.main.async {
-                isDirty = false
-                isSwitchingNode = false
             }
         }
     }

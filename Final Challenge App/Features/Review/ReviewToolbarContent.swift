@@ -149,6 +149,6 @@ struct ReviewToolbarContent: ToolbarContent {
             }
             .buttonStyle(.glassProminent)
             .tint(DesignTokens.accentPrimary)
-        } 
+        }
     }
 }
