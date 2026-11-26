@@ -147,6 +147,26 @@ struct ScanSessionTests {
         case neverStarted, stopped, discarded
     }
 
+    @Test("P7: stopping the plane search during an interruption does nothing; a call after it ends works")
+    func stopPlaneDetectionDuringAnInterruptionDoesNothing() throws {
+        let scan = makeScan()
+        try scan.start()
+        scan.setInterrupted(true)
+
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == 1)
+
+        scan.setInterrupted(false)
+        scan.stopPlaneDetection()
+
+        #expect(fake.runs.count == 2)
+        let second = try #require(fake.runs.last)
+        let configuration = try #require(second.configuration as? ARWorldTrackingConfiguration)
+        #expect(configuration.planeDetection == [])
+        #expect(second.options == [])
+    }
+
     @Test("Start without LiDAR throws and never runs ARKit")
     func startWithoutLiDARThrows() {
         let scan = makeScan(supportsLiDAR: false)
