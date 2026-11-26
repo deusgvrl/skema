@@ -64,7 +64,7 @@ final class ScanViewModel {
     let rendererChoice: ScanRendererChoice
     @ObservationIgnored private let cameraPermission: any CameraPermission
     @ObservationIgnored let storageController: StorageController
-    @ObservationIgnored private var scan: ScanSession?
+    @ObservationIgnored private(set) var scan: ScanSession?
     @ObservationIgnored private var stateTask: Task<Void, Never>?
     @ObservationIgnored private var framesTask: Task<Void, Never>?
     @ObservationIgnored private var isStarting = false
@@ -79,6 +79,8 @@ final class ScanViewModel {
     @ObservationIgnored private var floorSearchStart: Double?
     /// What was done at the last frame (item ids and `subjectID`), to say "… done" once when something turns done.
     @ObservationIgnored private var doneIDs: Set<UUID> = []
+    /// The time of the frame that found the floor first. The plane search stops 1 s after it (A10-121).
+    @ObservationIgnored private(set) var floorFoundAt: Double?
     /// Every tap that set something, newest last, for Undo.
     private var history: [TapRecord] = []
     @ObservationIgnored private var lastCollect: Double?
@@ -141,6 +143,7 @@ final class ScanViewModel {
         }
         guard !hadFloor else { return false }
         isFloorMissing = false
+        floorFoundAt = frame.timestamp
         justDone = .floor
         return true
     }
@@ -298,6 +301,7 @@ final class ScanViewModel {
         // A frame that finds the floor moves the scan on to the subject. A tap's own frame does not (`tap`): the tap
         // keeps the kind it was made with.
         if updateFloor(from: frame) { advance() }
+        stopPlaneSearchIfDue(at: frame.timestamp)
         guard let depth = frame.depth, let floorY else { return [] }
         let heights = (floorY + Self.columnFloorGap)...(floorY + Self.columnHeight)
         /// What one paint of a column did: `painted` points in this frame (for the walk-around, `see`) and `fresh`

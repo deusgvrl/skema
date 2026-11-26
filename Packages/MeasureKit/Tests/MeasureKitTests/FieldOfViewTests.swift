@@ -33,6 +33,12 @@ struct FieldOfViewTests {
         #expect(!FieldOfView.contains(cube(at: SIMD3(0, 0, 2)), camera: camera))
     }
 
+    @Test("V2b: a wide box behind the camera is not in view, even when no side wall alone hides it")
+    func aWideBoxBehindIsNotInView() {
+        let box = WorldBox(min: SIMD3(-10, -10, 1), max: SIMD3(10, 10, 2))
+        #expect(!FieldOfView.contains(box, camera: camera))
+    }
+
     @Test("V3: a box beside the picture is not in view", arguments: [
         SIMD3<Float>(-5, 0, -2), SIMD3<Float>(5, 0, -2), SIMD3<Float>(0, 5, -2), SIMD3<Float>(0, -5, -2)
     ])

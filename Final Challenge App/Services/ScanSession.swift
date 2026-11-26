@@ -20,6 +20,10 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
         var state = ScanSessionState.idle
         var throttle: FrameThrottle
         var planes = PlaneStore()
+        /// The mesh choice `start` made, so the run that stops the plane search keeps it.
+        var withMesh = false
+        /// False once `stopPlaneDetection` ran: ARKit no longer looks for planes.
+        var detectsPlanes = true
     }
 
     init(
@@ -49,10 +53,10 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
         ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
     }
 
-    static func makeConfiguration(withMesh: Bool = false) -> ARWorldTrackingConfiguration {
+    static func makeConfiguration(withMesh: Bool = false, detectsPlanes: Bool = true) -> ARWorldTrackingConfiguration {
         let configuration = ARWorldTrackingConfiguration()
         configuration.frameSemantics = [.sceneDepth]
-        configuration.planeDetection = [.horizontal]
+        configuration.planeDetection = detectsPlanes ? [.horizontal] : []
         if withMesh { configuration.sceneReconstruction = .mesh }
         return configuration
     }
@@ -80,14 +84,28 @@ nonisolated final class ScanSession: NSObject, ARSessionDelegate, @unchecked Sen
 
     func start() throws {
         guard isLiDARSupported else { throw ScanSessionError.lidarUnsupported }
+        // The room mesh only helps RealityKit hide the outline. Our own Metal view does not use it (D1).
+        let withMesh = supportsMesh() && renderer == .arView
         try store.withLock { current in
             guard current.state == .idle else { throw ScanSessionError.alreadyStarted }
             current.state = .running
+            current.withMesh = withMesh
         }
         stateBroadcast.yield(.running)
-        // The room mesh only helps RealityKit hide the outline. Our own Metal view does not use it (D1).
-        let withMesh = supportsMesh() && renderer == .arView
         session.run(Self.makeConfiguration(withMesh: withMesh), options: [.resetTracking, .removeExistingAnchors])
+    }
+
+    /// Stops ARKit's search for planes (A10-121). It runs the session once more with the same configuration minus plane
+    /// detection and with no run options, so tracking and the anchors stay. It does nothing when the scan is not
+    /// running or when the search is already off.
+    func stopPlaneDetection() {
+        let withMesh = store.withLock { current -> Bool? in
+            guard current.state == .running, current.detectsPlanes else { return nil }
+            current.detectsPlanes = false
+            return current.withMesh
+        }
+        guard let withMesh else { return }
+        session.run(Self.makeConfiguration(withMesh: withMesh, detectsPlanes: false), options: [])
     }
 
     func stop() {
