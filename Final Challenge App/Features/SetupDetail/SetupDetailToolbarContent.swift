@@ -171,15 +171,11 @@ struct SetupDetailToolbarContent: ToolbarContent {
     @ViewBuilder
     private var floatingButton: some View {
         if isEditing {
-            Button {
+            // A plain toolbar button on the bar's own glass: the red ✓ is this screen's one prominent action
+            // (HIG Toolbars, 26 Nov). No extra glassEffect, which drew a second shape inside the bar's circle.
+            Button("Add Equipment", systemImage: "plus") {
                 isAddingNode = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white)
             }
-            .buttonStyle(.glassProminent)
-            .tint(DesignTokens.accentPrimary)
         } else {
             Button ("Edit", systemImage: "square.and.pencil") {
                 withAnimation {
