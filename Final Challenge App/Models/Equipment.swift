@@ -5,9 +5,8 @@ import CoreGraphics
 
 /// Specific icon variations available when `category == .accessory`
 enum AccessoryType: String, Codable, CaseIterable, Identifiable {
-    case defaultType = "Default"
-    case backdrop = "Backdrop"
     case reflector = "Reflector"
+    case backdrop = "Backdrop"
     case diffuser = "Diffuser"
 
     var id: String { rawValue }
@@ -67,7 +66,7 @@ final class Equipment {
     init(
         id: UUID = UUID(),
         category: EquipmentCategory = .light,
-        accessoryType: AccessoryType = .defaultType,
+        accessoryType: AccessoryType = .reflector,
         label: String = "",
         name: String = "",
         role: String = "",
@@ -275,7 +274,7 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
 extension EquipmentCategory {
 
     /// Resolves the exact image asset name based on selection state and accessory type
-    func imageName(isSelected: Bool, accessoryType: AccessoryType = .defaultType) -> String {
+    func imageName(isSelected: Bool, accessoryType: AccessoryType = .reflector) -> String {
         switch self {
         case .camera:
             return isSelected ? "icon_camera_selected" : "icon_camera_viewonly"
@@ -289,14 +288,12 @@ extension EquipmentCategory {
                 return isSelected ? "icon_reflector_selected" : "icon_reflector_viewonly"
             case .diffuser:
                 return isSelected ? "icon_diffuser_selected" : "icon_diffuser_viewonly"
-            case .defaultType:
-                return isSelected ? "icon_acc_selected" : "icon_acc_viewonly"
             }
         }
     }
 
     /// The black icon drawn in the PDF's diagram.
-    func pdfImageName(accessoryType: AccessoryType = .defaultType) -> String {
+    func pdfImageName(accessoryType: AccessoryType = .reflector) -> String {
         switch self {
         case .camera:
             return "icon_camera_pdf"
@@ -310,8 +307,6 @@ extension EquipmentCategory {
                 return "icon_reflector_pdf"
             case .diffuser:
                 return "icon_diffuser_pdf"
-            case .defaultType:
-                return "icon_acc_pdf"
             }
         }
     }

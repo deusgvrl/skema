@@ -36,7 +36,11 @@ struct NodeView: View {
                     LightBeamConeView(colorTemp: node.colorTemp)
                 }
 
-                EquipmentNodeIconView(category: node.category, isSelected: isSelected)
+                EquipmentNodeIconView(
+                    category: node.category,
+                    accessoryType: node.accessoryType,
+                    isSelected: isSelected
+                )
 
                 // Directional Pointer Ray & Front Rotate Handle
                 if isSelected && !isReadOnly {
@@ -106,74 +110,13 @@ struct NodeView: View {
             .minimumScaleFactor(0.8)
             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .fixedSize()
-            .offset(y: 54)
+            .offset(y: node.category == .accessory ? 40 : 54)
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: zoomScale >= 1.75)
         }
         .scaleEffect(1 / zoomScale)
         .position(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
         .highPriorityGesture(TapGesture().onEnded { if !isRotating { onTap() } })
         .gesture(isReadOnly ? nil : dragGesture)
-    }
-
-    // MARK: - Category Details Subview
-
-    @ViewBuilder
-    private var categoryDetailsView: some View {
-        switch node.category {
-        case .camera:
-            let hasLens = !node.lens.trimmingCharacters(in: .whitespaces).isEmpty
-            let hasIso = !node.iso.trimmingCharacters(in: .whitespaces).isEmpty
-            let hasAperture = !node.aperture.trimmingCharacters(in: .whitespaces).isEmpty
-
-            if hasLens || hasIso || hasAperture {
-                HStack(spacing: 4) {
-                    if hasLens {
-                        Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens) mm")
-                    }
-                    if hasAperture {
-                        if hasLens {
-                            Text("·").foregroundStyle(DesignTokens.textSecondary)
-                        }
-                        Text(node.aperture)
-                    }
-                    if hasIso {
-                        if hasLens || hasAperture {
-                            Text("·").foregroundStyle(DesignTokens.textSecondary)
-                        }
-                        Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
-                    }
-                }
-                .font(.caption2)
-                .foregroundStyle(DesignTokens.textSecondary)
-            }
-
-        case .light:
-            if !node.power.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text(node.power)
-                    .font(.caption2)
-                    .foregroundStyle(DesignTokens.textSecondary)
-            }
-
-        case .accessory:
-            if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
-                Text(node.role)
-                    .font(.caption2)
-                    .foregroundStyle(DesignTokens.textSecondary)
-            }
-        }
-    }
-
-    // MARK: - Height Subview
-
-    @ViewBuilder
-    private var heightDetailsView: some View {
-        let trimmedHeight = node.height.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedHeight.isEmpty {
-            let heightText = trimmedHeight.lowercased().contains("m") ? trimmedHeight : "\(trimmedHeight) m"
-            Text("H: \(heightText)")
-                .font(.caption2)
-                .foregroundStyle(DesignTokens.textSecondary)
-        }
     }
 
     // MARK: - Gestures & Helpers
@@ -317,6 +260,80 @@ struct NodeView: View {
     }
 }
 
+// MARK: - Category Details Subview
+
+extension NodeView {
+    @ViewBuilder
+    var categoryDetailsView: some View {
+        switch node.category {
+        case .camera:
+            cameraDetailsView
+        case .light:
+            lightDetailsView
+        case .accessory:
+            accessoryDetailsView
+        }
+    }
+
+    @ViewBuilder
+    private var cameraDetailsView: some View {
+        let hasLens = !node.lens.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasIso = !node.iso.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasAperture = !node.aperture.trimmingCharacters(in: .whitespaces).isEmpty
+
+        if hasLens || hasIso || hasAperture {
+            HStack(spacing: 4) {
+                if hasLens {
+                    Text(node.lens.lowercased().contains("mm") ? node.lens : "\(node.lens) mm")
+                }
+                if hasAperture {
+                    if hasLens {
+                        Text("·").foregroundStyle(DesignTokens.textSecondary)
+                    }
+                    Text(node.aperture)
+                }
+                if hasIso {
+                    if hasLens || hasAperture {
+                        Text("·").foregroundStyle(DesignTokens.textSecondary)
+                    }
+                    Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(DesignTokens.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var lightDetailsView: some View {
+        if !node.power.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(node.power)
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var accessoryDetailsView: some View {
+        if !node.role.trimmingCharacters(in: .whitespaces).isEmpty {
+            Text(node.role)
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    var heightDetailsView: some View {
+        let trimmedHeight = node.height.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedHeight.isEmpty {
+            let heightText = trimmedHeight.lowercased().contains("m") ? trimmedHeight : "\(trimmedHeight) m"
+            Text("H: \(heightText)")
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.textSecondary)
+        }
+    }
+}
+
 // MARK: - Helper Dashed Line Shape
 
 struct DashedLine: Shape {
@@ -330,75 +347,13 @@ struct DashedLine: Shape {
 
 struct EquipmentNodeIconView: View {
     let category: EquipmentCategory
+    var accessoryType: AccessoryType = .reflector
     let isSelected: Bool
 
     var body: some View {
-        Image(category.imageName(isSelected: isSelected))
+        Image(category.imageName(isSelected: isSelected, accessoryType: accessoryType))
             .resizable()
             .scaledToFit()
             .frame(width: category.iconSize.width, height: category.iconSize.height)
-    }
-}
-
-struct LightBeamConeView: View {
-    let colorTemp: String
-
-    private var lightColor: Color {
-        Color.kelvinColor(from: colorTemp)
-    }
-
-    var body: some View {
-        ZStack {
-            LightBeamShape()
-                .fill(
-                    LinearGradient(
-                        stops: [
-                            .init(color: lightColor.opacity(0.85), location: 0.0),
-                            .init(color: lightColor.opacity(0.40), location: 0.4),
-                            .init(color: lightColor.opacity(0.10), location: 0.8),
-                            .init(color: .clear, location: 1.0)
-                        ],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
-                .frame(width: 84, height: 96)
-                .blur(radius: 4)
-
-            LightBeamShape()
-                .fill(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white.opacity(0.9), location: 0.0),
-                            .init(color: lightColor.opacity(0.6), location: 0.3),
-                            .init(color: .clear, location: 1.0)
-                        ],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
-                .frame(width: 48, height: 75)
-                .blur(radius: 1.5)
-        }
-        .offset(y: -55)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-struct LightBeamShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let originWidth: CGFloat = 16
-        let beamWidth: CGFloat = rect.width
-        let originInset = (beamWidth - originWidth) / 2
-
-        path.move(to: CGPoint(x: originInset, y: rect.maxY))
-        path.addLine(to: CGPoint(x: beamWidth - originInset, y: rect.maxY))
-        path.addLine(to: CGPoint(x: beamWidth, y: rect.minY))
-        path.addLine(to: CGPoint(x: 0, y: rect.minY))
-        path.closeSubpath()
-
-        return path
     }
 }

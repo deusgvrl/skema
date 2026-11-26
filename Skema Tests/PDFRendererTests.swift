@@ -371,6 +371,6 @@ struct PDFEquipmentTablesTests {
 
     @Test("Every type has a black PDF icon", arguments: EquipmentCategory.allCases)
     func icons(category: EquipmentCategory) {
-        #expect(UIImage(named: category.pdfImageName) != nil)
+        #expect(UIImage(named: category.pdfImageName()) != nil)
     }
 }

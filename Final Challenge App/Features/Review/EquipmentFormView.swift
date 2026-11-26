@@ -106,7 +106,9 @@ struct EquipmentFormView: View {
                 if !isReadOnly {
                     ToolbarItem(placement: .confirmationAction) {
                         Group {
-                            if !formViewModel.isEditing || selectedDetent == .large || selectedDetent == .medium || selectedDetent == .height(76) {
+                            let canShow = !formViewModel.isEditing || selectedDetent == .large
+                                || selectedDetent == .medium || selectedDetent == .height(76)
+                            if canShow {
                                 Button("Done", systemImage: "checkmark") {
                                     formViewModel.saveNode(undoManager: undoManager) { dismiss() }
                                 }
@@ -187,6 +189,16 @@ private extension EquipmentFormView {
     @ViewBuilder
     var categorySpecificSettingsSection: some View {
         @Bindable var formViewModel = formViewModel
+
+        if formViewModel.category == .accessory {
+            Section(header: FormSectionHeader("Icon")) {
+                AccessoryIconPickerView(
+                    selectedType: $formViewModel.accessoryType,
+                    isReadOnly: isReadOnly
+                )
+            }
+            .listRowBackground(DesignTokens.formRowBackground)
+        }
 
         if formViewModel.category == .light {
             Section(header: FormSectionHeader("Light Settings")) {

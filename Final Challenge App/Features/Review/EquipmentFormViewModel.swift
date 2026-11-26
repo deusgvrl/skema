@@ -12,6 +12,7 @@ import Observation
 final class EquipmentFormViewModel {
     // Form Inputs
     var category: EquipmentCategory = .camera
+    var accessoryType: AccessoryType = .reflector
     var name: String = ""
     var role: String = ""
 
@@ -41,6 +42,7 @@ final class EquipmentFormViewModel {
 
     struct Snapshot: Equatable {
        var category: EquipmentCategory = .camera
+       var accessoryType: AccessoryType = .reflector
        var name = ""
        var role = ""
        var power = ""
@@ -63,7 +65,8 @@ final class EquipmentFormViewModel {
 
     private var currentSnapshot: Snapshot {
        Snapshot(
-           category: category, name: name, role: role,
+           category: category, accessoryType: accessoryType,
+           name: name, role: role,
            power: power, colorTemp: colorTemp,
            lens: lens, iso: iso, aperture: aperture,
            shutterSpeed: shutterSpeed, whiteBalance: whiteBalance,
@@ -106,6 +109,7 @@ final class EquipmentFormViewModel {
         let cleanedTilt = cleanNumericString(node.tilt)
 
         category = node.category
+        accessoryType = node.accessoryType
         name = node.name
         role = node.role
         power = node.power
@@ -131,6 +135,7 @@ final class EquipmentFormViewModel {
     /// Resets all draft inputs to blank/default states for creating new equipment
     func resetToDefaults() {
         category = .camera
+        accessoryType = .reflector
         name = ""
         role = ""
         power = ""
@@ -158,57 +163,71 @@ final class EquipmentFormViewModel {
         let sanitizedAim = cleanNumericString(horizontalAim)
 
         if let id = editingNodeId, let index = reviewViewModel.nodes.firstIndex(where: { $0.id == id }) {
-            let node = reviewViewModel.nodes[index]
-            node.category = category
-            node.name = name
-            node.role = role
-            node.power = power
-            node.colorTemp = cleanNumericString(colorTemp)
-            node.lens = lens
-            node.iso = iso
-            node.aperture = aperture
-            node.shutterSpeed = shutterSpeed
-            node.whiteBalance = cleanNumericString(whiteBalance)
-            node.height = cleanNumericString(height)
-            node.tilt = cleanNumericString(tilt)
-            node.horizontalAim = sanitizedAim
-            node.distance = sanitizedDistance
-            node.accessories = accessories
-            node.notes = notes
-
-            // Synchronize diagram coordinates & heading rotation angle ONLY on save
-            node.syncRotationFromHorizontalAim()
-            node.syncPositionFromDistance()
-
+            updateExistingNode(
+                reviewViewModel.nodes[index],
+                sanitizedDistance: sanitizedDistance,
+                sanitizedAim: sanitizedAim
+            )
             reviewViewModel.updateEquipment(oldNodesSnapshot: oldNodesSnapshot, undoManager: undoManager)
         } else {
-            let newNode = Equipment(
-                category: category,
-                name: name,
-                role: role,
-                position: CGPoint(x: 0, y: -100),
-                power: power,
-                colorTemp: cleanNumericString(colorTemp),
-                lens: lens,
-                iso: iso,
-                aperture: aperture,
-                shutterSpeed: shutterSpeed,
-                whiteBalance: cleanNumericString(whiteBalance),
-                height: cleanNumericString(height),
-                tilt: cleanNumericString(tilt),
-                horizontalAim: sanitizedAim,
-                distance: sanitizedDistance.isEmpty ? "1.00" : sanitizedDistance,
-                accessories: accessories,
-                notes: notes
-            )
-
-            newNode.syncRotationFromHorizontalAim()
-            newNode.syncPositionFromDistance()
-
+            let newNode = createNewNode(sanitizedDistance: sanitizedDistance, sanitizedAim: sanitizedAim)
             reviewViewModel.addEquipment(newNode, undoManager: undoManager)
         }
 
         completion()
+    }
+
+    private func updateExistingNode(
+        _ node: Equipment,
+        sanitizedDistance: String,
+        sanitizedAim: String
+    ) {
+        node.category = category
+        node.accessoryType = accessoryType
+        node.name = name
+        node.role = role
+        node.power = power
+        node.colorTemp = cleanNumericString(colorTemp)
+        node.lens = lens
+        node.iso = iso
+        node.aperture = aperture
+        node.shutterSpeed = shutterSpeed
+        node.whiteBalance = cleanNumericString(whiteBalance)
+        node.height = cleanNumericString(height)
+        node.tilt = cleanNumericString(tilt)
+        node.horizontalAim = sanitizedAim
+        node.distance = sanitizedDistance
+        node.accessories = accessories
+        node.notes = notes
+
+        node.syncRotationFromHorizontalAim()
+        node.syncPositionFromDistance()
+    }
+
+    private func createNewNode(sanitizedDistance: String, sanitizedAim: String) -> Equipment {
+        let newNode = Equipment(
+            category: category,
+            accessoryType: accessoryType,
+            name: name,
+            role: role,
+            position: CGPoint(x: 0, y: -100),
+            power: power,
+            colorTemp: cleanNumericString(colorTemp),
+            lens: lens,
+            iso: iso,
+            aperture: aperture,
+            shutterSpeed: shutterSpeed,
+            whiteBalance: cleanNumericString(whiteBalance),
+            height: cleanNumericString(height),
+            tilt: cleanNumericString(tilt),
+            horizontalAim: sanitizedAim,
+            distance: sanitizedDistance.isEmpty ? "1.00" : sanitizedDistance,
+            accessories: accessories,
+            notes: notes
+        )
+        newNode.syncRotationFromHorizontalAim()
+        newNode.syncPositionFromDistance()
+        return newNode
     }
 
     func deleteNode(undoManager: UndoManager?, completion: () -> Void) {
