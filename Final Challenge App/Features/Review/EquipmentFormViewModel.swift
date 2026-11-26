@@ -103,6 +103,7 @@ final class EquipmentFormViewModel {
             resetToDefaults()
             return
         }
+        let cleanedTilt = cleanNumericString(node.tilt)
 
         category = node.category
         name = node.name
@@ -117,7 +118,7 @@ final class EquipmentFormViewModel {
         shutterSpeed = node.shutterSpeed
         whiteBalance = cleanNumericString(node.whiteBalance)
         height = cleanNumericString(node.height)
-        tilt = cleanNumericString(node.tilt)
+        tilt = cleanedTilt.isEmpty ? "0" : cleanedTilt
         horizontalAim = cleanNumericString(node.horizontalAim)
         distance = cleanNumericString(node.distance)
 
@@ -140,7 +141,7 @@ final class EquipmentFormViewModel {
         shutterSpeed = ""
         whiteBalance = ""
         height = ""
-        tilt = ""
+        tilt = "0"
         horizontalAim = ""
         distance = ""
         accessories = ""
