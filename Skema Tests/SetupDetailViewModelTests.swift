@@ -11,7 +11,7 @@ import Testing
 @Suite("Setup detail view model: subtitle")
 struct SetupDetailViewModelTests {
     @Test("Subtitle joins client and project with a dot, skipping blanks (Sketch R08)", arguments: [
-        ("Aesop", "November catalog", "Aesop · November catalog"),
+        ("Aesop", "November catalog", "Aesop | November catalog"),
         ("Aesop", "", "Aesop"),
         ("", "November catalog", "November catalog"),
         ("", "", "")

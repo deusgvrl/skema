@@ -22,7 +22,7 @@ struct LightingDiagramView: View {
 
     // Scale Meter Visibility State
     var onNodeDragStart: ((Equipment) -> Void)?
-    
+
     // Reported to the parent so it can render the scale meter in a safe-area-aware overlay.
     var onScaleMeterChange: ((ScaleMeterState?) -> Void)?
 
@@ -41,7 +41,7 @@ struct LightingDiagramView: View {
         onSubjectTap: (() -> Void)? = nil,
         onEmptyTap: (() -> Void)? = nil,
         onNodeDragStart: ((Equipment) -> Void)? = nil,
-        onScaleMeterChange:((ScaleMeterState?) -> Void)? = nil
+        onScaleMeterChange: ((ScaleMeterState?) -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly

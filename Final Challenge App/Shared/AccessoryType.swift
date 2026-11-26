@@ -17,4 +17,3 @@ enum AccessoryType: String, Codable, CaseIterable, Identifiable {
 
     var title: String { rawValue }
 }
-

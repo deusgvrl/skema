@@ -467,7 +467,7 @@ extension ScanViewModel {
         }
         storageController.addSetup(draftSetup)
     }
-    
+
     func addStartingCamera() {
         let name = "Camera"
         let equipment = Equipment(

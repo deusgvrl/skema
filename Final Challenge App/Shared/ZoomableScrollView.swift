@@ -76,7 +76,6 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
             scrollView.leftEdgeEffect.isHidden = true
             scrollView.rightEdgeEffect.isHidden = true
         }
-        
 
         let singleTap = UITapGestureRecognizer(
             target: context.coordinator,

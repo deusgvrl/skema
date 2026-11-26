@@ -7,7 +7,6 @@
 
 import Foundation
 
-
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case camera = "Camera"
     case light = "Light"
@@ -77,4 +76,3 @@ extension EquipmentCategory {
         }
     }
 }
-

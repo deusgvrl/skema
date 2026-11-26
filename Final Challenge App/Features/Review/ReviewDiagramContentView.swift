@@ -23,7 +23,7 @@ struct ReviewDiagramContentView: View {
 
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
-    
+
     @State private var scaleMeter: ScaleMeterState?
 
     var body: some View {
