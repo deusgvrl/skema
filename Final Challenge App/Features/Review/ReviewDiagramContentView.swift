@@ -39,17 +39,15 @@ struct ReviewDiagramContentView: View {
                     onNodeDragStart: onNodeDragStart
                 )
 
-                if !viewModel.nodes.isEmpty {
-                    Group {
-                        if viewModel.isEditingDiagram {
-                            DiagramTipPill(tip: editTip)
-                        } else {
-                            DiagramTipPill(tip: viewTip)
-                        }
+                Group {
+                    if viewModel.isEditingDiagram {
+                        DiagramTipPill(tip: editTip)
+                    } else {
+                        DiagramTipPill(tip: viewTip)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
             }
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
