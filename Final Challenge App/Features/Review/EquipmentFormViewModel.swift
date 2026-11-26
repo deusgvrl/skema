@@ -39,6 +39,43 @@ final class EquipmentFormViewModel {
     var editingNodeId: UUID?
     private unowned let reviewViewModel: ReviewViewModel
 
+    struct Snapshot: Equatable {
+       var category: EquipmentCategory = .camera
+       var name = ""
+       var role = ""
+       var power = ""
+       var colorTemp = ""
+       var lens = ""
+       var iso = ""
+       var aperture = ""
+       var shutterSpeed = ""
+       var whiteBalance = ""
+       var height = ""
+       var tilt = ""
+       var horizontalAim = ""
+       var distance = ""
+       var accessories = ""
+       var notes = ""
+    }
+
+    /// The values as last loaded from the model (the "clean" state).
+    private var original = Snapshot()
+
+    private var currentSnapshot: Snapshot {
+       Snapshot(
+           category: category, name: name, role: role,
+           power: power, colorTemp: colorTemp,
+           lens: lens, iso: iso, aperture: aperture,
+           shutterSpeed: shutterSpeed, whiteBalance: whiteBalance,
+           height: height, tilt: tilt,
+           horizontalAim: horizontalAim, distance: distance,
+           accessories: accessories, notes: notes
+       )
+    }
+
+    /// True only when the current form differs from what was loaded.
+    var hasChanges: Bool { currentSnapshot != original }
+
     var isEditing: Bool { editingNodeId != nil }
 
     var isFormValid: Bool {
@@ -66,6 +103,7 @@ final class EquipmentFormViewModel {
             resetToDefaults()
             return
         }
+        let cleanedTilt = cleanNumericString(node.tilt)
 
         category = node.category
         name = node.name
@@ -80,17 +118,19 @@ final class EquipmentFormViewModel {
         shutterSpeed = node.shutterSpeed
         whiteBalance = cleanNumericString(node.whiteBalance)
         height = cleanNumericString(node.height)
-        tilt = cleanNumericString(node.tilt)
+        tilt = cleanedTilt.isEmpty ? "0" : cleanedTilt
         horizontalAim = cleanNumericString(node.horizontalAim)
         distance = cleanNumericString(node.distance)
 
         accessories = node.accessories
         notes = node.notes
+
+        original = currentSnapshot
     }
 
     /// Resets all draft inputs to blank/default states for creating new equipment
     func resetToDefaults() {
-        category = .light
+        category = .camera
         name = ""
         role = ""
         power = ""
@@ -101,11 +141,13 @@ final class EquipmentFormViewModel {
         shutterSpeed = ""
         whiteBalance = ""
         height = ""
-        tilt = ""
+        tilt = "0"
         horizontalAim = ""
         distance = ""
         accessories = ""
         notes = ""
+
+        original = currentSnapshot
     }
 
     func saveNode(undoManager: UndoManager?, completion: () -> Void) {

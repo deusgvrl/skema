@@ -151,7 +151,7 @@ struct ScanView: View {
     }
 
     private func addEquipmentManually() {
-        viewModel.insertDraftSetup()
+        viewModel.insertDraftSetup(isManual: true)
         reviewViewModel = ReviewViewModel(setup: viewModel.draftSetup, storageController: viewModel.storageController)
     }
 

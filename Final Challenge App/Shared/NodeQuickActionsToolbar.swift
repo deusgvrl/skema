@@ -11,10 +11,10 @@ struct NodeQuickActionsToolbar: View {
     let nodeId: UUID?
     var showsDelete: Bool = true
     var onDelete: ((UUID) -> Void)?
-    var onAdd: () -> Void
 
     var body: some View {
         HStack {
+            Spacer()
             // Delete Button (Visible only when editing equipment nodes)
             if showsDelete, let id = nodeId {
                 Button(role: .destructive) {
@@ -31,16 +31,6 @@ struct NodeQuickActionsToolbar: View {
             }
 
             Spacer()
-
-            // Right-aligned Plus Button (45x45)
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .font(.title2)
-                    .foregroundStyle(.white)
-                    .frame(width: 45, height: 45)
-                    .background(Circle().fill(DesignTokens.accentPrimary))
-            }
-            .glassEffect(.clear.interactive())
         }
         .padding(.horizontal, 30)
         .frame(maxWidth: .infinity)

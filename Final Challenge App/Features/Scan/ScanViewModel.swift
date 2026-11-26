@@ -459,8 +459,28 @@ extension ScanViewModel {
     }
 
     /// Puts the draft setup into storage: at Finish, and for "Add Equipment Manually" on the message screens.
-    func insertDraftSetup() {
+    /// if isManual true, it will add a single camera as a starting equipment
+    func insertDraftSetup(isManual: Bool = false) {
+        /// add single camera as a initial equipment
+        if isManual {
+            addStartingCamera()
+        }
         storageController.addSetup(draftSetup)
+    }
+    
+    func addStartingCamera() {
+        let name = "Camera"
+        let equipment = Equipment(
+            category: .camera,
+            name: name,
+            position: CGPoint(x: 0, y: -100)
+        )
+        if equipment.distance.isEmpty {
+            equipment.distance = "1.00"
+        }
+        equipment.syncPositionFromDistance()
+        draftSetup.nodes.append(equipment)
+        draftSetup.alignAndOrientDiagram()
     }
 
     /// Writes the subject's height onto the setup, and each measured item's distance, height and plan position onto

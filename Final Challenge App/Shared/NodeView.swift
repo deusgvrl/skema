@@ -87,23 +87,27 @@ struct NodeView: View {
         )
         .overlay(alignment: .top) {
             VStack(spacing: 2) {
-               Text(node.name.isEmpty ? "Equipment" : node.name)
-                   .font(.caption)
-                   .fontWeight(isSelected ? .bold : .regular)
-                   .foregroundStyle(DesignTokens.textPrimary)
+                // 1. Primary Name
+                Text(node.name.isEmpty ? "Equipment" : node.name)
+                    .font(.caption)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .foregroundStyle(DesignTokens.textPrimary)
 
-               // 2. Secondary Specifications Subtitle (Visible when zoomed in)
-               if zoomScale >= 1.75 {
-                   categoryDetailsView
-                       .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
-               }
-           }
-           .lineLimit(1)
-           .minimumScaleFactor(0.8)
-           .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-           .fixedSize()
-           .offset(y: 54)
-           .animation(.spring(response: 0.25, dampingFraction: 0.8), value: zoomScale >= 1.75)
+                // 2. Secondary Specifications Subtitle (Visible when zoomed in)
+                if zoomScale >= 1.75 {
+                    categoryDetailsView
+                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
+
+                    heightDetailsView
+                        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .fixedSize()
+            .offset(y: 54)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: zoomScale >= 1.75)
         }
         .scaleEffect(1 / zoomScale)
         .position(x: subjectCenter.x + node.position.x, y: subjectCenter.y + node.position.y)
@@ -156,6 +160,19 @@ struct NodeView: View {
                     .font(.caption2)
                     .foregroundStyle(DesignTokens.textSecondary)
             }
+        }
+    }
+
+    // MARK: - Height Subview
+
+    @ViewBuilder
+    private var heightDetailsView: some View {
+        let trimmedHeight = node.height.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedHeight.isEmpty {
+            let heightText = trimmedHeight.lowercased().contains("m") ? trimmedHeight : "\(trimmedHeight) m"
+            Text("H: \(heightText)")
+                .font(.caption2)
+                .foregroundStyle(DesignTokens.textSecondary)
         }
     }
 
