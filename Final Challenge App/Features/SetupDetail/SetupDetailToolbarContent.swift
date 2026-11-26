@@ -180,6 +180,13 @@ struct SetupDetailToolbarContent: ToolbarContent {
             }
             .buttonStyle(.glassProminent)
             .tint(DesignTokens.accentPrimary)
+        } else {
+            Button ("Edit", systemImage: "square.and.pencil") {
+                withAnimation {
+                    viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
+                }
+            }
+            .glassEffect(.clear.interactive())
         }
     }
 }
