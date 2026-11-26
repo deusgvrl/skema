@@ -15,7 +15,9 @@ import Metal
 ///
 /// Keep the returned `CVMetalTexture` objects alive until the command buffer that uses them is done (Apple's rule).
 /// If one is freed early, the GPU can read memory that is already reused.
-final class CameraTextures {
+///
+/// Used on the render thread only, so it is not on the main actor.
+nonisolated final class CameraTextures {
     private let cache: CVMetalTextureCache
 
     /// Returns nil only when the texture cache cannot be made.

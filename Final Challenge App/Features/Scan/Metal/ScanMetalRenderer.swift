@@ -12,22 +12,27 @@ import ARKit
 import CoreVideo
 import MeasureKit
 import Metal
-import MetalKit
 import os
+import QuartzCore
 import simd
 
-private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Skema", category: "MetalScan")
+nonisolated private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Skema", category: "MetalScan")
 
-/// The `MTKView` delegate of the Metal scan view. Each draw reads `session.currentFrame` and encodes one render
+/// The display link delegate of the Metal scan view. Each frame reads `session.currentFrame` and encodes one render
 /// pass: the camera quad first, then the outlines (white, `OutlineLayout.opacity`, blended over the picture).
-@MainActor
-final class ScanMetalRenderer: NSObject, MTKViewDelegate {
+///
+/// It is used on the render thread only (A10-121, step 4): the display link calls it there, and its GPU buffers and
+/// texture cache are never touched from another thread. The main thread talks to it through the `OutlineInbox`.
+nonisolated final class ScanMetalRenderer: NSObject, CAMetalDisplayLinkDelegate {
     /// The colour format of the view and of both pipelines. The view must use the same one.
     static let colorPixelFormat: MTLPixelFormat = .bgra8Unorm
 
-    /// The boxes to outline, by item id. On the next draw, the GPU buffers follow the ones in view (`visibleOutlines`).
+    /// The boxes to outline, by item id. Each frame it takes the inbox's newest ones. On the next draw, the GPU
+    /// buffers follow the ones in view (`visibleOutlines`).
     var outlines: [UUID: WorldBox] = [:]
 
+    /// Where the main thread puts the newest outlines and the view size.
+    let inbox: OutlineInbox
     private let session: ARSession
     private let queue: any MTLCommandQueue
     private let cameraPipeline: any MTLRenderPipelineState
@@ -41,7 +46,7 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
 
     /// Returns nil when the shader library, a pipeline, the command queue, the texture cache or a stand-in texture
     /// cannot be made.
-    init?(device: any MTLDevice, session: ARSession) {
+    init?(device: any MTLDevice, session: ARSession, inbox: OutlineInbox = OutlineInbox()) {
         guard let library = device.makeDefaultLibrary() else {
             log.error("Metal renderer: no default shader library")
             return nil
@@ -70,6 +75,7 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
             return nil
         }
         self.session = session
+        self.inbox = inbox
         self.queue = queue
         self.cameraPipeline = cameraPipeline
         self.outlinePipeline = outlinePipeline
@@ -102,19 +108,26 @@ final class ScanMetalRenderer: NSObject, MTKViewDelegate {
         outlines.filter { FieldOfView.contains($0.value, camera: camera) }
     }
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    /// One frame, on the render thread: the display link gives the drawable to draw into.
+    func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update) {
+        draw(into: update.drawable)
+    }
 
-    /// One frame: one command buffer, one render pass. With no AR frame (or no camera picture) the view is only
+    /// One frame: one command buffer, one render pass. With no AR frame (or no camera picture) the drawable is only
     /// cleared.
-    func draw(in view: MTKView) {
-        guard let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable,
-              let commands = queue.makeCommandBuffer() else { return }
+    private func draw(into drawable: any CAMetalDrawable) {
+        let latest = inbox.snapshot()
+        outlines = latest.outlines
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].storeAction = .store
         pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-        guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
+        guard let commands = queue.makeCommandBuffer(),
+              let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else { return }
 
         // The size in points: the line thickness (OutlineLayout.thickness) is in points.
-        let viewSize = view.bounds.size
+        let viewSize = latest.viewSize
         if viewSize.width > 0, viewSize.height > 0, let frame = session.currentFrame,
            let picture = cameraTextures.cameraTextures(from: frame.capturedImage),
            let luma = CVMetalTextureGetTexture(picture.y), let chroma = CVMetalTextureGetTexture(picture.cbcr) {

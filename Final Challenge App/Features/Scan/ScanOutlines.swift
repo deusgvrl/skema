@@ -22,7 +22,7 @@ final class ScanOutlines {
     }
 
     /// A box that moved less than this (1 cm on every side) keeps its old mesh.
-    static let rebuildStep: Float = 0.01
+    nonisolated static let rebuildStep: Float = 0.01
 
     private let root: Entity
     private var outlines: [UUID: Outline] = [:]

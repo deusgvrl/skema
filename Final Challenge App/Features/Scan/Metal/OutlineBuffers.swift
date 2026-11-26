@@ -14,8 +14,8 @@ import MeasureKit
 import Metal
 import simd
 
-@MainActor
-final class OutlineBuffers {
+/// Used on the render thread only, so it is not on the main actor.
+nonisolated final class OutlineBuffers {
     /// The GPU data of one box. `box` is the box these buffers were built from.
     struct Entry {
         let box: WorldBox

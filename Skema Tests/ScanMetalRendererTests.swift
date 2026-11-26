@@ -75,6 +75,15 @@ struct ScanMetalRendererTests {
         #expect(behind > 0, "Scene depth 3 m is behind the box: the lines must show")
     }
 
+    @Test("R11: encode on the render thread draws the same pixels as on the main thread")
+    func encodeOnTheRenderThreadDrawsTheSamePixels() throws {
+        let onMain = try renderOutline(sceneDepth: 3.0)
+        let onRenderThread = try renderOutline(sceneDepth: 3.0, onRenderThread: true)
+
+        try #require(onMain.whitePixels > 0, "The main-thread picture has no line: nothing to compare")
+        #expect(onRenderThread.pixels == onMain.pixels)
+    }
+
     @Test("A line is drawn once: the back face of a tube is culled, so no pixel gets two layers of white")
     func outlineIsOneLayerOfWhite() throws {
         let result = try renderOutline(sceneDepth: 3.0)
@@ -145,10 +154,13 @@ struct ScanMetalRendererTests {
         /// The most common non-black red value.
         let commonRed: Int
         let histogram: String
+        /// Every byte of the target, to compare two renders exactly.
+        let pixels: [UInt8]
     }
 
     /// The render described at `whitePixelCount`, with its white-ish pixel count and its red values.
-    private func renderOutline(sceneDepth: Float) throws -> OutlineRender {
+    /// `onRenderThread`: the encode call runs on a `RenderThread` (the test waits for it).
+    private func renderOutline(sceneDepth: Float, onRenderThread: Bool = false) throws -> OutlineRender {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let renderer = try #require(ScanMetalRenderer(device: device, session: ARSession()))
         renderer.outlines = [UUID(): WorldBox(min: SIMD3(-0.2, -0.2, -2.2), max: SIMD3(0.2, 0.2, -1.8))]
@@ -168,8 +180,8 @@ struct ScanMetalRendererTests {
         pass.colorAttachments[0].storeAction = .store
         let commands = try #require(queue.makeCommandBuffer())
         let encoder = try #require(commands.makeRenderCommandEncoder(descriptor: pass))
-        renderer.encode(into: encoder, camera: sharedCamera(), viewSize: CGSize(width: width, height: height),
-                        picture: nil, sceneDepth: (depth, confidence))
+        try encodeOutline(renderer: renderer, encoder: encoder, depth: (depth, confidence),
+                          viewSize: CGSize(width: width, height: height), onRenderThread: onRenderThread)
         encoder.endEncoding()
         let blit = try #require(commands.makeBlitCommandEncoder())
         blit.copy(from: target, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
@@ -192,7 +204,31 @@ struct ScanMetalRendererTests {
         for index in starts where pixels[index + 2] > 0 { counts[Int(pixels[index + 2]), default: 0] += 1 }
         let top = counts.sorted { $0.value > $1.value }.prefix(6)
         return OutlineRender(whitePixels: white, commonRed: top.first?.key ?? 0,
-                             histogram: top.map { "\($0.key): \($0.value)" }.joined(separator: ", "))
+                             histogram: top.map { "\($0.key): \($0.value)" }.joined(separator: ", "),
+                             pixels: Array(pixels))
+    }
+
+    /// Calls `renderer.encode` for the shared camera, with no camera picture. `onRenderThread`: the call runs on a
+    /// `RenderThread` and the test waits for it.
+    private func encodeOutline(renderer: ScanMetalRenderer, encoder: any MTLRenderCommandEncoder,
+                               depth: (depth: any MTLTexture, confidence: any MTLTexture), viewSize: CGSize,
+                               onRenderThread: Bool) throws {
+        guard onRenderThread else {
+            renderer.encode(into: encoder, camera: sharedCamera(), viewSize: viewSize, picture: nil, sceneDepth: depth)
+            return
+        }
+        let thread = RenderThread()
+        thread.start()
+        defer { thread.stop() }
+        let done = DispatchSemaphore(value: 0)
+        let sendable = UncheckedSendable((renderer, encoder, depth.depth, depth.confidence))
+        thread.perform {
+            let (renderer, encoder, depthTexture, confidence) = sendable.value
+            renderer.encode(into: encoder, camera: sharedCamera(), viewSize: viewSize,
+                            picture: nil, sceneDepth: (depthTexture, confidence))
+            done.signal()
+        }
+        try #require(done.wait(timeout: .now() + 5) == .success, "The encode did not finish on the render thread")
     }
 
     /// A private texture filled through a blit (the simulator needs private textures for rendering).
