@@ -68,6 +68,14 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         scrollView.canCancelContentTouches = true
         scrollView.scrollsToTop = false
         scrollView.backgroundColor = .clear
+        scrollView.contentInsetAdjustmentBehavior = .never
+
+        if #available(iOS 26.0, *) {
+            scrollView.topEdgeEffect.isHidden = true
+            scrollView.bottomEdgeEffect.isHidden = true
+            scrollView.leftEdgeEffect.isHidden = true
+            scrollView.rightEdgeEffect.isHidden = true
+        }
 
         let singleTap = UITapGestureRecognizer(
             target: context.coordinator,

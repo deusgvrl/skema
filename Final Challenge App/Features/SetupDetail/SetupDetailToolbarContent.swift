@@ -177,7 +177,7 @@ struct SetupDetailToolbarContent: ToolbarContent {
                 isAddingNode = true
             }
         } else {
-            Button ("Edit", systemImage: "square.and.pencil") {
+            Button("Edit", systemImage: "square.and.pencil") {
                 withAnimation {
                     viewModel.reviewViewModel.beginEditing(undoManager: undoManager)
                 }

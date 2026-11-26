@@ -24,31 +24,48 @@ struct ReviewDiagramContentView: View {
     private let viewTip = ReviewViewModeTip()
     private let editTip = ReviewEditModeTip()
 
-    var body: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .top) {
-                LightingDiagramView(
-                    viewModel: viewModel,
-                    isReadOnly: !viewModel.isEditingDiagram,
-                    undoManager: undoManager,
-                    selectedNodeId: $selectedNodeId,
-                    isSubjectSelected: isSubjectSelected,
-                    onNodeTap: onNodeTap,
-                    onSubjectTap: onSubjectTap,
-                    onEmptyTap: onEmptyTap,
-                    onNodeDragStart: onNodeDragStart
-                )
+    @State private var scaleMeter: ScaleMeterState?
 
-                Group {
-                    if viewModel.isEditingDiagram {
-                        DiagramTipPill(tip: editTip)
-                    } else {
-                        DiagramTipPill(tip: viewTip)
-                    }
+    var body: some View {
+        ZStack(alignment: .top) {
+            LightingDiagramView(
+                viewModel: viewModel,
+                isReadOnly: !viewModel.isEditingDiagram,
+                undoManager: undoManager,
+                selectedNodeId: $selectedNodeId,
+                isSubjectSelected: isSubjectSelected,
+                onNodeTap: onNodeTap,
+                onSubjectTap: onSubjectTap,
+                onEmptyTap: onEmptyTap,
+                onNodeDragStart: onNodeDragStart,
+                onScaleMeterChange: { newValue in
+                    scaleMeter = newValue
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+            )
+            .ignoresSafeArea()
+
+            // Overlays respect the safe area, stacked vertically
+            VStack(alignment: .leading, spacing: 4) {
+               Group {
+                   if viewModel.isEditingDiagram {
+                       DiagramTipPill(tip: editTip)
+                   } else {
+                       DiagramTipPill(tip: viewTip)
+                   }
+               }
+
+               if let scaleMeter {
+                   ScaleMeterView(
+                       labelText: scaleMeter.labelText,
+                       barWidth: scaleMeter.barWidth
+                   )
+                   .transition(.opacity)
+                   .allowsHitTesting(false)
+               }
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
         }
         .background(DesignTokens.pageBackground.ignoresSafeArea())
     }

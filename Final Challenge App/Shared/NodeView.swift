@@ -52,13 +52,7 @@ struct NodeView: View {
                         .offset(y: -(currentHandleDistance + 4) / 2)
                         .shadow(color: DesignTokens.accentPrimary.opacity(0.3), radius: 2)
 
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(DesignTokens.accentPrimary)
-                        .offset(y: -currentHandleDistance + 20)
-                        .shadow(color: DesignTokens.accentPrimary.opacity(0.4), radius: 2)
-
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                    Image(systemName: "arrow.trianglehead.clockwise.rotate.90")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(DesignTokens.accentPrimary)
                         .frame(width: 28, height: 28)
@@ -288,13 +282,13 @@ extension NodeView {
                 }
                 if hasAperture {
                     if hasLens {
-                        Text("·").foregroundStyle(DesignTokens.textSecondary)
+                        Text("|").foregroundStyle(DesignTokens.textSecondary)
                     }
                     Text(node.aperture)
                 }
                 if hasIso {
                     if hasLens || hasAperture {
-                        Text("·").foregroundStyle(DesignTokens.textSecondary)
+                        Text("|").foregroundStyle(DesignTokens.textSecondary)
                     }
                     Text(node.iso.lowercased().contains("iso") ? node.iso : "ISO \(node.iso)")
                 }

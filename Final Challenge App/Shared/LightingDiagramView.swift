@@ -19,12 +19,15 @@ struct LightingDiagramView: View {
 
     // Smooth Zoom & Scale States
     @State private var zoomScale: CGFloat = 1.0
-    @State private var overlayScale: CGFloat = 1.0
 
     // Scale Meter Visibility State
-    @State private var showScaleMeter: Bool = false
-    @State private var hideScaleMeterTask: Task<Void, Never>?
     var onNodeDragStart: ((Equipment) -> Void)?
+
+    // Reported to the parent so it can render the scale meter in a safe-area-aware overlay.
+    var onScaleMeterChange: ((ScaleMeterState?) -> Void)?
+
+    // keep a task for hiding:
+    @State private var hideScaleMeterTask: Task<Void, Never>?
 
     init(
         viewModel: ReviewViewModel,
@@ -37,7 +40,8 @@ struct LightingDiagramView: View {
         onNodeTap: ((Equipment) -> Void)? = nil,
         onSubjectTap: (() -> Void)? = nil,
         onEmptyTap: (() -> Void)? = nil,
-        onNodeDragStart: ((Equipment) -> Void)? = nil
+        onNodeDragStart: ((Equipment) -> Void)? = nil,
+        onScaleMeterChange: ((ScaleMeterState?) -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.isReadOnly = isReadOnly
@@ -50,6 +54,7 @@ struct LightingDiagramView: View {
         self.onSubjectTap = onSubjectTap
         self.onEmptyTap = onEmptyTap
         self.onNodeDragStart = onNodeDragStart
+        self.onScaleMeterChange = onScaleMeterChange
     }
 
     private let canvasDimension: CGFloat = 3000
@@ -83,14 +88,15 @@ struct LightingDiagramView: View {
                 onEmptyTap?()
             },
             onZoomChanged: { scale in
-                overlayScale = scale
                 guard !isReadOnly else { return }
                 hideScaleMeterTask?.cancel()
-                if !showScaleMeter {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showScaleMeter = true
-                    }
-                }
+                let config = GridConfig.config(for: scale)
+                onScaleMeterChange?(
+                    ScaleMeterState(
+                        labelText: config.labelText,
+                        barWidth: config.stepInPoints * scale
+                    )
+                )
             },
             onZoomEnded: {
                 guard !isReadOnly else { return }
@@ -98,11 +104,7 @@ struct LightingDiagramView: View {
                 hideScaleMeterTask = Task {
                     try? await Task.sleep(nanoseconds: 1_200_000_000)
                     if !Task.isCancelled {
-                        await MainActor.run {
-                            withAnimation(.easeInOut(duration: 0.4)) {
-                                showScaleMeter = false
-                            }
-                        }
+                        await MainActor.run { onScaleMeterChange?(nil) }
                     }
                 }
             },
@@ -141,7 +143,10 @@ struct LightingDiagramView: View {
                     isSelected: isSubjectSelected,
                     isReadOnly: isReadOnly,
                     rotationAngle: $viewModel.draftSetup.subjectRotationAngle,
-                    onTap: { onSubjectTap?() },
+                    onTap: {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onSubjectTap?()
+                    },
                     onGestureStart: {
                         subjectRotationStart = viewModel.draftSetup.subjectRotationAngle
                     },
@@ -227,19 +232,5 @@ struct LightingDiagramView: View {
         }
         )
         .clipped()
-        .overlay(alignment: .topLeading) {
-            if !isReadOnly {
-                let activeScale = overlayScale
-                let activeConfig = GridConfig.config(for: activeScale)
-
-                ScaleMeterView(
-                    labelText: activeConfig.labelText,
-                    barWidth: activeConfig.stepInPoints * activeScale
-                )
-                .padding(16)
-                .opacity(showScaleMeter ? 1.0 : 0.0)
-                .allowsHitTesting(false)
-            }
-        }
     }
 }

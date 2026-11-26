@@ -63,7 +63,7 @@ final class SetupDetailViewModel {
         [setup.client, setup.project]
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-            .joined(separator: " · ")
+            .joined(separator: " | ")
     }
 
     /// The alert text: saved setups can be recovered for 30 days, drafts cannot (A10-95).

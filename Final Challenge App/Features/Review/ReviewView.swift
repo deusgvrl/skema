@@ -69,7 +69,6 @@ struct ReviewView: View {
                 },
                 onNodeDragStart: { node in handleNodeDragStart(node) }
             )
-            .ignoresSafeArea(edges: .bottom)
 
             // Floating Quick Actions Toolbar (Tracks touch gesture & fades out live)
             if viewModel.isEditingDiagram,

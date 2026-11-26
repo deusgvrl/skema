@@ -33,3 +33,8 @@ struct ScaleMeterView: View {
     ScaleMeterView(labelText: "50 cm", barWidth: 50.0)
         .padding()
 }
+
+struct ScaleMeterState: Equatable {
+    let labelText: String
+    let barWidth: CGFloat
+}
