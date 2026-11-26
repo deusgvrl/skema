@@ -48,11 +48,12 @@ struct PDFRendererTests {
         return setup
     }
 
-    /// A tiny PNG, enough to be drawn as a photo.
+    /// A tiny PNG, enough to be drawn as a photo. Its colour follows the date, so no two photos are the same image.
     private func photo(createdAt: Date) -> ReferenceImage {
         let size = CGSize(width: 2, height: 2)
+        let hue = CGFloat(Int(createdAt.timeIntervalSince1970 / 86_400) % 97) / 97
         let data = UIGraphicsImageRenderer(size: size).pngData { context in
-            UIColor.red.setFill()
+            UIColor(hue: hue, saturation: 1, brightness: 1, alpha: 1).setFill()
             context.fill(CGRect(origin: .zero, size: size))
         }
         return ReferenceImage(imageData: data, createdAt: createdAt)
@@ -65,6 +66,28 @@ struct PDFRendererTests {
 
     private func text(of document: PDFDocument, page index: Int) -> String {
         document.page(at: index)?.string ?? ""
+    }
+
+    /// How many images a page draws, from its Resources → XObject dictionary.
+    private func imageCount(of document: PDFDocument, page index: Int) -> Int {
+        guard let dictionary = document.page(at: index)?.pageRef?.dictionary else { return 0 }
+        var resources: CGPDFDictionaryRef?
+        var objects: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources,
+              CGPDFDictionaryGetDictionary(resources, "XObject", &objects), let objects else { return 0 }
+        var count = 0
+        CGPDFDictionaryApplyBlock(objects, { _, object, _ in
+            var stream: CGPDFStreamRef?
+            var subtype: UnsafePointer<CChar>?
+            if CGPDFObjectGetValue(object, .stream, &stream), let stream,
+               let streamDictionary = CGPDFStreamGetDictionary(stream),
+               CGPDFDictionaryGetName(streamDictionary, "Subtype", &subtype), let subtype,
+               String(cString: subtype) == "Image" {
+                count += 1
+            }
+            return true
+        }, nil)
+        return count
     }
 
     @Test("Case 1: the base setup makes 2 A4 pages")
@@ -118,22 +141,21 @@ struct PDFRendererTests {
         #expect(!page2.contains("Backdrop"), "There is no backdrop row.")
     }
 
-    @Test("Case 4: photos show the heading and are numbered in order")
-    func referencesNumbered() throws {
+    @Test("Case 4: photos show the heading and no caption under each photo")
+    func referencesWithoutCaptions() throws {
         // Arrange
         let setup = baseSetup()
         setup.referenceImages = [photo(createdAt: nov3), photo(createdAt: nov2)]
 
         // Act
-        let page2 = text(of: try document(setup), page: 1)
+        let pdf = try document(setup)
 
         // Assert
+        let page2 = text(of: pdf, page: 1)
         #expect(page2.contains("References · 2 photos"), "Page 2 should have the references heading.")
-        let first = page2.range(of: "Reference 1")
-        let second = page2.range(of: "Reference 2")
-        #expect(first != nil && second != nil, "Both photo labels should be on page 2.")
-        if let first, let second {
-            #expect(first.lowerBound < second.lowerBound, "Reference 1 should come before Reference 2.")
+        #expect(imageCount(of: pdf, page: 1) == 2, "Page 2 should draw both photos.")
+        for index in 0..<pdf.pageCount {
+            #expect(!text(of: pdf, page: index).contains("Reference 1"), "Page \(index + 1) has no photo captions.")
         }
     }
 
@@ -152,8 +174,8 @@ struct PDFRendererTests {
         }
     }
 
-    @Test("Case 6: 7 photos start on their own page, 6 photos per page")
-    func sevenPhotosFourPages() throws {
+    @Test("Case 6: with no captions, 6 photos fit under the tables and photo 7 goes on the next page")
+    func sevenPhotosThreePages() throws {
         // Arrange
         let setup = baseSetup(photoCount: 7)
 
@@ -161,12 +183,10 @@ struct PDFRendererTests {
         let pdf = try document(setup)
 
         // Assert
-        #expect(pdf.pageCount == 4, "The tables fill page 2, so 7 photos need pages 3 and 4.")
-        let page3 = text(of: pdf, page: 2)
-        let page4 = text(of: pdf, page: 3)
-        #expect(page3.contains("Reference 1") && page3.contains("Reference 6"), "Page 3 should have photos 1 to 6.")
-        #expect(!page3.contains("Reference 7"), "Page 3 should not have photo 7.")
-        #expect(page4.contains("Reference 7"), "Page 4 should have photo 7.")
+        #expect(pdf.pageCount == 3, "Page 2 has the tables and photos 1 to 6; page 3 has photo 7.")
+        #expect(imageCount(of: pdf, page: 1) == 6, "Page 2 should have photos 1 to 6.")
+        #expect(imageCount(of: pdf, page: 2) == 1, "Page 3 should have photo 7.")
+        #expect(!text(of: pdf, page: 1).contains("Reference 1"), "Photos have no captions.")
     }
 
     @Test("Case 7: long notes continue on the next page and equipment starts after them")
@@ -232,8 +252,8 @@ struct PDFRendererTests {
 
     @Test("Case 10: every page says its own number out of the total")
     func pageNumbers() throws {
-        // Arrange
-        let setup = baseSetup(photoCount: 7)
+        // Arrange: 6 photos under the tables, 6 on page 3, 1 on page 4.
+        let setup = baseSetup(photoCount: 13)
 
         // Act
         let pdf = try document(setup)

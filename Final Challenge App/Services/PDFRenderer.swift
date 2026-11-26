@@ -23,16 +23,15 @@ enum PDFLayout {
 
     /// The notes box on page 1 takes a tenth of the page; the diagram box gets the rest (was a quarter, 18 Nov).
     static var notesBoxHeight: CGFloat { pageSize.height / 10 }
-    /// About the shape of the page-1 diagram box. The View draws the diagram at this shape (or bigger, see
-    /// `DiagramCanvas`), and the PDF fits the picture into the real box.
-    static var diagramCanvasSize: CGSize { CGSize(width: contentWidth, height: 540) }
+    /// About the size of the page-1 diagram box, inside its padding. The View draws the diagram at this size
+    /// (`PDFDiagramLayout` fills it), and the PDF fits the picture into the real box.
+    static var diagramCanvasSize: CGSize { CGSize(width: contentWidth - 2 * boxPadding, height: 520) }
     static let footerHeight: CGFloat = 28
 
     static let photoColumns = 3
     static let photoRows = 2
     static let photosPerPage = photoColumns * photoRows
     static let photoBoxHeight: CGFloat = 150
-    static let photoLabelHeight: CGFloat = 14
     /// The photos of a row share the content width, with one gap between each two.
     static var photoColumnWidth: CGFloat {
         (contentWidth - CGFloat(photoColumns - 1) * spacing) / CGFloat(photoColumns)
@@ -167,7 +166,7 @@ final class PDFRenderer {
         guard !photos.isEmpty else { return }
 
         // The first block (up to `photosPerPage`) goes under the tables only if it fits there; otherwise on a new page.
-        let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.photoLabelHeight + PDFLayout.spacing
+        let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.spacing
         let firstCount = min(photos.count, PDFLayout.photosPerPage)
         let firstRows = (firstCount + PDFLayout.photoColumns - 1) / PDFLayout.photoColumns
         let blockHeight = CGFloat(firstRows) * cellHeight
@@ -182,13 +181,13 @@ final class PDFRenderer {
         for start in stride(from: 0, to: photos.count, by: PDFLayout.photosPerPage) {
             if start > 0 { pages.startPage() }
             let group = photos[start..<min(start + PDFLayout.photosPerPage, photos.count)]
-            drawPhotoGrid(Array(group), firstNumber: start + 1, pages: pages)
+            drawPhotoGrid(Array(group), pages: pages)
         }
     }
 
-    private func drawPhotoGrid(_ group: [ReferenceImage], firstNumber: Int, pages: PageWriter) {
+    private func drawPhotoGrid(_ group: [ReferenceImage], pages: PageWriter) {
         let columnWidth = PDFLayout.photoColumnWidth
-        let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.photoLabelHeight + PDFLayout.spacing
+        let cellHeight = PDFLayout.photoBoxHeight + PDFLayout.spacing
         let top = pages.cursorY
         for (offset, photo) in group.enumerated() {
             let column = offset % PDFLayout.photoColumns
@@ -203,9 +202,6 @@ final class PDFRenderer {
                 let inner = box.insetBy(dx: PDFLayout.boxPadding, dy: PDFLayout.boxPadding)
                 image.draw(in: PageWriter.aspectFit(image.size, in: inner))
             }
-            let labelRect = CGRect(x: origin.x, y: box.maxY + 1, width: columnWidth, height: PDFLayout.photoLabelHeight)
-            let label = "Reference \(firstNumber + offset)"
-            PageWriter.draw(label, font: .systemFont(ofSize: PDFLayout.bodyFontSize), color: .black, in: labelRect)
         }
         let rows = (group.count + PDFLayout.photoColumns - 1) / PDFLayout.photoColumns
         pages.advance(CGFloat(rows) * cellHeight)
