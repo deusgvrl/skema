@@ -107,7 +107,7 @@ struct PDFDiagramView: View {
     }
 
     private func icon(of node: Equipment) -> some View {
-        Image(node.category.pdfImageName)
+        Image(node.pdfImageName)
             .resizable()
             .interpolation(.high)
             .scaledToFit()

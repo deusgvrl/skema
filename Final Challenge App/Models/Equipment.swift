@@ -3,11 +3,23 @@ import SwiftData
 import Foundation
 import CoreGraphics
 
-/// One item in a setup: light, modifier, reflector or camera. Fields are added with A10-7 and A10-11.
+/// Specific icon variations available when `category == .accessory`
+enum AccessoryType: String, Codable, CaseIterable, Identifiable {
+    case reflector = "Reflector"
+    case backdrop = "Backdrop"
+    case diffuser = "Diffuser"
+
+    var id: String { rawValue }
+
+    var title: String { rawValue }
+}
+
+/// One item in a setup: light, modifier, reflector or camera.
 @Model
 final class Equipment {
     @Attribute(.unique) var id: UUID
     var category: EquipmentCategory
+    var accessoryType: AccessoryType
 
     var label: String
     var name: String
@@ -52,14 +64,31 @@ final class Equipment {
     var setup: Setup?
 
     init(
-        id: UUID = UUID(), category: EquipmentCategory = .light, label: String = "", name: String = "",
-        role: String = "", position: CGPoint = .zero, power: String = "", colorTemp: String = "",
-        lens: String = "", iso: String = "", aperture: String = "", shutterSpeed: String = "",
-        whiteBalance: String = "", height: String = "", tilt: String = "", horizontalAim: String = "",
-        distance: String = "", rotationAngle: Double = 0.0, accessories: String = "", notes: String = ""
+        id: UUID = UUID(),
+        category: EquipmentCategory = .light,
+        accessoryType: AccessoryType = .reflector,
+        label: String = "",
+        name: String = "",
+        role: String = "",
+        position: CGPoint = .zero,
+        power: String = "",
+        colorTemp: String = "",
+        lens: String = "",
+        iso: String = "",
+        aperture: String = "",
+        shutterSpeed: String = "",
+        whiteBalance: String = "",
+        height: String = "",
+        tilt: String = "",
+        horizontalAim: String = "",
+        distance: String = "",
+        rotationAngle: Double = 0.0,
+        accessories: String = "",
+        notes: String = ""
     ) {
         self.id = id
         self.category = category
+        self.accessoryType = accessoryType
         self.label = label
         self.name = name
         self.role = role
@@ -84,6 +113,16 @@ final class Equipment {
 
 extension Equipment {
     static let pointsPerMeter: Double = 100.0
+
+    /// Resolves image asset name for this equipment instance based on state and selection
+    func imageName(isSelected: Bool) -> String {
+        category.imageName(isSelected: isSelected, accessoryType: accessoryType)
+    }
+
+    /// Resolves PDF icon asset name for this equipment instance
+    var pdfImageName: String {
+        category.pdfImageName(accessoryType: accessoryType)
+    }
 
     /// Updates `distance` string as a clean number (e.g. "2.50") from (positionX, positionY)
     func syncDistanceFromPosition() {
@@ -141,6 +180,7 @@ extension Equipment {
         Equipment(
             id: self.id,
             category: self.category,
+            accessoryType: self.accessoryType,
             label: self.label,
             name: self.name,
             role: self.role,
@@ -164,6 +204,7 @@ extension Equipment {
 
     func restoreValues(from snapshot: Equipment) {
         self.category = snapshot.category
+        self.accessoryType = snapshot.accessoryType
         self.label = snapshot.label
         self.name = snapshot.name
         self.role = snapshot.role
@@ -195,13 +236,13 @@ extension Equipment {
         // In screen coordinates (+Y is down), adding 90° aligns front pointer with target vector
         var targetAngle = (atan2(deltaY, deltaX) * 180.0 / .pi) + 90.0
 
-            // Normalize angle to [0, 360) range
-            targetAngle = targetAngle.truncatingRemainder(dividingBy: 360.0)
-            if targetAngle < 0 { targetAngle += 360.0 }
+        // Normalize angle to [0, 360) range
+        targetAngle = targetAngle.truncatingRemainder(dividingBy: 360.0)
+        if targetAngle < 0 { targetAngle += 360.0 }
 
-            self.rotationAngle = targetAngle
-            self.syncHorizontalAimFromRotation()
-        }
+        self.rotationAngle = targetAngle
+        self.syncHorizontalAimFromRotation()
+    }
 }
 
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
@@ -223,36 +264,53 @@ enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
 
 extension EquipmentCategory {
 
-    /// Resolves the exact image asset name based on selection state
-    func imageName(isSelected: Bool) -> String {
+    /// Resolves the exact image asset name based on selection state and accessory type
+    func imageName(isSelected: Bool, accessoryType: AccessoryType = .reflector) -> String {
         switch self {
         case .camera:
             return isSelected ? "icon_camera_selected" : "icon_camera_viewonly"
         case .light:
             return isSelected ? "icon_light_selected" : "icon_light_viewonly"
         case .accessory:
-            return isSelected ? "icon_acc_selected" : "icon_acc_viewonly"
+            switch accessoryType {
+            case .backdrop:
+                return isSelected ? "icon_backdrop_selected" : "icon_backdrop_viewonly"
+            case .reflector:
+                return isSelected ? "icon_reflector_selected" : "icon_reflector_viewonly"
+            case .diffuser:
+                return isSelected ? "icon_diffuser_selected" : "icon_diffuser_viewonly"
+            }
         }
     }
 
     /// The black icon drawn in the PDF's diagram.
-    var pdfImageName: String {
+    func pdfImageName(accessoryType: AccessoryType = .reflector) -> String {
         switch self {
-        case .camera: "icon_camera_pdf"
-        case .light: "icon_light_pdf"
-        case .accessory: "icon_acc_pdf"
+        case .camera:
+            return "icon_camera_pdf"
+        case .light:
+            return "icon_light_pdf"
+        case .accessory:
+            switch accessoryType {
+            case .backdrop:
+                return "icon_backdrop_pdf"
+            case .reflector:
+                return "icon_reflector_pdf"
+            case .diffuser:
+                return "icon_diffuser_pdf"
+            }
         }
     }
 
     /// Controls specific width/height dimensions for each category
     var iconSize: CGSize {
-            switch self {
-            case .camera:
-                return CGSize(width: 80, height: 80)
-            case .light:
-                return CGSize(width: 80, height: 80)
-            case .accessory:
-                return CGSize(width: 80, height: 80) // Can adjust width/height per category if needed
-            }
+        switch self {
+        case .camera:
+            return CGSize(width: 80, height: 80)
+        case .light:
+            return CGSize(width: 80, height: 80)
+        case .accessory:
+            return CGSize(width: 80, height: 80)
         }
+    }
 }
