@@ -18,7 +18,7 @@ struct ScanView: View {
     @State private var viewModel: ScanViewModel
     @State private var reviewViewModel: ReviewViewModel?
     @State private var showsLeaveAlert = false
-    /// Apple's coaching screen (`RoomScanView`) is showing: our instruction steps aside.
+    /// Apple's coaching screen (on `MetalScanView`) is showing: our instruction steps aside.
     @State private var isCoaching = false
     var onDismissToSetups: (() -> Void)?
 
@@ -129,7 +129,9 @@ struct ScanView: View {
 
     /// The camera: our own Metal view (A10-121). It draws the picture and the outlines.
     private func cameraView(session: ARSession) -> some View {
-        MetalScanView(session: session, outlines: viewModel.outlineBoxes)
+        MetalScanView(session: session, outlines: viewModel.outlineBoxes, onCoachingChange: { coaching in
+            withAnimation { isCoaching = coaching }
+        })
     }
 
     private var usesCameraAppearance: Bool {

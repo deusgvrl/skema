@@ -141,4 +141,77 @@ struct MetalScanViewTests {
         #expect(layer.drawableSize == CGSize(width: 390 * nativeScale, height: 844 * nativeScale))
         #expect(view.inbox.snapshot().viewSize == CGSize(width: 390, height: 844))
     }
+
+    // MARK: - Apple's coaching screen on the Metal view (Richie's design from RoomScanView)
+
+    @Test("CO1: the Metal view holds Apple's coaching view, on top, with the session, the goal and auto-activation",
+          .enabled(if: MTLCreateSystemDefaultDevice() != nil,
+                    "No Metal device here: the Metal view tests are skipped."))
+    func metalViewHoldsTheCoachingView() throws {
+        let session = ARSession()
+
+        let view = try #require(MetalScanView.makeMetalView(session: session))
+
+        let coaching = try #require(view.subviews.compactMap { $0 as? ARCoachingOverlayView }.first,
+                                    "The Metal view has no coaching view")
+        #expect(view.subviews.last === coaching)
+        // The simulator's ARCoachingOverlayView does not keep `session` and `goal` (see R7).
+        #if !targetEnvironment(simulator)
+        #expect(coaching.session === session)
+        #expect(coaching.goal == .horizontalPlane)
+        #endif
+        #expect(coaching.activatesAutomatically)
+        #expect(coaching.autoresizingMask == [.flexibleWidth, .flexibleHeight])
+        // It grows with the Metal view.
+        view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        view.layoutIfNeeded()
+        #expect(coaching.frame == view.bounds)
+    }
+
+    @Test("CO2: the coaching view reports to the delegate that the Metal view was given",
+          .enabled(if: MTLCreateSystemDefaultDevice() != nil,
+                    "No Metal device here: the Metal view tests are skipped."))
+    func coachingViewHasTheGivenDelegate() throws {
+        let coordinator = MetalScanView.Coordinator()
+
+        let view = try #require(MetalScanView.makeMetalView(session: ARSession(), coachingDelegate: coordinator))
+
+        let coaching = try #require(view.subviews.compactMap { $0 as? ARCoachingOverlayView }.first)
+        #expect(coaching.delegate === coordinator)
+    }
+
+    @Test("CO2: when the coaching screen starts to show the view sends true; when it goes away, false")
+    func coachingChangesAreSent() {
+        let coordinator = MetalScanView.Coordinator()
+        var sent: [Bool] = []
+        coordinator.onCoachingChange = { sent.append($0) }
+        let coaching = ARCoachingOverlayView()
+
+        coordinator.coachingOverlayViewWillActivate(coaching)
+        #expect(sent == [true])
+
+        coordinator.coachingOverlayViewDidDeactivate(coaching)
+        #expect(sent == [true, false])
+    }
+
+    // On the simulator the coaching view does not keep the session (see R7), so G1 proves the most on a device.
+    @Test("G1: with the coaching view in the Metal view, ScanSession is still the ARKit session's delegate",
+          .enabled(if: MTLCreateSystemDefaultDevice() != nil,
+                    "No Metal device here: the Metal view tests are skipped."))
+    func scanSessionStaysTheDelegate() throws {
+        let arSession = ARSession()
+        let scan = ScanSession(session: arSession, frameInterval: 1.0 / 15.0, supportsLiDAR: { true })
+        #expect(arSession.delegate === scan)
+        let view = try #require(MetalScanView.makeMetalView(session: arSession,
+                                                            coachingDelegate: MetalScanView.Coordinator()))
+        try #require(view.subviews.contains { $0 is ARCoachingOverlayView }, "The Metal view has no coaching view")
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first,
+                                 "No window scene in the test host")
+        let window = UIWindow(windowScene: scene)
+        window.addSubview(view)
+        defer { view.removeFromSuperview() }
+
+        #expect(arSession.delegate === scan)
+        withExtendedLifetime(scan) {}
+    }
 }

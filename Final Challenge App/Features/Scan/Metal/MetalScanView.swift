@@ -22,9 +22,15 @@ struct MetalScanView: UIViewRepresentable {
     let session: ARSession
     /// The world box of each tapped item, drawn as a 3D dashed box.
     var outlines: [UUID: WorldBox] = [:]
+    /// Apple's coaching screen showed (true) or went away (false): the scan's own instruction steps aside meanwhile.
+    var onCoachingChange: (Bool) -> Void = { _ in }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCoachingChange: onCoachingChange)
+    }
 
     func makeUIView(context: Context) -> UIView {
-        guard let view = Self.makeMetalView(session: session) else {
+        guard let view = Self.makeMetalView(session: session, coachingDelegate: context.coordinator) else {
             // No Metal device or no renderer: an empty view keeps the screen alive (LiDAR iPhones always have Metal,
             // so this should not happen).
             log.error("Metal scan view: Metal setup failed, showing an empty view")
@@ -34,27 +40,34 @@ struct MetalScanView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: UIView, context: Context) {
+        context.coordinator.onCoachingChange = onCoachingChange
         // The render thread reads them at the start of its next frame.
         (view as? ScanMetalLayerView)?.inbox.setOutlines(outlines)
     }
 
     /// The view the renderer draws into, or nil when there is no Metal device or the renderer cannot be made. The
     /// format matches the renderer's pipelines. No depth buffer: the outline pass does its own depth test (LiDAR).
-    static func makeMetalView(session: ARSession) -> ScanMetalLayerView? {
+    /// Apple's coaching view sits on top of it and reports to `coachingDelegate`.
+    static func makeMetalView(session: ARSession,
+                              coachingDelegate: (any ARCoachingOverlayViewDelegate)? = nil) -> ScanMetalLayerView? {
         guard let device = MTLCreateSystemDefaultDevice() else {
             log.error("Metal scan view: no Metal device")
             return nil
         }
         let inbox = OutlineInbox()
         guard let renderer = ScanMetalRenderer(device: device, session: session, inbox: inbox) else { return nil }
-        return ScanMetalLayerView(device: device, renderer: renderer)
+        let view = ScanMetalLayerView(device: device, renderer: renderer)
+        let coaching = makeCoachingView(session: session, in: view.bounds)
+        coaching.delegate = coachingDelegate
+        view.addSubview(coaching)
+        return view
     }
 
     /// What the coaching view helps to find. The scan needs a floor (a horizontal plane).
     static let coachingGoal: ARCoachingOverlayView.Goal = .horizontalPlane
 
-    /// The coaching view on the scan's session: it asks the person to find a flat surface when tracking needs it.
-    /// The settings are the same as the scan-instruction branch.
+    /// Apple's coaching screen, Richie's design from `RoomScanView`: it asks the person to find a flat surface when
+    /// tracking needs it.
     static func makeCoachingView(session: ARSession, in bounds: CGRect) -> ARCoachingOverlayView {
         let view = ARCoachingOverlayView(frame: bounds)
         view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -62,6 +75,26 @@ struct MetalScanView: UIViewRepresentable {
         view.goal = coachingGoal
         view.activatesAutomatically = true
         return view
+    }
+}
+
+extension MetalScanView {
+    /// The coaching view's delegate: it passes "showing" and "gone" on to the closure. (The view's `delegate` is
+    /// weak, so SwiftUI keeps this object.)
+    final class Coordinator: NSObject, ARCoachingOverlayViewDelegate {
+        var onCoachingChange: (Bool) -> Void
+
+        init(onCoachingChange: @escaping (Bool) -> Void = { _ in }) {
+            self.onCoachingChange = onCoachingChange
+        }
+
+        func coachingOverlayViewWillActivate(_ coachingOverlayView: ARCoachingOverlayView) {
+            onCoachingChange(true)
+        }
+
+        func coachingOverlayViewDidDeactivate(_ coachingOverlayView: ARCoachingOverlayView) {
+            onCoachingChange(false)
+        }
     }
 }
 
