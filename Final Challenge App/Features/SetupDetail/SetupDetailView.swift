@@ -175,7 +175,6 @@ private extension SetupDetailView {
             onEmptyTap: { handleEmptyTap() },
             onNodeDragStart: { node in handleNodeDragStart(node) }
         )
-        .ignoresSafeArea(edges: .bottom)
     }
 
     var unifiedSheetBinding: Binding<Bool> {
