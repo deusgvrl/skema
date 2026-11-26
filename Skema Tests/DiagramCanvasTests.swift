@@ -1,5 +1,6 @@
 import Testing
 import CoreGraphics
+import Foundation
 @testable import Skema_Photo
 
 /// Where the PDF diagram draws the subject, each item and its name inside the PDF's box (26 Nov):
@@ -68,12 +69,137 @@ struct PDFDiagramLayoutTests {
         #expect(layout.isBroken == [false, false, false])
     }
 
-    @Test("A name that would touch the item below it moves above; a name with room stays below")
-    func nameNudged() {
-        let points = [CGPoint(x: 100, y: 100), CGPoint(x: 100, y: 145), CGPoint(x: 400, y: 400)]
+    // MARK: Nothing overlaps, accessories included (27 Nov)
 
-        let sides = PDFDiagramLayout.nameSides(points: points, names: names(3), subject: CGPoint(x: 250, y: 250))
+    /// One item of a test setup: its kind, name and position (diagram points from the subject).
+    @MainActor
+    private struct Spec {
+        let category: EquipmentCategory
+        var accessoryType: AccessoryType = .reflector
+        let name: String
+        let posX: CGFloat
+        let posY: CGFloat
 
-        #expect(sides == [.above, .below, .below])
+        static func light(_ name: String, _ posX: CGFloat, _ posY: CGFloat) -> Spec {
+            Spec(category: .light, name: name, posX: posX, posY: posY)
+        }
+
+        static func camera(_ posX: CGFloat, _ posY: CGFloat) -> Spec {
+            Spec(category: .camera, name: "Camera", posX: posX, posY: posY)
+        }
+
+        static func accessory(_ type: AccessoryType, _ posX: CGFloat, _ posY: CGFloat) -> Spec {
+            Spec(category: .accessory, accessoryType: type, name: type.title, posX: posX, posY: posY)
+        }
+    }
+
+    /// Items as the PDF draws them: each icon's real shape, turned to face the subject, and its distance label.
+    private func items(_ specs: [Spec]) -> [PDFDiagramLayout.Item] {
+        specs.map { spec in
+            let item = Equipment(category: spec.category, accessoryType: spec.accessoryType, name: spec.name,
+                                 position: CGPoint(x: spec.posX, y: spec.posY))
+            item.pointToSubject()
+            let footprint = PDFDiagramLayout.footprint(of: spec.category, accessoryType: spec.accessoryType)
+            return PDFDiagramLayout.Item(position: item.position, name: spec.name, footprint: footprint,
+                                         rotation: item.rotationAngle,
+                                         distanceText: String(format: "%.2f m", hypot(spec.posX, spec.posY) / 100))
+        }
+    }
+
+    /// The render that showed the overlaps: a diffuser in front of the key light, a reflector by the subject,
+    /// a backdrop behind it.
+    private var studio: [Spec] {
+        [.camera(0, 250), .light("Key light", -180, -120), .accessory(.diffuser, -120, -80),
+         .light("Fill light", 200, -100), .accessory(.reflector, 70, 40), .accessory(.backdrop, 0, -150),
+         .light("Rim light", 120, -220)]
+    }
+
+    private func subjectRect(_ layout: PDFDiagramLayout.Result) -> CGRect {
+        let size = PDFDiagramLayout.subjectSize
+        return CGRect(x: layout.subject.x - size.width / 2, y: layout.subject.y - size.height / 2,
+                      width: size.width, height: size.height)
+    }
+
+    /// Index pairs that overlap, for a readable failure.
+    private func touching(_ rects: [CGRect]) -> [[Int]] {
+        rects.indices.flatMap { first in
+            rects.indices.filter { $0 > first && rects[first].intersects(rects[$0]) }.map { [first, $0] }
+        }
+    }
+
+    @Test("A diffuser turned 90° takes 7 pt across and 46 pt along")
+    func turnedFootprint() {
+        let size = PDFDiagramLayout.rotatedSize(PDFDiagramLayout.footprint(of: .accessory, accessoryType: .diffuser),
+                                                degrees: 90)
+
+        #expect(abs(size.width - 7) < 0.01 && abs(size.height - 46) < 0.01)
+    }
+
+    @Test("No icon touches another icon or the subject, in the studio and with a diffuser 0.3 m in front of a light")
+    func iconsApart() {
+        let diffuserInFront: [Spec] = [.light("Key light", 0, -250), .accessory(.diffuser, 0, -220), .camera(0, 250)]
+        for specs in [studio, diffuserInFront] {
+            let layout = PDFDiagramLayout.make(items: items(specs), in: box)
+
+            #expect(touching(layout.iconRects).isEmpty)
+            #expect(!layout.iconRects.contains { $0.intersects(subjectRect(layout)) })
+        }
+    }
+
+    @Test("No distance label touches another label, an icon, a name or the subject")
+    func distancesClear() throws {
+        let layout = PDFDiagramLayout.make(items: items(studio), in: box)
+        let labels = layout.distanceRects.compactMap { $0 }
+
+        #expect(labels.count == studio.count)
+        #expect(touching(labels).isEmpty)
+        for label in labels {
+            let others = layout.iconRects + layout.nameRects + [subjectRect(layout)]
+            #expect(!others.contains { $0.intersects(label) })
+        }
+    }
+
+    @Test("A name goes on the side facing away from the subject")
+    func nameOutward() {
+        let positions = [CGPoint(x: 0, y: -200), CGPoint(x: 0, y: 200), CGPoint(x: 220, y: 0)]
+
+        let layout = PDFDiagramLayout.make(positions: positions, names: names(3), in: box)
+
+        #expect(layout.nameSides == [.above, .below, .right])
+    }
+
+    @Test("The backdrop's name crosses no line from the subject")
+    func backdropNameClearOfLines() throws {
+        let layout = PDFDiagramLayout.make(items: items(studio), in: box)
+        let backdrop = try #require(studio.firstIndex { $0.name == "Backdrop" })
+
+        #expect(!layout.points.contains { point in
+            PDFDiagramLayout.segment(from: layout.subject, to: point, crosses: layout.nameRects[backdrop])
+        })
+    }
+
+    @Test("A name moves off another item's line, even from its outward side")
+    func nameClearOfAnotherLine() throws {
+        // The rim light's line passes just above the backdrop, where its name would go.
+        let specs: [Spec] = [.accessory(.backdrop, 0, -150), .light("Rim light", 40, -300), .camera(0, 250)]
+
+        let layout = PDFDiagramLayout.make(items: items(specs), in: box)
+
+        #expect(!layout.points.contains { point in
+            PDFDiagramLayout.segment(from: layout.subject, to: point, crosses: layout.nameRects[0])
+        })
+    }
+
+    @Test("Names and distance labels stay inside the box")
+    func labelsInsideBox() {
+        let oneSided: [Spec] = [.camera(0, 260), .light("Light 1", -170, 120), .light("Light 2", 170, 130),
+                                .accessory(.reflector, -90, 230)]
+        let bounds = CGRect(origin: .zero, size: box)
+        for specs in [oneSided, studio] {
+            let layout = PDFDiagramLayout.make(items: items(specs), in: box)
+
+            #expect(layout.nameRects.allSatisfy { bounds.contains($0) })
+            #expect(layout.distanceRects.compactMap { $0 }.allSatisfy { bounds.contains($0) })
+        }
     }
 }

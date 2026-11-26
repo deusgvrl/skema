@@ -23,8 +23,7 @@ struct PDFDiagramView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let layout = PDFDiagramLayout.make(positions: nodes.map(\.position),
-                                               names: nodes.map(\.labelName), in: geometry.size)
+            let layout = PDFDiagramLayout.make(items: nodes.map(\.layoutItem), in: geometry.size)
             ZStack {
                 Color.white
 
@@ -37,11 +36,12 @@ struct PDFDiagramView: View {
                 }
 
                 ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
-                    label(of: node, at: layout.points[index], side: layout.nameSides[index])
+                    label(of: node, in: layout.nameRects[index])
                 }
 
                 ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
-                    distanceLabel(for: node, at: layout.points[index], from: layout.subject)
+                    distanceLabel(for: node, in: layout.distanceRects[index], at: layout.points[index],
+                                  from: layout.subject)
                 }
             }
             .overlay(alignment: .bottomTrailing) { scaleBar(scale: layout.scale).padding(12) }
@@ -117,9 +117,8 @@ struct PDFDiagramView: View {
 
     // MARK: - Equipment Name
 
-    private func label(of node: Equipment, at point: CGPoint, side: PDFDiagramLayout.NameSide) -> some View {
-        let rect = PDFDiagramLayout.nameRect(for: node.labelName, at: point, side: side)
-        return Text(node.labelName)
+    private func label(of node: Equipment, in rect: CGRect) -> some View {
+        Text(node.labelName)
             .font(.system(size: 11, weight: .semibold))
             .lineLimit(1)
             .padding(.horizontal, 3)
@@ -130,18 +129,13 @@ struct PDFDiagramView: View {
 
     // MARK: - Inline Rotated Distance Label
 
+    /// The distance along the line, turned to read along it, in the free spot the layout found.
     @ViewBuilder
-    private func distanceLabel(for node: Equipment, at point: CGPoint, from centre: CGPoint) -> some View {
-        let posX = point.x - centre.x
-        let posY = point.y - centre.y
-
-        if posX != 0 || posY != 0,
-           let labelPos = calculateDistanceLabelPosition(posX: posX, posY: posY, centre: centre) {
-            let metres = hypot(node.position.x, node.position.y) / Equipment.pointsPerMeter
-            let text = node.distance.isEmpty ? String(format: "%.2f", metres) : node.distance
-
+    private func distanceLabel(for node: Equipment, in rect: CGRect?, at point: CGPoint,
+                               from centre: CGPoint) -> some View {
+        if let rect {
             let angle: Double = {
-                var rawAngle = atan2(posY, posX) * 180 / .pi
+                var rawAngle = atan2(point.y - centre.y, point.x - centre.x) * 180 / .pi
                 if rawAngle > 90 {
                     rawAngle -= 180
                 } else if rawAngle < -90 {
@@ -150,7 +144,7 @@ struct PDFDiagramView: View {
                 return rawAngle
             }()
 
-            Text("\(text) m")
+            Text(node.distanceText)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Color.black.opacity(0.85))
                 .padding(.horizontal, 4)
@@ -165,28 +159,8 @@ struct PDFDiagramView: View {
                 )
                 .fixedSize()
                 .rotationEffect(.degrees(angle))
-                .position(labelPos)
+                .position(x: rect.midX, y: rect.midY)
         }
-    }
-
-    private func calculateDistanceLabelPosition(posX: CGFloat, posY: CGFloat, centre: CGPoint) -> CGPoint? {
-        let length = hypot(posX, posY)
-        guard length > 5 else { return nil }
-
-        let unitX = posX / length
-        let unitY = posY / length
-
-        let minSubjectClearance: CGFloat = (Self.subjectDiameter / 2) + 14
-        let minEquipmentClearance: CGFloat = 32
-
-        let startDist = minSubjectClearance
-        let endDist = max(startDist + 10, length - minEquipmentClearance)
-        let midDistance = (startDist + endDist) / 2
-
-        return CGPoint(
-            x: centre.x + unitX * midDistance,
-            y: centre.y + unitY * midDistance
-        )
     }
 
     // MARK: - Dynamic Scale Bar
@@ -248,120 +222,16 @@ struct PDFDiagramView: View {
 private extension Equipment {
     /// The name printed by the item; Name is required, so "Equipment" is only a fallback.
     var labelName: String { name.isEmpty ? "Equipment" : name }
-}
 
-/// Where the PDF diagram draws the subject, each item and its name inside the PDF's box (26 Nov).
-/// - The usual items, with the subject, fill the box (less `padding` for icons and names), wherever they sit
-///   around the subject.
-/// - An item more than `farFactor` times the median distance away is drawn `farGap` beyond the others, in its own
-///   direction, and marked as broken (its line gets a break mark; its label keeps the real distance).
-/// - Each name goes below its icon unless that would touch another icon, the subject or a name; then above, right
-///   or left, whichever is free first.
-enum PDFDiagramLayout {
-    enum NameSide: Equatable { case below, above, right, left }
-
-    struct Result {
-        /// Diagram points per position point, for the scale bar.
-        let scale: CGFloat
-        /// The subject's centre in the box.
-        let subject: CGPoint
-        /// Each item's centre in the box, in the order given.
-        let points: [CGPoint]
-        /// Drawn closer than it really is.
-        let isBroken: [Bool]
-        let nameSides: [NameSide]
+    /// "2.16 m": the distance typed or scanned, else measured from the diagram.
+    var distanceText: String {
+        let metres = hypot(position.x, position.y) / Equipment.pointsPerMeter
+        return "\(distance.isEmpty ? String(format: "%.2f", metres) : distance) m"
     }
 
-    /// Room kept at the box's edges for an icon and its name.
-    static let padding: CGFloat = 70
-    static let farFactor: CGFloat = 2.5
-    static let farGap: CGFloat = 70
-    /// Never blow a tiny setup up more than this.
-    static let maxScale: CGFloat = 5
-
-    private static let iconHalf: CGFloat = 25
-    private static let subjectHalf: CGFloat = 26
-    private static let nameGap: CGFloat = 28
-    private static let nameHeight: CGFloat = 15
-
-    /// - Parameter positions: each item's position relative to the subject, in diagram points (100 per metre).
-    static func make(positions: [CGPoint], names: [String], in box: CGSize) -> Result {
-        let lengths = positions.map { hypot($0.x, $0.y) }
-        let sorted = lengths.filter { $0 > 0 }.sorted()
-        let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
-        let isFar = lengths.map { median > 0 && $0 > farFactor * median }
-        let usual = [CGPoint.zero] + positions.indices.filter { !isFar[$0] }.map { positions[$0] }
-        var scale = min(maxScale,
-                        (box.width - 2 * padding) / max(span(usual.map(\.x)), 1),
-                        (box.height - 2 * padding) / max(span(usual.map(\.y)), 1))
-        let fits = { (scale: CGFloat) -> Bool in
-            let all = [CGPoint.zero] + drawnOffsets(positions, lengths: lengths, isFar: isFar, scale: scale)
-            return span(all.map(\.x)) + 2 * padding <= box.width + 0.01
-                && span(all.map(\.y)) + 2 * padding <= box.height + 0.01
-        }
-        // A far item can push the drawing past the box: find the biggest scale that still fits.
-        if !fits(scale) {
-            var low: CGFloat = 0
-            var high = scale
-            for _ in 0..<40 {
-                let mid = (low + high) / 2
-                if fits(mid) { low = mid } else { high = mid }
-            }
-            scale = low
-        }
-        let offsets = drawnOffsets(positions, lengths: lengths, isFar: isFar, scale: scale)
-        let all = [CGPoint.zero] + offsets
-        let subject = CGPoint(x: box.width / 2 - middle(all.map(\.x)), y: box.height / 2 - middle(all.map(\.y)))
-        let points = offsets.map { CGPoint(x: subject.x + $0.x, y: subject.y + $0.y) }
-        return Result(scale: scale, subject: subject, points: points, isBroken: isFar,
-                      nameSides: nameSides(points: points, names: names, subject: subject))
+    var layoutItem: PDFDiagramLayout.Item {
+        PDFDiagramLayout.Item(position: position, name: labelName,
+                              footprint: PDFDiagramLayout.footprint(of: category, accessoryType: accessoryType),
+                              rotation: rotationAngle, distanceText: distanceText)
     }
-
-    /// Below first; otherwise the first side that touches no other icon, the subject or a name placed before it.
-    static func nameSides(points: [CGPoint], names: [String], subject: CGPoint) -> [NameSide] {
-        let icons = points.map { point in
-            CGRect(x: point.x - iconHalf, y: point.y - iconHalf, width: 2 * iconHalf, height: 2 * iconHalf)
-        }
-        let subjectRect = CGRect(x: subject.x - subjectHalf, y: subject.y - subjectHalf,
-                                 width: 2 * subjectHalf, height: 2 * subjectHalf)
-        var placed: [CGRect] = []
-        return points.indices.map { index in
-            let obstacles = icons.indices.filter { $0 != index }.map { icons[$0] } + [subjectRect] + placed
-            let side = [NameSide.below, .above, .right, .left].first { side in
-                let rect = nameRect(for: names[index], at: points[index], side: side)
-                return !obstacles.contains { $0.intersects(rect) }
-            } ?? .below
-            placed.append(nameRect(for: names[index], at: points[index], side: side))
-            return side
-        }
-    }
-
-    /// Where a name goes on a side of its icon, from an estimate of its size at 11 pt semibold.
-    static func nameRect(for name: String, at point: CGPoint, side: NameSide) -> CGRect {
-        let width = CGFloat(name.count) * 6.5 + 6
-        switch side {
-        case .below: return CGRect(x: point.x - width / 2, y: point.y + nameGap, width: width, height: nameHeight)
-        case .above:
-            return CGRect(x: point.x - width / 2, y: point.y - nameGap - nameHeight, width: width, height: nameHeight)
-        case .right:
-            return CGRect(x: point.x + iconHalf + 7, y: point.y - nameHeight / 2, width: width, height: nameHeight)
-        case .left:
-            return CGRect(x: point.x - iconHalf - 7 - width, y: point.y - nameHeight / 2,
-                          width: width, height: nameHeight)
-        }
-    }
-
-    private static func drawnOffsets(_ positions: [CGPoint], lengths: [CGFloat], isFar: [Bool],
-                                     scale: CGFloat) -> [CGPoint] {
-        let reach = positions.indices.filter { !isFar[$0] }.map { lengths[$0] * scale }.max() ?? 0
-        return positions.indices.map { index in
-            let position = positions[index]
-            guard isFar[index] else { return CGPoint(x: position.x * scale, y: position.y * scale) }
-            let drawn = reach + farGap
-            return CGPoint(x: position.x / lengths[index] * drawn, y: position.y / lengths[index] * drawn)
-        }
-    }
-
-    private static func span(_ values: [CGFloat]) -> CGFloat { (values.max() ?? 0) - (values.min() ?? 0) }
-    private static func middle(_ values: [CGFloat]) -> CGFloat { ((values.max() ?? 0) + (values.min() ?? 0)) / 2 }
 }
