@@ -204,15 +204,6 @@ extension Equipment {
         }
 }
 
-extension Equipment {
-    /// "L1 Key" (label + role), or the model name when there is no role (Sketch R04 labels and chips).
-    var displayName: String {
-        let role = role.trimmingCharacters(in: .whitespaces)
-        guard !role.isEmpty else { return name }
-        return label.isEmpty ? role : "\(role) - \(name)"
-    }
-}
-
 enum EquipmentCategory: String, Codable, CaseIterable, Identifiable {
     case camera = "Camera"
     case light = "Light"

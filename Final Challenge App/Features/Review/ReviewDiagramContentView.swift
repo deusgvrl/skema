@@ -118,7 +118,7 @@ private struct DiagramTipPill<TipType: Tip>: View {
 
 struct ReviewViewModeTip: Tip {
     var title: Text {
-        Text("Tap the equipment or subject to edit your diagram")
+        Text("Tap equipment or the subject to edit it.")
     }
 }
 
