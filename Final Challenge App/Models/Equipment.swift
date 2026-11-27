@@ -83,7 +83,8 @@ final class Equipment {
     ) {
         self.id = id
         self.category = category
-        self.accessoryTypeRaw = accessoryType.rawValue        self.label = label
+        self.accessoryTypeRaw = accessoryType.rawValue
+        self.label = label
         self.name = name
         self.role = role
         self.positionX = Double(position.x)
