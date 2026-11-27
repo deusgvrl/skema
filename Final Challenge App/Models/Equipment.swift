@@ -8,8 +8,14 @@ import CoreGraphics
 final class Equipment {
     @Attribute(.unique) var id: UUID
     var category: EquipmentCategory
-    var accessoryType: AccessoryType
+    var accessoryTypeRaw: String?   // stored, nil for old rows
 
+    @Transient
+    var accessoryType: AccessoryType {
+       get { accessoryTypeRaw.flatMap(AccessoryType.init(rawValue:)) ?? .reflector }
+       set { accessoryTypeRaw = newValue.rawValue }
+    }
+    
     var label: String
     var name: String
     var role: String
@@ -77,7 +83,7 @@ final class Equipment {
     ) {
         self.id = id
         self.category = category
-        self.accessoryType = accessoryType
+        self.accessoryTypeRaw = accessoryType.rawValue
         self.label = label
         self.name = name
         self.role = role
