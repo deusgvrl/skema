@@ -220,8 +220,8 @@ final class ScanViewModel {
         items.append(ScanItem(id: equipment.id, kind: kind, name: name, anchor: anchor))
         history.append(.item(equipment.id))
         draftSetup.nodes.append(equipment)
-        // A light is measured at the middle of its head; a camera keeps the top-point rule for now.
-        if kind == .light { measurements.setRule(.middle, for: equipment.id) }
+        // A light and a camera are measured at the middle of their head (27 Nov: the camera matches the light).
+        if kind == .light || kind == .camera { measurements.setRule(.middle, for: equipment.id) }
     }
 
     /// The light whose grown box holds `point`, if any.

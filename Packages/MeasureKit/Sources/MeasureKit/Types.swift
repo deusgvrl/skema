@@ -37,7 +37,8 @@ public struct CameraModel: Sendable {
 
 /// How the top centre of a piece of equipment is found.
 public enum CentreRule: Sendable {
-    /// The top centre is the highest part of the points (a thin slice under the top height). Cameras, for now.
+    /// The top centre is the highest part of the points (a thin slice under the top height). The default; since 27 Nov
+    /// the app gives lights and cameras `.middle`.
     case topPoint
     /// The top centre is the middle of the points in 3D: the centre of their extents, with a few stray points trimmed.
     /// A light: the middle of the head. Its base centre is that point straight down.

@@ -187,6 +187,21 @@ struct ScanTapTests {
         #expect(abs(light.position.x) < 4 && abs(light.position.y - 100) < 2)
     }
 
+    @Test("Finish writes the camera's height at the middle of its body, like a light")
+    func finishWritesTheCameraHeightAtItsMiddle() throws {
+        let viewModel = makeViewModel()
+        try tap(viewModel, .subject, metres: 3)
+        try tap(viewModel, .camera, metres: 2, walk: false)
+
+        viewModel.finishTapped()
+
+        let camera = try #require(viewModel.draftSetup.nodes.first { $0.category == .camera })
+        let height = try #require(Double(camera.height.replacingOccurrences(of: " m", with: "")))
+        // 27 Nov: the camera is painted within its 0.6 m reach around the tap, 1 m above the floor, so the middle of
+        // its dots is at the tap height. The old top-point rule read 1.47 m here, near the top of the dots.
+        #expect(abs(height - 1.0) < 0.05)
+    }
+
     @Test("Finish writes the subject's height above the floor onto the setup")
     func finishWritesTheSubjectHeight() throws {
         let viewModel = makeViewModel()

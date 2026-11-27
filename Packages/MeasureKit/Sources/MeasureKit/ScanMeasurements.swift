@@ -189,7 +189,7 @@ public struct ScanMeasurements: Sendable {
         measuredBoxes[id]
     }
 
-    /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light uses `.middle`.
+    /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light and a camera use `.middle`.
     public mutating func setRule(_ rule: CentreRule, for id: UUID) {
         rules[id] = rule
         cachedCentres[id] = nil
