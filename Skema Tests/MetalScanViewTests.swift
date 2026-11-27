@@ -21,7 +21,7 @@ import UIKit
 @Suite("Metal scan view")
 struct MetalScanViewTests {
     @Test("R7: the coaching view has the session, the horizontal plane goal and activates by itself")
-    func coachingViewSettings() {
+    func coachingViewSettings() async {
         let session = ARSession()
         let bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
 
@@ -32,7 +32,7 @@ struct MetalScanViewTests {
         // these two are checked on a device only.
         #if !targetEnvironment(simulator)
         #expect(view.session === session)
-        #expect(view.goal == .horizontalPlane)
+        #expect(await goalWhileFindingFloors(view, session: session) == .horizontalPlane)
         #endif
         #expect(view.activatesAutomatically)
         #expect(view.frame == bounds)
@@ -147,7 +147,7 @@ struct MetalScanViewTests {
     @Test("CO1: the Metal view holds Apple's coaching view, on top, with the session, the goal and auto-activation",
           .enabled(if: MTLCreateSystemDefaultDevice() != nil,
                     "No Metal device here: the Metal view tests are skipped."))
-    func metalViewHoldsTheCoachingView() throws {
+    func metalViewHoldsTheCoachingView() async throws {
         let session = ARSession()
 
         let view = try #require(MetalScanView.makeMetalView(session: session))
@@ -158,7 +158,7 @@ struct MetalScanViewTests {
         // The simulator's ARCoachingOverlayView does not keep `session` and `goal` (see R7).
         #if !targetEnvironment(simulator)
         #expect(coaching.session === session)
-        #expect(coaching.goal == .horizontalPlane)
+        #expect(await goalWhileFindingFloors(coaching, session: session) == .horizontalPlane)
         #endif
         #expect(coaching.activatesAutomatically)
         #expect(coaching.autoresizingMask == [.flexibleWidth, .flexibleHeight])
@@ -214,4 +214,21 @@ struct MetalScanViewTests {
         #expect(arSession.delegate === scan)
         withExtendedLifetime(scan) {}
     }
+}
+
+/// The goal `view` shows once `session` runs as the scan does, looking for floors. On an iPhone (16 Pro Max, 27 Nov)
+/// the coaching view keeps the goal it is given but reads it back as `.tracking` until its session runs with that kind
+/// of plane detection, which takes a moment after `run`. Waits up to 3 s for the scan's goal, then stops the session.
+@MainActor
+private func goalWhileFindingFloors(_ view: ARCoachingOverlayView,
+                                    session: ARSession) async -> ARCoachingOverlayView.Goal {
+    let configuration = ARWorldTrackingConfiguration()
+    configuration.planeDetection = [.horizontal]
+    session.run(configuration)
+    defer { session.pause() }
+    let deadline = ContinuousClock.now + .seconds(3)
+    while view.goal != MetalScanView.coachingGoal, ContinuousClock.now < deadline {
+        try? await Task.sleep(for: .milliseconds(100))
+    }
+    return view.goal
 }
