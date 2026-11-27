@@ -18,16 +18,20 @@ public struct WorldBox: Equatable, Sendable {
         self.max = max
     }
 
-    /// Cases D24–D26: per axis from the 2nd to the 98th percentile of the points;
+    /// The trim for a scanned item's box (27 Nov): its points are already cleaned by `DepthGrouping.itemPoints`, and
+    /// over a whole scan 2% would cut off the thinly seen far end of a slanted item.
+    public static let itemTrim: Float = 1
+
+    /// Cases D24–D26: per axis from the `trim` to the (100 - `trim`) percentile of the points (2 and 98 by default);
     /// a side shorter than `minSide` is widened to it, centred on the same middle. Nil for no points.
-    public static func around(_ points: [SIMD3<Float>]) -> WorldBox? {
+    public static func around(_ points: [SIMD3<Float>], trim: Float = lowPercentile) -> WorldBox? {
         guard !points.isEmpty else { return nil }
         var low = SIMD3<Float>.zero
         var high = SIMD3<Float>.zero
         for axis in 0..<3 {
             let values = points.map { $0[axis] }.sorted()
-            low[axis] = percentile(of: values, lowPercentile)
-            high[axis] = percentile(of: values, highPercentile)
+            low[axis] = percentile(of: values, trim)
+            high[axis] = percentile(of: values, 100 - trim)
             if high[axis] - low[axis] < minSide {
                 let middle = (low[axis] + high[axis]) / 2
                 low[axis] = middle - minSide / 2
@@ -35,11 +39,6 @@ public struct WorldBox: Equatable, Sendable {
             }
         }
         return WorldBox(min: low, max: high)
-    }
-
-    /// Both boxes grown to hold each other (min of the mins, max of the maxes). Case D28.
-    public func union(_ other: WorldBox) -> WorldBox {
-        WorldBox(min: simd_min(min, other.min), max: simd_max(max, other.max))
     }
 
     /// True when `point` is inside the box or on its surface.

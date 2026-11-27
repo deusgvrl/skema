@@ -19,15 +19,21 @@ nonisolated final class OutlineInbox: Sendable {
     struct Snapshot: Sendable {
         /// The world box of each item to outline, by item id.
         var outlines: [UUID: WorldBox] = [:]
+        /// The ids in `outlines` whose item is done (drawn green; the others white).
+        var done: Set<UUID> = []
         /// The view size in points (the line thickness is in points).
         var viewSize: CGSize = .zero
     }
 
     private let data = Mutex(Snapshot())
 
-    /// Replaces the outlines. Called on the main thread.
-    func setOutlines(_ outlines: [UUID: WorldBox]) {
-        data.withLock { $0.outlines = outlines }
+    /// Replaces the outlines and which of them are done, together, so a frame never mixes new boxes with old
+    /// colours. Called on the main thread.
+    func setOutlines(_ outlines: [UUID: WorldBox], done: Set<UUID>) {
+        data.withLock {
+            $0.outlines = outlines
+            $0.done = done
+        }
     }
 
     /// Replaces the view size in points. Called on the main thread.

@@ -19,7 +19,8 @@ import simd
 nonisolated private let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Skema", category: "MetalScan")
 
 /// The display link delegate of the Metal scan view. Each frame reads `session.currentFrame` and encodes one render
-/// pass: the camera quad first, then the outlines (green #30D158, `OutlineLayout.opacity`, blended over the picture).
+/// pass: the camera quad first, then the outlines (white while the item is scanned, green #30D158 once it is done, at
+/// `OutlineLayout.opacity`, blended over the picture).
 ///
 /// It is used on the render thread only (A10-121, step 4): the display link calls it there, and its GPU buffers and
 /// texture cache are never touched from another thread. The main thread talks to it through the `OutlineInbox`.
@@ -30,6 +31,13 @@ nonisolated final class ScanMetalRenderer: NSObject, CAMetalDisplayLinkDelegate 
     /// The boxes to outline, by item id. Each frame it takes the inbox's newest ones. On the next draw, the GPU
     /// buffers follow the ones in view (`visibleOutlines`).
     var outlines: [UUID: WorldBox] = [:]
+    /// The ids in `outlines` whose item is done, drawn in `doneColor`; the others in `scanningColor`.
+    var doneOutlines: Set<UUID> = []
+
+    /// A done item's outline: the app's captured green (#30D158), the same as `ScanPalette.green`.
+    static let doneColor = SIMD4<Float>(0.188, 0.820, 0.345, OutlineLayout.opacity)
+    /// The outline of an item still being scanned: white.
+    static let scanningColor = SIMD4<Float>(1, 1, 1, OutlineLayout.opacity)
 
     /// Where the main thread puts the newest outlines and the view size.
     let inbox: OutlineInbox
@@ -98,8 +106,8 @@ nonisolated final class ScanMetalRenderer: NSObject, CAMetalDisplayLinkDelegate 
             minConfidence: UInt32(OcclusionRule.minConfidence),
             maxRange: OcclusionRule.maxRange,
             hasDepth: hasDepth ? 1 : 0,
-            // The app's captured green (#30D158): keep it the same as `ScanPalette.green`.
-            lineColor: SIMD4(0.188, 0.820, 0.345, OutlineLayout.opacity)
+            // Each box sets its own colour when it is drawn (`encode`).
+            lineColor: doneColor
         )
     }
 
@@ -119,6 +127,7 @@ nonisolated final class ScanMetalRenderer: NSObject, CAMetalDisplayLinkDelegate 
     private func draw(into drawable: any CAMetalDrawable) {
         let latest = inbox.snapshot()
         outlines = latest.outlines
+        doneOutlines = latest.done
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear
@@ -186,10 +195,11 @@ nonisolated final class ScanMetalRenderer: NSObject, CAMetalDisplayLinkDelegate 
         encoder.setFrontFacing(.counterClockwise)
         encoder.setCullMode(.back)
         encoder.setVertexBytes(&uniforms, length: uniformsLength, index: 1)
-        encoder.setFragmentBytes(&uniforms, length: uniformsLength, index: 0)
         encoder.setFragmentTexture(sceneDepth?.depth ?? placeholderDepth, index: 0)
         encoder.setFragmentTexture(sceneDepth?.confidence ?? placeholderConfidence, index: 1)
-        for entry in outlineBuffers.entries.values {
+        for (id, entry) in outlineBuffers.entries {
+            uniforms.lineColor = doneOutlines.contains(id) ? Self.doneColor : Self.scanningColor
+            encoder.setFragmentBytes(&uniforms, length: uniformsLength, index: 0)
             encoder.setVertexBuffer(entry.vertexBuffer, offset: 0, index: 0)
             encoder.drawIndexedPrimitives(type: .triangle, indexCount: entry.indexCount, indexType: .uint32,
                                           indexBuffer: entry.indexBuffer, indexBufferOffset: 0)

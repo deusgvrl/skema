@@ -54,7 +54,7 @@ final class ScanViewModel {
     /// How far around each tapped item, and the subject (`subjectID`), the phone has seen it (phase 3: an item is done
     /// once seen from two spots 45° apart). `ScanViewModel+Progress.swift` reads it.
     private(set) var viewSpreads: [UUID: ViewSpread] = [:]
-    /// Each item's collected points, as a world box, for its green outline.
+    /// Each item's collected points, as a world box, for its outline (white while scanned, green when done).
     private(set) var itemBounds: [UUID: WorldBox] = [:]
     /// The subject's collected points, as a world box.
     private(set) var subjectBounds: WorldBox?
@@ -84,11 +84,6 @@ final class ScanViewModel {
     @ObservationIgnored private var lastCollect: Double?
     @ObservationIgnored private var guidanceHold = GuidanceHold()
 
-    /// The painted column (the A10-41 debug screen's rule): 10 cm around the tapped axis, from 3 cm above the floor
-    /// up to 3 m above it.
-    static let columnRadius: Float = 0.10
-    static let columnFloorGap: Float = 0.03
-    static let columnHeight: Float = 3.0
     /// Five frames a second are plenty for items that do not move.
     static let collectInterval: Double = 0.2
 
@@ -225,8 +220,8 @@ final class ScanViewModel {
         items.append(ScanItem(id: equipment.id, kind: kind, name: name, anchor: anchor))
         history.append(.item(equipment.id))
         draftSetup.nodes.append(equipment)
-        // A light is measured at the middle of its head; a camera keeps the top-point rule for now.
-        if kind == .light { measurements.setRule(.middle, for: equipment.id) }
+        // A light and a camera are measured at the middle of their head (27 Nov: the camera matches the light).
+        if kind == .light || kind == .camera { measurements.setRule(.middle, for: equipment.id) }
     }
 
     /// The light whose grown box holds `point`, if any.
@@ -287,8 +282,9 @@ final class ScanViewModel {
 
     // MARK: Painting
 
-    /// Takes one frame: collects the column of the subject and of every item that is in view (A10-121) and refreshes
-    /// the live results. An item out of view keeps everything it has. Internal so tests can call it.
+    /// Takes one frame: picks out the subject and every item that is in view (A10-121, `DepthGrouping.itemPoints`)
+    /// and refreshes their outlines and the live results. An item out of view keeps everything it has. Internal so
+    /// tests can call it.
     /// - Returns: the ids (the subject's too) whose LiDAR was sampled in this frame. Empty when the frame has no depth
     ///   or there is no floor.
     @discardableResult
@@ -299,44 +295,31 @@ final class ScanViewModel {
         if updateFloor(from: frame) { advance() }
         stopPlaneSearchIfDue(at: frame.timestamp)
         guard let depth = frame.depth, let floorY else { return [] }
-        let heights = (floorY + Self.columnFloorGap)...(floorY + Self.columnHeight)
-        /// What one paint of a column did: `painted` points in this frame (for the walk-around, `see`) and `fresh`
-        /// new ones kept (for the box). Nil when the column is out of view and nothing was sampled (A10-121).
-        func paint(around anchor: SIMD3<Float>, for id: UUID) -> (painted: Int, fresh: Int)? {
-            guard Self.isInView(anchor, floorY: floorY, camera: frame.camera) else { return nil }
-            let points = DepthSampler.columnPoints(around: [anchor], radius: Self.columnRadius, betweenY: heights,
-                                                   depth: depth, camera: frame.camera)
-            let fresh = measurements.add(points: points, to: id, camera: frame.camera)
-            return (points.count, fresh)
+        /// One frame of an item (27 Nov): its dots join its points, or nil when the frame tells nothing about it
+        /// (out of view, or something stands in front of it).
+        /// - Returns: how many dots it had in this frame, for the walk-around (`see`).
+        func sample(_ kind: ItemKind, at anchor: SIMD3<Float>, for id: UUID) -> Int? {
+            // A light was always painted only from a tapped spot in the picture; the others skip a column out of view.
+            if kind != .light, !Self.isInView(anchor, floorY: floorY, camera: frame.camera) { return nil }
+            guard let points = DepthGrouping.itemPoints(kind, anchor: anchor, depth: depth, camera: frame.camera,
+                                                        floorY: floorY) else { return nil }
+            measurements.addFrame(points, to: id, kind: kind, camera: frame.camera)
+            return points.count
         }
         var sampled: Set<UUID> = []
-        if let subject, let result = paint(around: subject, for: subjectID) {
+        if let subject, let count = sample(.subject, at: subject, for: subjectID) {
             sampled.insert(subjectID)
-            see(subjectID, at: subject, pointCount: result.painted, camera: frame.camera)
-            if result.fresh > 0 {
-                subjectBounds = measurements.bounds(for: subjectID).map { WorldBox(min: $0.min, max: $0.max) }
-            }
+            see(subjectID, at: subject, pointCount: count, camera: frame.camera)
+            // The outline follows the newest frames, so it is read after every one (`ScanMeasurements.outline`).
+            subjectBounds = measurements.outline(for: subjectID)
         }
         for item in items {
-            let painted: Int
-            if item.kind == .light {
-                // A10-106: a light is the surface painted from its tap; its outline is its grown box. The grown box
-                // can change with no new point (a new small box, the oldest one dropped), so it is read again after
-                // every paint; it is a cheap union of at most 30 boxes.
-                guard let count = paintSurface(of: item, depth: depth, camera: frame.camera, floorY: floorY) else {
-                    continue
-                }
-                painted = count
-                itemBounds[item.id] = measurements.bigBox(for: item.id)
-            } else {
-                guard let result = paint(around: item.anchor, for: item.id) else { continue }
-                painted = result.painted
-                if result.fresh > 0 {
-                    itemBounds[item.id] = measurements.bounds(for: item.id).map { WorldBox(min: $0.min, max: $0.max) }
-                }
+            guard let count = sample(item.kind == .light ? .light : .camera, at: item.anchor, for: item.id) else {
+                continue
             }
             sampled.insert(item.id)
-            see(item.id, at: item.anchor, pointCount: painted, camera: frame.camera)
+            see(item.id, at: item.anchor, pointCount: count, camera: frame.camera)
+            itemBounds[item.id] = measurements.outline(for: item.id)
         }
         refreshResults()
         updateDone()
@@ -352,8 +335,7 @@ final class ScanViewModel {
 
     /// Says "… done" once when the subject or an item turns done, and moves the next tap on to what is still missing.
     private func updateDone() {
-        var done = Set(items.filter(isDone).map(\.id))
-        if subjectIsDone { done.insert(subjectID) }
+        let done = doneItemIDs
         let newlyDone = done.subtracting(doneIDs)
         doneIDs = done
         guard !newlyDone.isEmpty else { return }
@@ -363,16 +345,6 @@ final class ScanViewModel {
             justDone = .item(item.name)
         }
         advance()
-    }
-
-    /// One frame of a light: the paint bucket from its tapped point, where the point is in this frame's picture.
-    /// - Returns: how many points it painted, or nil when the tapped point is not in the picture (nothing painted).
-    private func paintSurface(of item: ScanItem, depth: DepthFrame, camera: CameraModel, floorY: Float) -> Int? {
-        guard let pixel = DepthSampler.project(item.anchor, camera: camera) else { return nil }
-        let points = DepthGrouping.surface(fromNormalized: pixel / camera.imageResolution, depth: depth, camera: camera,
-                                           floorY: floorY)
-        measurements.addSurface(points: points, to: item.id, camera: camera)
-        return points.count
     }
 
     /// The live results, and the values written onto the draft equipment as soon as they exist, so what a tag says

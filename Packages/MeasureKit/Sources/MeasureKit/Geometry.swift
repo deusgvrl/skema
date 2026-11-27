@@ -201,7 +201,7 @@ public enum Geometry {
     /// The wide part of a light's points, without its stand: cut the points into layers of `middleLayer`, measure each
     /// layer's horizontal width, and keep the layers around the widest one that are at least `middleMinWidthShare` as
     /// wide. Every point when no layer has a width or the head would have fewer than `middleMinHeadPoints` points.
-    private static func headPoints(of points: [SIMD3<Float>], lowest: Float) -> [SIMD3<Float>] {
+    static func headPoints(of points: [SIMD3<Float>], lowest: Float) -> [SIMD3<Float>] {
         var layers: [Int: [SIMD3<Float>]] = [:]
         for point in points {
             layers[Int(((point.y - lowest) / middleLayer).rounded(.down)), default: []].append(point)

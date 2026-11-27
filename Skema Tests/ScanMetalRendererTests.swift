@@ -96,6 +96,19 @@ struct ScanMetalRendererTests {
                 "Most common line value \(result.commonGreen), one layer \(oneLayer). Histogram: \(result.histogram)")
     }
 
+    @Test("A box still being scanned is drawn white; once its item is done, green (#30D158)", arguments: [false, true])
+    func outlineColourFollowsDone(isDone: Bool) throws {
+        let result = try renderOutline(sceneDepth: 3.0, isDone: isDone)
+
+        // One layer at OutlineLayout.opacity over black: white gives about 178 in red and green; the green gives
+        // about 34 in red and 146 in green.
+        let colour: (red: Float, green: Float) = isDone ? (0.188, Self.lineGreen) : (1, 1)
+        let red = Int((colour.red * OutlineLayout.opacity * 255).rounded())
+        let green = Int((colour.green * OutlineLayout.opacity * 255).rounded())
+        #expect(abs(result.commonRed - red) <= 12, "Most common red \(result.commonRed), expected \(red)")
+        #expect(abs(result.commonGreen - green) <= 12, "Most common green \(result.commonGreen), expected \(green)")
+    }
+
     @Test("O6: a box off the screen is not drawn and loses its GPU buffers")
     func anOffScreenBoxIsNotDrawnAndLosesItsBuffers() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
@@ -156,17 +169,23 @@ struct ScanMetalRendererTests {
         let linePixels: Int
         /// The most common non-black green value.
         let commonGreen: Int
+        /// The most common red value of the pixels that have some green.
+        let commonRed: Int
         let histogram: String
         /// Every byte of the target, to compare two renders exactly.
         let pixels: [UInt8]
     }
 
     /// The render described at `linePixelCount`, with its line pixel count and its green values.
-    /// `onRenderThread`: the encode call runs on a `RenderThread` (the test waits for it).
-    private func renderOutline(sceneDepth: Float, onRenderThread: Bool = false) throws -> OutlineRender {
+    /// `onRenderThread`: the encode call runs on a `RenderThread` (the test waits for it). `isDone`: the box's item is
+    /// done, so it is drawn green; else white.
+    private func renderOutline(sceneDepth: Float, onRenderThread: Bool = false,
+                               isDone: Bool = true) throws -> OutlineRender {
         let device = try #require(MTLCreateSystemDefaultDevice())
         let renderer = try #require(ScanMetalRenderer(device: device, session: ARSession()))
-        renderer.outlines = [UUID(): WorldBox(min: SIMD3(-0.2, -0.2, -2.2), max: SIMD3(0.2, 0.2, -1.8))]
+        let id = UUID()
+        renderer.outlines = [id: WorldBox(min: SIMD3(-0.2, -0.2, -2.2), max: SIMD3(0.2, 0.2, -1.8))]
+        renderer.doneOutlines = isDone ? [id] : []
         let queue = try #require(device.makeCommandQueue())
         let width = 64, height = 128
         let depthBytes = withUnsafeBytes(of: sceneDepth) { Array($0) }
@@ -206,7 +225,10 @@ struct ScanMetalRendererTests {
         var counts: [Int: Int] = [:]
         for index in starts where pixels[index + 1] > 0 { counts[Int(pixels[index + 1]), default: 0] += 1 }
         let top = counts.sorted { $0.value > $1.value }.prefix(6)
+        var reds: [Int: Int] = [:]
+        for index in starts where pixels[index + 1] > 0 { reds[Int(pixels[index + 2]), default: 0] += 1 }
         return OutlineRender(linePixels: line, commonGreen: top.first?.key ?? 0,
+                             commonRed: reds.max { $0.value < $1.value }?.key ?? 0,
                              histogram: top.map { "\($0.key): \($0.value)" }.joined(separator: ", "),
                              pixels: Array(pixels))
     }

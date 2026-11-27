@@ -134,27 +134,44 @@ struct GrownBoxTests {
         #expect(measurements.bigBox(for: enough) != nil)
     }
 
-    @Test("Case 7: with 31 small boxes, the big box is the union of the newest 30")
-    func bigBoxKeepsTheNewestThirty() throws {
+    // 27 Nov: the big box is no longer the union of the newest 30 frames' boxes, which one bad frame could stretch
+    // for 30 frames. It is the box of all the light's points, a frame far bigger than the usual ones is left out, and
+    // the outline only uses the spots seen in the newest 30 frames.
+
+    @Test("Case 7: one frame far bigger than the usual ones (a leak) is left out of the box")
+    func bigFrameIsLeftOut() throws {
         var measurements = ScanMeasurements()
         let light = UUID()
-        // The first box reaches 50 cm to the left; the 29 after it reach only 10 cm to the left, and the second
-        // reaches 30 cm higher, so the union is more than the newest box alone.
-        measurements.addSurface(points: dots(x: -50...40, y: 0...50, z: -250 ... -200), to: light, camera: makeCamera())
-        for index in 1..<30 {
-            let top: Float = index == 1 ? 80 : 50
-            measurements.addSurface(points: dots(x: -10...40, y: 0...top, z: -250 ... -200), to: light,
-                                    camera: makeCamera())
+        for _ in 0..<6 {
+            measurements.addFrame(dots(x: -10...40, y: 0...50, z: -250 ... -200), to: light, kind: .light,
+                                  camera: makeCamera())
         }
-        let thirty = try #require(measurements.bigBox(for: light))
-        #expect(near(thirty.min.x, cm(-50)))
-        #expect(near(thirty.max.y, cm(80)))
+        // This frame reaches 1.5 m to the left: more than twice the usual 50 cm.
+        let added = measurements.addFrame(dots(x: -150...40, y: 0...50, z: -250 ... -200), to: light, kind: .light,
+                                          camera: makeCamera())
 
-        measurements.addSurface(points: dots(x: -10...40, y: 0...50, z: -250 ... -200), to: light, camera: makeCamera())
+        #expect(!added)
+        let box = try #require(measurements.bigBox(for: light))
+        #expect(near(box.min.x, cm(-10), cm(3)) && near(box.max.x, cm(40), cm(3)))
+    }
 
-        let thirtyOne = try #require(measurements.bigBox(for: light))
-        #expect(near(thirtyOne.min.x, cm(-10)))
-        #expect(near(thirtyOne.max.y, cm(80)))
+    @Test("Case 7b: the outline lets go of spots not seen in the newest 30 frames; the big box keeps them")
+    func outlineFollowsTheNewestFrames() throws {
+        var measurements = ScanMeasurements()
+        let light = UUID()
+        for _ in 0..<5 {
+            measurements.addFrame(dots(x: -10...40, y: 0...50, z: -250 ... -200), to: light, kind: .light,
+                                  camera: makeCamera())
+        }
+        // The item now shows 30 cm further right (ARKit's world moved) for the next 30 frames.
+        for _ in 0..<30 {
+            measurements.addFrame(dots(x: 20...70, y: 0...50, z: -250 ... -200), to: light, kind: .light,
+                                  camera: makeCamera())
+        }
+
+        let outline = try #require(measurements.outline(for: light))
+        #expect(near(outline.min.x, cm(20), cm(3)), "Outline: \(outline)")
+        #expect(near(try #require(measurements.bigBox(for: light)).min.x, cm(-10), cm(3)))
     }
 }
 

@@ -36,7 +36,8 @@ struct BigBoxResultsTests {
         // 8 m in front of the camera: the box is made, but every point is beyond DepthSampler.maxRange.
         measurements.addSurface(points: grid(200, z: -800), to: light, camera: makeCamera())
 
-        #expect(measurements.bigBox(for: light) != nil)
+        // No point is kept, so there is no box to measure from (27 Nov: the box comes from kept points only).
+        #expect(measurements.bigBox(for: light) == nil)
         #expect(try #require(measurements.results(subject: subject, floorY: 0)[light]).status == .outOfRange)
     }
 
@@ -49,10 +50,8 @@ struct BigBoxResultsTests {
                 stride(from: Float(110), through: 170, by: 2).map { y in SIMD3(cm(x), cm(y), cm(z)) }
             }
         }
-        // The stand: a thin column under the head, 0–108 cm high, added as points only (it makes no box).
-        let stand = stride(from: Float(0.5), through: 108, by: 1).flatMap { y in
-            [Float(199.5), 200.5].map { x in SIMD3(cm(x), cm(y), cm(0.5)) }
-        }
+        // The stand under the head is not added: picking out a light keeps only its head (27 Nov,
+        // `DepthGrouping.itemPoints`), so the box is the head's.
         // A 20 x 20 cm subject block, 50 cm high, standing at (0, 0).
         let block = stride(from: Float(-10), through: 10, by: 2).flatMap { dx in
             stride(from: Float(-10), through: 10, by: 2).flatMap { dz in
@@ -61,7 +60,6 @@ struct BigBoxResultsTests {
         }
         measurements.add(points: block, to: subject, camera: makeCamera())
         measurements.addSurface(points: head, to: light, camera: makeCamera())
-        measurements.add(points: stand, to: light, camera: makeCamera())
 
         let result = try #require(measurements.results(subject: subject, floorY: 0)[light])
 
