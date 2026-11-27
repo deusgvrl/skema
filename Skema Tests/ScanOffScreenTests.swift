@@ -112,17 +112,21 @@ struct ScanOffScreenTests {
         #expect(sampled.contains(camera.id))
     }
 
-    @Test("O3: a tall item whose tapped point is below the picture is still sampled")
-    func aTallItemWhoseTapIsBelowThePictureIsSampled() throws {
+    @Test("O3: an item whose tapped point is out of the picture is skipped and keeps what it has")
+    func anItemWhoseTapIsOutOfThePictureIsSkipped() throws {
         let viewModel = try scanWithCamera()
         let camera = try item(.camera, in: viewModel)
+        let before = camera.result
         // The phone looks up 60 degrees: the tap (height 0) is below the picture, the top of the 3 m tube is in it.
+        // 27 Nov: an item is picked out from its tapped spot (`DepthGrouping.itemPoints`), so with the spot out of the
+        // picture the frame says nothing about it (it was sampled from the rest of its column before).
         let frame = try turnedFrame(at: 2, pitch: .pi / 3)
         try #require(DepthSampler.project(camera.anchor, camera: frame.camera) == nil)
 
         let sampled = viewModel.collect(from: frame)
 
-        #expect(sampled.contains(camera.id))
+        #expect(!sampled.contains(camera.id))
+        #expect(try item(.camera, in: viewModel).result == before)
     }
 
     @Test("O4: items out of view keep their results, their boxes and Finish")
@@ -149,16 +153,15 @@ struct ScanOffScreenTests {
         #expect(viewModel.canFinish)
     }
 
-    @Test("O4-light (review fix): a painted light's outline follows its grown box, also with no new points")
-    func aLightsOutlineFollowsItsGrownBox() throws {
-        // The tap frame paints the wall from x = -1.92 to 1.92 m. Frames from 1 m to the right paint -0.92 to 2.92 m:
-        // the first one adds new points, the rest add none, but each adds a small box. After 30 of them the tap
-        // frame's box is the oldest of 31 and drops out (`ScanMeasurements.maxKeptBoxes`), so the grown box loses
-        // its left part.
+    @Test("O4-light (review fix): a painted light's outline follows the newest frames, also with no new points")
+    func aLightsOutlineFollowsTheNewestFrames() throws {
+        // The tap frame paints the wall to the left of x = -1 m. Frames from 1 m to the right paint from -0.92 m:
+        // the first one adds new points, the rest add none. After 30 of them the tap frame is older than the newest
+        // 30 (`EquipmentPoints.recentWindow`, 27 Nov), so the outline loses its left part.
         let viewModel = try scanWithCameraAndLight()
         let light = try item(.light, in: viewModel)
 
-        for frame in 0..<ScanMeasurements.maxKeptBoxes {
+        for frame in 0..<EquipmentPoints.recentWindow {
             viewModel.collect(from: try measuringFrame(at: 2 + Double(frame) * 0.2, metres: 2, planes: planes,
                                                        cameraX: 1))
         }

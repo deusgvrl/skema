@@ -71,12 +71,12 @@ struct ScanGrownBoxTests {
         #expect(try #require(width(of: viewModel.itemBounds[light.id])) > 1)
     }
 
-    @Test("Case 16: a camera keeps the 10 cm column")
-    func cameraKeepsTheColumn() throws {
+    @Test("Case 16: a camera's box stays within its reach of the tapped spot (0.6 m), even on a flat wall")
+    func cameraStaysWithinItsReach() throws {
         let viewModel = try scanWithCamera()
 
         let camera = try #require(viewModel.items.first { $0.kind == .camera })
-        #expect(try #require(width(of: viewModel.itemBounds[camera.id])) <= 0.2 + 1e-4)
+        #expect(try #require(width(of: viewModel.itemBounds[camera.id])) <= 2 * DepthGrouping.reach(.camera) + 1e-4)
     }
 
     @Test("Case 12: a light tap inside Light 1's big box makes no new item and says Light 1 already added")

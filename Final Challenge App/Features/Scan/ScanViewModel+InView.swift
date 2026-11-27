@@ -12,8 +12,9 @@ extension ScanViewModel {
     /// The painted column of an item as a world box: 10 cm around the tapped axis, from 3 cm above the floor up to
     /// 3 m above it. The whole tube counts, not only the tapped point.
     static func columnBox(around anchor: SIMD3<Float>, floorY: Float) -> WorldBox {
-        WorldBox(min: SIMD3(anchor.x - columnRadius, floorY + columnFloorGap, anchor.z - columnRadius),
-                 max: SIMD3(anchor.x + columnRadius, floorY + columnHeight, anchor.z + columnRadius))
+        let radius = DepthGrouping.columnRadius
+        return WorldBox(min: SIMD3(anchor.x - radius, floorY + DepthGrouping.columnFloorGap, anchor.z - radius),
+                        max: SIMD3(anchor.x + radius, floorY + DepthGrouping.columnHeight, anchor.z + radius))
     }
 
     /// True when the column around `anchor` can be in `camera`'s picture (`FieldOfView.contains`).

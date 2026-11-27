@@ -178,10 +178,13 @@ struct ScanTapTests {
         let light = try #require(viewModel.draftSetup.nodes.first)
         let height = try #require(Double(light.height.replacingOccurrences(of: " m", with: "")))
         #expect(light.distance == "1.01")
-        // A10-106: a light is measured at the middle height of its grown box: here the wall painted from 3 cm above
-        // the floor up to the top of the picture at 2 m, so its middle is 1.24 m above the floor.
-        #expect(abs(height - 1.24) < 0.05)
-        #expect(abs(light.position.x) < 2 && abs(light.position.y - 100) < 2)
+        // A10-106: a light is measured at the middle height of its box. 27 Nov: here the wall is painted within
+        // 1.5 m of the tap (1.01 m above the floor), and only its head counts: the layers at least half as wide as
+        // the widest, up to 1.3 m above the tap. So the box runs from 3 cm above the floor to 2.31 m: middle 1.17 m.
+        #expect(abs(height - 1.17) < 0.05)
+        // 27 Nov: each item is painted within its reach around its tapped spot, and the spots sit up to 1.5 cm off
+        // the middle (the depth grid), so on these endless walls the plan position can be 3 cm off to the side.
+        #expect(abs(light.position.x) < 4 && abs(light.position.y - 100) < 2)
     }
 
     @Test("Finish writes the subject's height above the floor onto the setup")

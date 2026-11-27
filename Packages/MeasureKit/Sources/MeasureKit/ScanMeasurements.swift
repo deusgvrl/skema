@@ -12,14 +12,30 @@ public struct EquipmentPoints: Sendable {
     /// The side of a cell (metres): the points keep at most one per cell.
     public static let cellSize: Float = 0.01
 
-    /// The 1 cm cells that already hold a point, so the same spot seen in many frames is stored once.
-    private var voxels: Set<SIMD3<Int32>> = []
+    /// The 1 cm cells that already hold a point, so the same spot seen in many frames is stored once: each cell's
+    /// place in `points`.
+    private var voxels: [SIMD3<Int32>: Int] = [:]
+    /// For each point, the last frame that saw its cell.
+    private var lastSeen: [Int] = []
+    /// How many frames added a point closer than `DepthSampler.maxRange`.
+    public private(set) var frames = 0
+
+    /// The outline uses the spots seen in the newest this many frames, so old spots fade (27 Nov).
+    public static let recentWindow = 30
 
     public init() {}
+
+    /// The points seen in the newest `recentWindow` frames: what the outline is drawn around, so it follows the item
+    /// and lets go of old spots, such as the copies ARKit's drift corrections leave behind.
+    public var recentPoints: [SIMD3<Float>] {
+        points.indices.filter { frames - lastSeen[$0] < Self.recentWindow }.map { points[$0] }
+    }
 
     /// Adds world points of the equipment (a painted column, `DepthSampler.columnPoints`). A point farther than
     /// `DepthSampler.maxRange` from `camera` is dropped, a cell that already has a point is skipped, and only far points
     /// (and none near) make the item `outOfRange`.
+    ///
+    /// Each call that keeps a near point is one frame; every cell it sees remembers it (`recentPoints`).
     ///
     /// Returns true when the points changed: a new cell got a point, or `sawPointsBeyondRange` turned on.
     @discardableResult
@@ -29,16 +45,23 @@ public struct EquipmentPoints: Sendable {
         let toCamera = camera.cameraToWorld.inverse
         let near = newPoints.filter { -(toCamera * SIMD4<Float>($0, 1)).z <= DepthSampler.maxRange }
         if near.isEmpty, !newPoints.isEmpty { sawPointsBeyondRange = true }
+        if !near.isEmpty { frames += 1 }
         insert(near)
         return points.count != countBefore || sawPointsBeyondRange != sawBeyondBefore
     }
 
-    /// Keeps each point whose 1 cm cell has no point yet.
+    /// Keeps each point whose 1 cm cell has no point yet, and marks every cell it sees as seen in this frame.
     private mutating func insert(_ newPoints: [SIMD3<Float>]) {
         for point in newPoints {
             // The cell is the point's position divided by the cell size, rounded down.
             let cell = SIMD3<Int32>((point / Self.cellSize).rounded(.down), rounding: .towardZero)
-            if voxels.insert(cell).inserted { points.append(point) }
+            if let index = voxels[cell] {
+                lastSeen[index] = frames
+            } else {
+                voxels[cell] = points.count
+                points.append(point)
+                lastSeen.append(frames)
+            }
         }
     }
 
@@ -68,8 +91,12 @@ public struct EquipmentPoints: Sendable {
 public struct ScanMeasurements: Sendable {
     private var equipment: [UUID: EquipmentPoints] = [:]
     private var rules: [UUID: CentreRule] = [:]
-    /// The small boxes of equipment collected with `addSurface`, newest last.
-    private var boxes: [UUID: [WorldBox]] = [:]
+    /// Equipment measured from its box (`bigBox`), not from its points: a light, once a frame painted enough of it.
+    private var boxMeasured: Set<UUID> = []
+    /// Each box-measured item's box, worked out again when its points change.
+    private var measuredBoxes: [UUID: WorldBox] = [:]
+    /// The sizes of each item's newest frames (`maxFrameSizes`), for the bad-frame check in `addFrame`.
+    private var frameSizes: [UUID: [SIMD3<Float>]] = [:]
     /// The centres of each item as `cachedResults` last worked them out. An item leaves it when it changes.
     private var cachedCentres: [UUID: EquipmentCentres] = [:]
     /// The subject the cached centres were worked out for (the subject decides how its own centres are found).
@@ -87,6 +114,7 @@ public struct ScanMeasurements: Sendable {
         let countBefore = equipment[id]?.points.count ?? 0
         if equipment[id, default: EquipmentPoints()].add(points: points, camera: camera) {
             cachedCentres[id] = nil
+            if boxMeasured.contains(id) { measuredBoxes[id] = equipment[id].flatMap { WorldBox.around($0.points, trim: WorldBox.itemTrim) } }
         }
         return (equipment[id]?.points.count ?? 0) - countBefore
     }
@@ -95,41 +123,70 @@ public struct ScanMeasurements: Sendable {
     public mutating func remove(_ id: UUID) {
         equipment[id] = nil
         rules[id] = nil
-        boxes[id] = nil
+        boxMeasured.remove(id)
+        measuredBoxes[id] = nil
+        frameSizes[id] = nil
         cachedCentres[id] = nil
     }
 
-    /// The smallest box (world, axis-aligned) holding every point kept for the equipment `id`; nil before any.
-    /// The scan screen draws its outline around the tapped item.
-    public func bounds(for id: UUID) -> (min: SIMD3<Float>, max: SIMD3<Float>)? {
-        guard let points = equipment[id]?.points, let first = points.first else { return nil }
-        return points.dropFirst().reduce((min: first, max: first)) { box, point in
-            (min: simd_min(box.min, point), max: simd_max(box.max, point))
+    /// A frame is ignored when its box is more than this many times the usual size (the median of the item's
+    /// newest `maxFrameSizes` frames) on any side, plus `frameSizeSlack`: a leak or a glitchy depth frame.
+    public static let maxFrameGrowth: Float = 2
+    public static let frameSizeSlack: Float = 0.02
+    public static let maxFrameSizes = 15
+    /// The check starts once this many frames are known.
+    public static let minFrameSizes = 5
+
+    /// Adds one frame's dots of the equipment `id` (`DepthGrouping.itemPoints`): a light's as `addSurface`, the
+    /// subject's and a camera's as `add(points:to:camera:)`. A frame far bigger than the item's usual frames
+    /// (`maxFrameGrowth`) is ignored. Returns true when what the item is measured from changed.
+    @discardableResult
+    public mutating func addFrame(_ points: [SIMD3<Float>], to id: UUID, kind: ItemKind, camera: CameraModel) -> Bool {
+        if let box = WorldBox.around(points) {
+            let size = box.max - box.min
+            let known = frameSizes[id, default: []]
+            if known.count >= Self.minFrameSizes {
+                let usual = SIMD3((0..<3).map { axis in known.map { $0[axis] }.sorted()[known.count / 2] })
+                guard all(size .<= usual * Self.maxFrameGrowth + Self.frameSizeSlack) else { return false }
+            }
+            frameSizes[id] = Array((known + [size]).suffix(Self.maxFrameSizes))
         }
+        if kind == .light {
+            return addSurface(points: points, to: id, camera: camera)
+        }
+        return add(points: points, to: id, camera: camera) > 0 || cachedCentres[id] == nil
     }
 
-    /// A small box needs at least this many points of one frame (A10-106, Amadeus: 20, as the A10-90 sightings).
+    /// The box the scan screen draws around the equipment `id`: around the spots seen in the newest frames
+    /// (`EquipmentPoints.recentPoints`), with the strays at each end trimmed (`WorldBox.around`). It follows the item
+    /// and can shrink again. Nil before any frame.
+    public func outline(for id: UUID) -> WorldBox? {
+        equipment[id].flatMap { WorldBox.around($0.recentPoints, trim: WorldBox.itemTrim) }
+    }
+
+    /// A light is measured from its box once a frame painted at least this many of its dots (A10-106, Amadeus: 20,
+    /// as the A10-90 sightings).
     public static let minSurfacePoints = 20
-    /// The big box is the union of this many newest small boxes (A10-90 rule E, 30).
-    public static let maxKeptBoxes = 30
 
-    /// A10-106 cases 6–7: one frame's painted surface of the equipment `id` (`DepthGrouping.surface`). Its points join
-    /// the equipment's points as `add(points:to:camera:)` does, and with `minSurfacePoints` or more they make a small
-    /// box; the newest `maxKeptBoxes` are kept.
-    public mutating func addSurface(points: [SIMD3<Float>], to id: UUID, camera: CameraModel) {
-        add(points: points, to: id, camera: camera)
-        guard points.count >= Self.minSurfacePoints, let box = WorldBox.around(points) else { return }
-        var kept = boxes[id, default: []]
-        kept.append(box)
-        boxes[id] = Array(kept.suffix(Self.maxKeptBoxes))
-        // A new small box changes how the item is measured, even when none of its points was new.
+    /// A10-106 cases 6–7: one frame's painted surface of the equipment `id` (`DepthGrouping.itemPoints`). Its points
+    /// join the equipment's points as `add(points:to:camera:)` does; with `minSurfacePoints` or more the equipment is
+    /// measured from its box (`bigBox`), worked out here. Returns true when what it is measured from changed.
+    @discardableResult
+    public mutating func addSurface(points: [SIMD3<Float>], to id: UUID, camera: CameraModel) -> Bool {
+        let countBefore = equipment[id]?.points.count ?? 0
+        let changed = equipment[id, default: EquipmentPoints()].add(points: points, camera: camera)
+        let firstBox = points.count >= Self.minSurfacePoints && boxMeasured.insert(id).inserted
+        guard changed || firstBox else { return (equipment[id]?.points.count ?? 0) != countBefore }
         cachedCentres[id] = nil
+        if boxMeasured.contains(id) { measuredBoxes[id] = equipment[id].flatMap { WorldBox.around($0.points, trim: WorldBox.itemTrim) } }
+        return true
     }
 
-    /// The grown box of the equipment `id`: the union of its kept small boxes. Nil before its first small box.
+    /// The box the equipment `id` is measured from: around all its points, with the strays at each end trimmed
+    /// (`WorldBox.around`). Nil before it is measured from a box (27 Nov: was the union of the newest 30 frames'
+    /// boxes, which one bad frame could stretch; a bad frame is now left out by `addFrame`).
     public func bigBox(for id: UUID) -> WorldBox? {
-        guard let kept = boxes[id], let first = kept.first else { return nil }
-        return kept.dropFirst().reduce(first) { $0.union($1) }
+        measuredBoxes[id]
     }
 
     /// How the top centre of the equipment `id` is found (default: `.topPoint`). A light uses `.middle`.
@@ -138,11 +195,16 @@ public struct ScanMeasurements: Sendable {
         cachedCentres[id] = nil
     }
 
+    /// The centres of the equipment `id` when `subject` is the subject; nil when it has no points. Tests read it.
+    func centres(for id: UUID, subject: UUID) -> EquipmentCentres? {
+        equipment[id].map { centres(of: id, points: $0, subject: subject) }
+    }
+
     /// The centres of the equipment `id`, or the reason there are none (see `EquipmentPoints.scanResult`).
     private func centres(of id: UUID, points: EquipmentPoints, subject: UUID) -> EquipmentCentres {
         // A10-106 commit 7: an item with a big box is measured from the box (`results`), so the centres of its
         // points would be thrown away; only its status is worked out.
-        if boxes[id]?.isEmpty == false {
+        if boxMeasured.contains(id) {
             return EquipmentCentres(status: points.status, baseCentre: nil, topCentre: nil)
         }
         return points.scanResult(isSubject: id == subject, rule: rules[id] ?? .topPoint)
