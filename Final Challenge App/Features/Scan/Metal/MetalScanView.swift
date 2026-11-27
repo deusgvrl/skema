@@ -22,6 +22,8 @@ struct MetalScanView: UIViewRepresentable {
     let session: ARSession
     /// The world box of each tapped item, drawn as a 3D dashed box.
     var outlines: [UUID: WorldBox] = [:]
+    /// The ids in `outlines` whose item is done: drawn green, the others white.
+    var done: Set<UUID> = []
     /// Apple's coaching screen showed (true) or went away (false): the scan's own instruction steps aside meanwhile.
     var onCoachingChange: (Bool) -> Void = { _ in }
 
@@ -42,7 +44,7 @@ struct MetalScanView: UIViewRepresentable {
     func updateUIView(_ view: UIView, context: Context) {
         context.coordinator.onCoachingChange = onCoachingChange
         // The render thread reads them at the start of its next frame.
-        (view as? ScanMetalLayerView)?.inbox.setOutlines(outlines)
+        (view as? ScanMetalLayerView)?.inbox.setOutlines(outlines, done: done)
     }
 
     /// The view the renderer draws into, or nil when there is no Metal device or the renderer cannot be made. The

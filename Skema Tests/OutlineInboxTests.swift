@@ -16,19 +16,22 @@ import Testing
 
 @Suite("Outline inbox")
 struct OutlineInboxTests {
-    @Test("R10: the render side reads the newest outlines and the newest view size")
+    @Test("R10: the render side reads the newest outlines, which of them are done, and the newest view size")
     func readsTheNewestValues() {
         let inbox = OutlineInbox()
         let older = [UUID(): WorldBox(min: SIMD3(0, 0, 0), max: SIMD3(1, 1, 1))]
         let newer = [UUID(): WorldBox(min: SIMD3(2, 2, 2), max: SIMD3(3, 3, 3))]
 
-        inbox.setOutlines(older)
+        let done: Set<UUID> = [newer.keys.first!]
+
+        inbox.setOutlines(older, done: [])
         inbox.setViewSize(CGSize(width: 390, height: 844))
-        inbox.setOutlines(newer)
+        inbox.setOutlines(newer, done: done)
         inbox.setViewSize(CGSize(width: 844, height: 390))
         let seen = inbox.snapshot()
 
         #expect(seen.outlines == newer)
+        #expect(seen.done == done)
         #expect(seen.viewSize == CGSize(width: 844, height: 390))
     }
 
@@ -37,6 +40,7 @@ struct OutlineInboxTests {
         let seen = OutlineInbox().snapshot()
 
         #expect(seen.outlines.isEmpty)
+        #expect(seen.done.isEmpty)
         #expect(seen.viewSize == .zero)
     }
 }

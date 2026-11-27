@@ -20,6 +20,13 @@ extension ScanViewModel {
         subjectIsSaved && viewSpreads[subjectID]?.isEnough == true
     }
 
+    /// The subject's and the items' ids that are done: their tags show a tick and their outlines turn green.
+    var doneItemIDs: Set<UUID> {
+        var done = Set(items.filter(isDone).map(\.id))
+        if subjectIsDone { done.insert(subjectID) }
+        return done
+    }
+
     /// How many items of `kind` are done.
     func doneCount(of kind: ScanTapKind) -> Int {
         items.count { $0.kind == kind && isDone($0) }

@@ -54,7 +54,7 @@ final class ScanViewModel {
     /// How far around each tapped item, and the subject (`subjectID`), the phone has seen it (phase 3: an item is done
     /// once seen from two spots 45° apart). `ScanViewModel+Progress.swift` reads it.
     private(set) var viewSpreads: [UUID: ViewSpread] = [:]
-    /// Each item's collected points, as a world box, for its green outline.
+    /// Each item's collected points, as a world box, for its outline (white while scanned, green when done).
     private(set) var itemBounds: [UUID: WorldBox] = [:]
     /// The subject's collected points, as a world box.
     private(set) var subjectBounds: WorldBox?
@@ -335,8 +335,7 @@ final class ScanViewModel {
 
     /// Says "… done" once when the subject or an item turns done, and moves the next tap on to what is still missing.
     private func updateDone() {
-        var done = Set(items.filter(isDone).map(\.id))
-        if subjectIsDone { done.insert(subjectID) }
+        let done = doneItemIDs
         let newlyDone = done.subtracting(doneIDs)
         doneIDs = done
         guard !newlyDone.isEmpty else { return }

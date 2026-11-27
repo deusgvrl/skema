@@ -120,6 +120,22 @@ struct ScanOneItemTests {
         #expect(viewModel.justDone == .item("Camera") && viewModel.currentStep == .light)
     }
 
+    @Test("Outlines: an item's box is white while it is scanned and turns green with its tag (doneItemIDs)")
+    func doneItemIDsFollowTheTags() throws {
+        let viewModel = makeViewModel()
+        try tap(viewModel, metres: 3)
+        #expect(viewModel.doneItemIDs.isEmpty)
+
+        try walk(viewModel, around: viewModel.subject, metres: 3)
+        #expect(viewModel.doneItemIDs == [viewModel.subjectID])
+
+        try tap(viewModel, at: leftOfMiddle)
+        let camera = try #require(viewModel.items.last)
+        #expect(viewModel.doneItemIDs == [viewModel.subjectID])
+        try walk(viewModel, around: camera.anchor)
+        #expect(viewModel.doneItemIDs == [viewModel.subjectID, camera.id])
+    }
+
     @Test("Hard gate: a tap on the next item while one is being scanned sets nothing and says which to finish")
     func gateBlocksTheNextTap() throws {
         let viewModel = try readyForLights()

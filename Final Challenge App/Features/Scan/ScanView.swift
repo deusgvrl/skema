@@ -129,7 +129,8 @@ struct ScanView: View {
 
     /// The camera: our own Metal view (A10-121). It draws the picture and the outlines.
     private func cameraView(session: ARSession) -> some View {
-        MetalScanView(session: session, outlines: viewModel.outlineBoxes, onCoachingChange: { coaching in
+        MetalScanView(session: session, outlines: viewModel.outlineBoxes, done: viewModel.doneItemIDs,
+                      onCoachingChange: { coaching in
             withAnimation { isCoaching = coaching }
         })
     }
