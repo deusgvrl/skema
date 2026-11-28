@@ -25,6 +25,7 @@ struct ReviewToolbarContent: ToolbarContent {
     let onClose: () -> Void
     let onDiscardSetup: () -> Void
     let onDismiss: () -> Void
+    let onResetSheetState: () -> Void
 
     var body: some ToolbarContent {
         ToolbarSpacer(placement: .bottomBar)
@@ -87,7 +88,8 @@ struct ReviewToolbarContent: ToolbarContent {
             titleVisibility: .visible
         ) {
             Button("Discard Changes", role: .destructive) {
-                viewModel.discardEdits(undoManager: undoManager)
+                onResetSheetState()   // new closure, or clear the bindings directly
+                withAnimation { viewModel.discardEdits(undoManager: undoManager) }
                 if !isFromScanScreen { onDismiss() }
             }
         }
@@ -117,9 +119,10 @@ struct ReviewToolbarContent: ToolbarContent {
 
     private var saveChangesButton: some View {
         Button("Save Changes", systemImage: "checkmark") {
-            selectedNodeId = nil
-            activeSheetContent = nil
-            viewModel.confirmEdits(undoManager: undoManager)
+            onResetSheetState()
+            withAnimation {
+                viewModel.confirmEdits(undoManager: undoManager)
+            }
             if !isFromScanScreen { onDismiss() }
         }
         .buttonStyle(.glassProminent)

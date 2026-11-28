@@ -15,7 +15,7 @@ final class Equipment {
        get { accessoryTypeRaw.flatMap(AccessoryType.init(rawValue:)) ?? .reflector }
        set { accessoryTypeRaw = newValue.rawValue }
     }
-    
+
     var label: String
     var name: String
     var role: String

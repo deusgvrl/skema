@@ -42,7 +42,7 @@ struct ReviewDiagramContentView: View {
                     scaleMeter = newValue
                 }
             )
-            .ignoresSafeArea()
+            .ignoresSafeArea(edges: viewModel.isEditingDiagram ? .all : .bottom)
 
             // Overlays respect the safe area, stacked vertically
             VStack(alignment: .leading, spacing: 4) {
