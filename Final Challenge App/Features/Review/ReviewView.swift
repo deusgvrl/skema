@@ -119,7 +119,8 @@ struct ReviewView: View {
                     viewModel.discardSetup()
                     dismissAll()
                 },
-                onDismiss: { dismiss() }
+                onDismiss: { dismiss() },
+                onResetSheetState: { resetSheetState() }
             )
         }
         .onAppear {
@@ -263,9 +264,10 @@ struct ReviewView: View {
         if viewModel.hasPendingEdits {
             showsDiscardChangesAlert = true
         } else {
-            selectedNodeId = nil
-            activeSheetContent = nil
-            viewModel.discardEdits(undoManager: undoManager)
+            resetSheetState()
+            withAnimation {
+                viewModel.discardEdits(undoManager: undoManager)
+            }
             if !isFromScanScreen { dismiss() }
         }
     }
